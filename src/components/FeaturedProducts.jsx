@@ -1,99 +1,183 @@
-const products = [
-  {
-    code: "C1",
-    category: "Camisas",
-    price: 65,
-    sizes: ["S", "M"],
-    colors: ["Marrón", "Negro", "Beige"],
-  },
+import { useState } from "react"
+import products from "../data/products"
+import { useCart } from "../CartContext"
 
-  {
-    code: "A1",
-    category: "Casacas",
-    price: 90,
-    sizes: ["S", "M"],
-    colors: ["Azul", "Negro"],
-  },
+function FeaturedProducts({ category }) {
+  const { addToCart } = useCart()
 
-  {
-    code: "C2",
-    category: "Camisas",
-    price: 65,
-    sizes: ["S", "M"],
-    colors: ["Azul", "Negro", "Blanco"],
-  },
+  const [selectedOptions, setSelectedOptions] = useState({})
 
-  {
-    code: "B1",
-    category: "Pantalones",
-    price: 99,
-    sizes: ["S", "M"],
-    colors: ["Beige", "Negro"],
-  },
-]
+  const updateOption = (productId, field, value) => {
+    setSelectedOptions((current) => ({
+      ...current,
+      [productId]: {
+        ...current[productId],
+        [field]: value,
+      },
+    }))
+  }
 
-function FeaturedProducts() {
+  const handleAddToCart = (product) => {
+    const options = selectedOptions[product.id] || {}
+
+    const size = options.size || product.sizes[0]
+    const color = options.color || product.colors[0]
+
+    addToCart({
+      ...product,
+      selectedSize: size,
+      selectedColor: color,
+    })
+  }
+
+  const filteredProducts = products.filter((product) => {
+    if (category === "todos") {
+      return true
+    }
+
+    if (category === "ofertas") {
+      return product.offer === true
+    }
+
+    return product.category === category
+  })
+
   return (
-    <section
-      id="productos"
-      className="mx-auto max-w-7xl px-6 py-16"
-    >
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-[#D4AF5A]">
-            Selección GMISH
+    <section className="mx-auto max-w-7xl px-4 py-12">
+
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold">
+          {category === "hombre" && "Hombre"}
+          {category === "mujer" && "Mujer"}
+          {category === "ofertas" && "Ofertas"}
+          {category === "todos" && "Productos destacados"}
+        </h2>
+
+        <p className="mt-2 text-gray-400">
+          {category === "ofertas"
+            ? "Encuentra nuestros productos con descuento."
+            : "Descubre algunos de nuestros favoritos."}
+        </p>
+      </div>
+
+      {filteredProducts.length === 0 ? (
+        <div className="rounded-2xl border border-[#302E28] bg-[#151714] p-10 text-center">
+          <p className="text-gray-400">
+            No hay productos disponibles en esta categoría todavía.
           </p>
-
-          <h2 className="mt-2 text-3xl font-bold text-white">
-            Destacados
-          </h2>
         </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
 
-        <button className="text-sm font-semibold text-[#E7E1D2] underline underline-offset-4 transition hover:text-[#D4AF5A]">
-          Ver todos
-        </button>
-      </div>
+          {filteredProducts.map((product) => {
+            const options = selectedOptions[product.id] || {}
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-        {products.map((product) => (
-          <article
-            key={product.code}
-            className="group"
-          >
-            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-[#302E28] bg-[#1B1D1A] transition duration-300 group-hover:border-[#D4AF5A]">
-              <span className="text-2xl font-semibold text-[#D4AF5A]">
-                {product.code}
-              </span>
-            </div>
+            return (
+              <article
+                key={product.id}
+                className="overflow-hidden rounded-2xl border border-[#302E28] bg-[#151714]"
+              >
 
-            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-[#D4AF5A]">
-              {product.category}
-            </p>
+                <div className="relative flex aspect-[4/5] items-center justify-center bg-[#22231F] text-gray-500">
 
-            <h3 className="mt-1 font-medium text-white">
-              Producto {product.code}
-            </h3>
+                  {product.offer && (
+                    <span className="absolute left-3 top-3 rounded-full bg-[#FF4D4D] px-3 py-1 text-xs font-bold text-white">
+                      OFERTA
+                    </span>
+                  )}
 
-            <p className="mt-2 font-semibold text-[#F0D58A]">
-              S/ {product.price}
-            </p>
+                  Foto del producto
 
-            <div className="mt-3">
-              <p className="text-xs text-[#E7E1D2]">
-                Tallas: {product.sizes.join(", ")}
-              </p>
+                </div>
 
-              <p className="mt-1 text-xs text-[#E7E1D2]">
-                Colores: {product.colors.join(", ")}
-              </p>
-            </div>
+                <div className="p-4">
 
-            <button className="mt-4 w-full rounded-full border border-[#D4AF5A] px-4 py-2 text-sm font-semibold text-[#D4AF5A] transition hover:bg-[#D4AF5A] hover:text-[#111210]">
-              Ver producto
-            </button>
-          </article>
-        ))}
-      </div>
+                  <h3 className="font-semibold">
+                    {product.name}
+                  </h3>
+
+                  <div className="mt-1 flex items-center gap-2">
+
+                    {product.oldPrice && (
+                      <span className="text-sm text-gray-500 line-through">
+                        S/ {product.oldPrice}
+                      </span>
+                    )}
+
+                    <span className="text-lg font-bold text-[#F0D58A]">
+                      S/ {product.price}
+                    </span>
+
+                  </div>
+
+                  <div className="mt-4">
+
+                    <p className="mb-2 text-sm text-gray-400">
+                      Talla
+                    </p>
+
+                    <div className="flex gap-2">
+                      {product.sizes.map((size) => (
+                        <button
+                          key={size}
+                          onClick={() =>
+                            updateOption(product.id, "size", size)
+                          }
+                          className={`rounded-full border px-4 py-2 text-sm transition ${
+                            (options.size || product.sizes[0]) === size
+                              ? "border-[#F0D58A] bg-[#F0D58A] text-black"
+                              : "border-[#302E28] text-white hover:border-[#F0D58A]"
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+
+                  </div>
+
+                  <div className="mt-4">
+
+                    <p className="mb-2 text-sm text-gray-400">
+                      Color
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {product.colors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() =>
+                            updateOption(product.id, "color", color)
+                          }
+                          className={`rounded-full border px-3 py-2 text-xs transition ${
+                            (options.color || product.colors[0]) === color
+                              ? "border-[#F0D58A] bg-[#F0D58A] text-black"
+                              : "border-[#302E28] text-white hover:border-[#F0D58A]"
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                    </div>
+
+                  </div>
+
+                  <button
+                    onClick={() => handleAddToCart(product)}
+                    className="mt-5 w-full rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#F0D58A]"
+                  >
+                    Agregar al carrito
+                  </button>
+
+                </div>
+
+              </article>
+            )
+          })}
+
+        </div>
+      )}
+
     </section>
   )
 }
