@@ -22,7 +22,9 @@ function App() {
 
   return (
     <CartProvider>
+
       <div className="min-h-screen bg-[#0D0F0C] text-white">
+
         <Navbar
           category={category}
           setCategory={selectCategory}
@@ -57,9 +59,12 @@ function App() {
           <FeaturedProducts
             category="ofertas"
             search={search}
+            newOnly={false}
           />
         )}
+
       </div>
+
     </CartProvider>
   )
 }

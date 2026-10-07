@@ -30,25 +30,35 @@ function Navbar({
     setSearch("")
     setSearchInput("")
     setSearchOpen(false)
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
   }
 
-  const submitSearch = () => {
+  const submitSearch = (event) => {
+    event.preventDefault()
+
     const value = searchInput.trim()
+
+    if (value === "") {
+      setSearch("")
+      return
+    }
 
     setSearch(value)
 
-    if (value !== "") {
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      })
-    }
-  }
+    setTimeout(() => {
+      const productsSection = document.getElementById("productos")
 
-  const handleSearchKeyDown = (event) => {
-    if (event.key === "Enter") {
-      submitSearch()
-    }
+      if (productsSection) {
+        productsSection.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      }
+    }, 100)
   }
 
   return (
@@ -67,7 +77,10 @@ function Navbar({
           <div className="flex items-center gap-4">
 
             {searchOpen ? (
-              <div className="flex items-center rounded-full border border-[#302E28] bg-[#111210]">
+              <form
+                onSubmit={submitSearch}
+                className="flex items-center rounded-full border border-[#302E28] bg-[#111210]"
+              >
 
                 <span className="pl-3">
                   🔍
@@ -76,21 +89,17 @@ function Navbar({
                 <input
                   type="text"
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
+                  onChange={(event) =>
+                    setSearchInput(event.target.value)
+                  }
                   placeholder="Buscar productos..."
                   autoFocus
+                  enterKeyHint="search"
                   className="w-40 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-gray-500 md:w-56"
                 />
 
                 <button
-                  onClick={submitSearch}
-                  className="px-2 text-sm font-semibold text-[#F0D58A] transition hover:text-white"
-                >
-                  Enviar
-                </button>
-
-                <button
+                  type="button"
                   onClick={closeSearch}
                   className="px-3 text-gray-400 transition hover:text-white"
                   aria-label="Cerrar búsqueda"
@@ -98,7 +107,7 @@ function Navbar({
                   ✕
                 </button>
 
-              </div>
+              </form>
             ) : (
               <button
                 onClick={openSearch}

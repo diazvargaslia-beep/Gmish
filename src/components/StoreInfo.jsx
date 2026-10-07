@@ -1,4 +1,4 @@
-function StoreInfo() {
+function StoreInfo({ onSelectCategory }) {
   const handleDirections = () => {
     const confirmed = window.confirm(
       "¿Quieres abrir Google Maps?"
@@ -13,12 +13,17 @@ function StoreInfo() {
     }
   }
 
+  const whatsappUrl =
+    "https://wa.me/51921366147"
+
   return (
     <>
       <section className="mx-auto max-w-7xl px-4 py-16">
         <div className="grid gap-6 md:grid-cols-2">
+
           {/* VISÍTANOS */}
           <div className="rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:p-8">
+
             <p className="text-sm font-semibold uppercase tracking-wider text-[#F0D58A]">
               Visítanos
             </p>
@@ -27,14 +32,12 @@ function StoreInfo() {
               Encuéntranos
             </h2>
 
-            {/* FOTO DEL LOCAL */}
             <div className="mt-6 flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-[#22231F]">
               <p className="text-sm text-gray-500">
                 Foto del local
               </p>
             </div>
 
-            {/* DIRECCIÓN */}
             <div className="mt-6">
               <p className="text-sm text-gray-400">
                 Dirección
@@ -45,10 +48,11 @@ function StoreInfo() {
               </p>
             </div>
 
-            {/* MAPA */}
             <div className="mt-5 flex aspect-[16/9] items-center justify-center overflow-hidden rounded-2xl border border-[#302E28] bg-[#0D0F0C]">
               <div className="text-center">
-                <p className="text-3xl">📍</p>
+                <p className="text-3xl">
+                  📍
+                </p>
 
                 <p className="mt-2 text-sm text-gray-500">
                   Aquí aparecerá nuestro mapa
@@ -56,7 +60,6 @@ function StoreInfo() {
               </div>
             </div>
 
-            {/* CÓMO LLEGAR */}
             <button
               onClick={handleDirections}
               className="mt-5 w-full rounded-full bg-[#F0D58A] px-5 py-3.5 text-sm font-bold text-black transition hover:bg-white"
@@ -67,8 +70,10 @@ function StoreInfo() {
 
           {/* WHATSAPP + REDES */}
           <div className="flex flex-col gap-6">
+
             {/* WHATSAPP */}
             <div className="rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:p-8">
+
               <p className="text-sm font-semibold uppercase tracking-wider text-[#F0D58A]">
                 WhatsApp
               </p>
@@ -82,22 +87,20 @@ function StoreInfo() {
                 pagos, envíos o cualquier otra consulta.
               </p>
 
-              <button
-                onClick={() =>
-                  window.open(
-                    "https://wa.me/",
-                    "_blank",
-                    "noopener,noreferrer"
-                  )
-                }
-                className="mt-6 w-full rounded-full border border-[#F0D58A] px-5 py-3.5 text-sm font-bold text-[#F0D58A] transition hover:bg-[#F0D58A] hover:text-black"
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 block w-full rounded-full border border-[#F0D58A] px-5 py-3.5 text-center text-sm font-bold text-[#F0D58A] transition hover:bg-[#F0D58A] hover:text-black"
               >
                 Escríbenos por WhatsApp
-              </button>
+              </a>
+
             </div>
 
             {/* REDES */}
             <div className="rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:p-8">
+
               <p className="text-sm font-semibold uppercase tracking-wider text-[#F0D58A]">
                 Redes sociales
               </p>
@@ -111,6 +114,7 @@ function StoreInfo() {
               </p>
 
               <div className="mt-6 grid grid-cols-3 gap-3">
+
                 <button
                   className="rounded-2xl border border-[#302E28] p-4 text-sm font-semibold transition hover:border-[#F0D58A] hover:text-[#F0D58A]"
                 >
@@ -123,20 +127,27 @@ function StoreInfo() {
                   TikTok
                 </button>
 
-                <button
-                  className="rounded-2xl border border-[#302E28] p-4 text-sm font-semibold transition hover:border-[#F0D58A] hover:text-[#F0D58A]"
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-[#302E28] p-4 text-center text-sm font-semibold transition hover:border-[#F0D58A] hover:text-[#F0D58A]"
                 >
                   WhatsApp
-                </button>
+                </a>
+
               </div>
             </div>
+
           </div>
         </div>
       </section>
 
       {/* FOOTER */}
       <footer className="border-t border-[#302E28] bg-[#0A0C09]">
+
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between">
+
           <div>
             <p className="text-xl font-bold tracking-wide">
               GMISH
@@ -148,22 +159,34 @@ function StoreInfo() {
           </div>
 
           <div className="flex flex-wrap gap-5 text-sm text-gray-400">
-            <button className="transition hover:text-[#F0D58A]">
+
+            <button
+              onClick={() => onSelectCategory("hombre")}
+              className="transition hover:text-[#F0D58A]"
+            >
               Hombre
             </button>
 
-            <button className="transition hover:text-[#F0D58A]">
+            <button
+              onClick={() => onSelectCategory("mujer")}
+              className="transition hover:text-[#F0D58A]"
+            >
               Mujer
             </button>
 
-            <button className="transition hover:text-[#F0D58A]">
+            <button
+              onClick={() => onSelectCategory("ofertas")}
+              className="transition hover:text-[#F0D58A]"
+            >
               Ofertas
             </button>
+
           </div>
 
           <div className="text-sm text-gray-500">
             © 2026 GMISH
           </div>
+
         </div>
       </footer>
     </>

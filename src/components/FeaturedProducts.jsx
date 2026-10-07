@@ -17,15 +17,16 @@ function FeaturedProducts({
 
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
-      category === "todos" ||
-      category === "ofertas"
-        ? category === "todos"
-          ? true
-          : product.offer === true
-        : product.category === category
+      category === "todos"
+        ? true
+        : category === "ofertas"
+          ? product.offer === true
+          : product.category === category
 
     const matchesNew =
-      newOnly ? product.new === true : true
+      newOnly && normalizedSearch === ""
+        ? product.new === true
+        : true
 
     const matchesSearch =
       normalizedSearch === ""
@@ -100,20 +101,24 @@ function FeaturedProducts({
   const sectionTitle =
     category === "ofertas"
       ? "Ofertas"
-      : newOnly
+      : newOnly && normalizedSearch === ""
         ? "Últimas novedades"
-        : category === "hombre"
-          ? "Hombre"
-          : category === "mujer"
-            ? "Mujer"
-            : "Colección"
+        : normalizedSearch !== ""
+          ? `Resultados para "${search}"`
+          : category === "hombre"
+            ? "Hombre"
+            : category === "mujer"
+              ? "Mujer"
+              : "Colección"
 
   const sectionDescription =
     category === "ofertas"
       ? "Aprovecha nuestros modelos con descuento."
-      : newOnly
+      : newOnly && normalizedSearch === ""
         ? "Descubre nuestras prendas más recientes."
-        : "Explora nuestros modelos y encuentra tu estilo."
+        : normalizedSearch !== ""
+          ? "Encuentra lo que estás buscando."
+          : "Explora nuestros modelos y encuentra tu estilo."
 
   return (
     <>
@@ -134,7 +139,7 @@ function FeaturedProducts({
         {filteredProducts.length === 0 ? (
           <div className="rounded-2xl border border-[#302E28] bg-[#151714] p-10 text-center">
             <p className="text-gray-400">
-              Aún no hay productos disponibles.
+              No encontramos productos con esa búsqueda.
             </p>
           </div>
         ) : (
@@ -142,7 +147,8 @@ function FeaturedProducts({
             {Object.entries(groupedProducts).map(
               ([subcategory, categoryProducts]) => (
                 <div key={subcategory}>
-                  {!newOnly && category !== "ofertas" && (
+
+                  {!newOnly && normalizedSearch === "" && category !== "ofertas" && (
                     <div className="mb-5">
                       <h3 className="text-2xl font-bold">
                         {categoryNames[subcategory] || subcategory}
@@ -156,6 +162,7 @@ function FeaturedProducts({
                   )}
 
                   <div className="relative">
+
                     <div
                       className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 pr-4 scrollbar-hide"
                       style={{
@@ -163,16 +170,20 @@ function FeaturedProducts({
                         msOverflowStyle: "none",
                       }}
                     >
+
                       {categoryProducts.map((product) => (
                         <article
                           key={product.id}
                           className="w-[72vw] max-w-[300px] flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-[#302E28] bg-[#151714] transition hover:border-[#F0D58A] sm:w-[280px]"
                         >
+
                           <button
                             onClick={() => setSelectedProduct(product)}
                             className="block w-full text-left"
                           >
+
                             <div className="relative aspect-[4/5] w-full bg-[#22231F]">
+
                               {product.images?.[0] ? (
                                 <img
                                   src={product.images[0]}
@@ -196,14 +207,17 @@ function FeaturedProducts({
                                   NUEVO
                                 </span>
                               )}
+
                             </div>
 
                             <div className="p-4">
+
                               <h4 className="text-lg font-semibold">
                                 {product.name}
                               </h4>
 
                               <div className="mt-1 flex items-center gap-2">
+
                                 {product.oldPrice && (
                                   <span className="text-sm text-gray-500 line-through">
                                     S/ {product.oldPrice}
@@ -213,15 +227,20 @@ function FeaturedProducts({
                                 <span className="text-xl font-bold text-[#F0D58A]">
                                   S/ {product.price}
                                 </span>
+
                               </div>
 
                               <p className="mt-3 text-xs text-gray-500">
                                 Ver producto →
                               </p>
+
                             </div>
+
                           </button>
+
                         </article>
                       ))}
+
                     </div>
 
                     {categoryProducts.length > 2 && (
@@ -229,7 +248,9 @@ function FeaturedProducts({
                         →
                       </div>
                     )}
+
                   </div>
+
                 </div>
               )
             )}
@@ -247,8 +268,11 @@ function FeaturedProducts({
 
       {notification && (
         <div className="fixed bottom-5 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border border-[#302E28] bg-[#151714] p-4 shadow-2xl">
+
           <div className="flex items-center justify-between gap-4">
+
             <div>
+
               <p className="font-semibold">
                 ✓ Producto agregado
               </p>
@@ -256,6 +280,7 @@ function FeaturedProducts({
               <p className="mt-1 text-sm text-gray-400">
                 {notification.name} · Cantidad: {notification.quantity}
               </p>
+
             </div>
 
             <button
@@ -267,7 +292,9 @@ function FeaturedProducts({
             >
               Ver carrito
             </button>
+
           </div>
+
         </div>
       )}
     </>
