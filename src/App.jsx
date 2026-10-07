@@ -2,6 +2,7 @@ import { useState } from "react"
 import Navbar from "./components/Navbar"
 import Hero from "./components/Hero"
 import FeaturedProducts from "./components/FeaturedProducts"
+import CategorySection from "./components/CategorySection"
 import { CartProvider } from "./CartContext"
 
 function App() {
@@ -40,17 +41,10 @@ function App() {
           </>
         )}
 
-        {category === "hombre" && (
-          <FeaturedProducts
-            category="hombre"
-            search={search}
-          />
-        )}
-
-        {category === "mujer" && (
-          <FeaturedProducts
-            category="mujer"
-            search={search}
+        {(category === "hombre" || category === "mujer") && (
+          <CategorySection
+            category={category}
+            onSelectCategory={selectCategory}
           />
         )}
 
