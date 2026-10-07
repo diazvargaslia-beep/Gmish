@@ -1,230 +1,259 @@
-import { useState } from "react"
-import products from "../data/products"
+import { useMemo, useState } from "react"
 import ProductDetailModal from "./ProductDetailModal"
-import { useCart } from "../CartContext"
 
 function CategorySection({
   category,
   onSelectCategory,
+  products = [],
 }) {
-  const { addToCart } = useCart()
+  const [selectedSubcategory, setSelectedSubcategory] =
+    useState("todos")
 
-  const [selectedProduct, setSelectedProduct] = useState(null)
-  const [notification, setNotification] = useState(null)
+  const [selectedProduct, setSelectedProduct] =
+    useState(null)
 
-  const subcategories = {
-    hombre: [
-      {
-        id: "polos",
-        name: "Polos",
-      },
-      {
-        id: "pantalones",
-        name: "Pantalones",
-      },
-    ],
+  const subcategories =
+    category === "hombre"
+      ? ["polos", "pantalones"]
+      : [
+          "tops",
+          "conjuntos",
+          "vestidos",
+          "pantalones",
+          "zapatos",
+        ]
 
-    mujer: [
-      {
-        id: "tops",
-        name: "Tops",
-      },
-      {
-        id: "conjuntos",
-        name: "Conjuntos",
-      },
-      {
-        id: "vestidos",
-        name: "Vestidos",
-      },
-      {
-        id: "pantalones",
-        name: "Pantalones",
-      },
-      {
-        id: "zapatos",
-        name: "Zapatos",
-      },
-    ],
-  }
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      if (product.category !== category) {
+        return false
+      }
 
-  const addProductToCart = (product) => {
-    addToCart(product)
+      if (
+        selectedSubcategory !== "todos" &&
+        product.subcategory !==
+          selectedSubcategory
+      ) {
+        return false
+      }
 
-    setNotification({
-      name: product.name,
-      quantity: product.quantity || 1,
+      return true
     })
-
-    setSelectedProduct(null)
-
-    setTimeout(() => {
-      setNotification(null)
-    }, 3500)
-  }
-
-  const ProductCard = ({ product }) => (
-    <article className="w-[72vw] max-w-[300px] flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-[#302E28] bg-[#151714] transition hover:border-[#F0D58A] sm:w-[280px]">
-      <button
-        onClick={() => setSelectedProduct(product)}
-        className="block w-full text-left"
-      >
-        <div className="relative aspect-[4/5] w-full bg-[#22231F]">
-          <div className="flex h-full items-center justify-center text-sm text-gray-500">
-            Foto del producto
-          </div>
-
-          {product.offer && (
-            <span className="absolute left-3 top-3 rounded-full bg-[#FF4D4D] px-3 py-1 text-xs font-bold text-white">
-              OFERTA
-            </span>
-          )}
-
-          {product.new && (
-            <span className="absolute right-3 top-3 rounded-full border border-[#F0D58A] bg-[#111210]/90 px-3 py-1 text-xs font-bold text-[#F0D58A]">
-              NUEVO
-            </span>
-          )}
-        </div>
-
-        <div className="p-4">
-          <h4 className="text-lg font-semibold">
-            {product.name}
-          </h4>
-
-          <div className="mt-1 flex items-center gap-2">
-            {product.oldPrice && (
-              <span className="text-sm text-gray-500 line-through">
-                S/ {product.oldPrice}
-              </span>
-            )}
-
-            <span className="text-xl font-bold text-[#F0D58A]">
-              S/ {product.price}
-            </span>
-          </div>
-
-          <p className="mt-3 text-xs text-gray-500">
-            Ver producto →
-          </p>
-        </div>
-      </button>
-    </article>
-  )
-
-  const CategoryCarousel = ({
-    categoryId,
-    subcategoryId,
-    title,
-  }) => {
-    const categoryProducts = products.filter(
-      (product) =>
-        product.category === categoryId &&
-        product.subcategory === subcategoryId
-    )
-
-    if (categoryProducts.length === 0) {
-      return null
-    }
-
-    return (
-      <div className="mb-12">
-        <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-2xl font-bold">
-            {title}
-          </h3>
-
-          {categoryProducts.length > 2 && (
-            <span className="text-sm text-gray-500">
-              Desliza →
-            </span>
-          )}
-        </div>
-
-        <div
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 pr-4"
-          style={{
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
-        >
-          {categoryProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-            />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const categories = subcategories[category] || []
+  }, [
+    products,
+    category,
+    selectedSubcategory,
+  ])
 
   return (
-    <>
-      <section className="mx-auto max-w-7xl px-4 py-12">
-        <div className="mb-10">
+    <section className="mx-auto max-w-7xl px-4 py-10 md:py-14">
+      <div className="mb-8">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#F0D58A]">
+          Colección
+        </p>
+
+        <h1 className="mt-2 text-3xl font-black capitalize md:text-5xl">
+          {category}
+        </h1>
+      </div>
+
+      <div className="mb-10 flex gap-3 overflow-x-auto pb-2">
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedSubcategory("todos")
+          }
+          className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold transition ${
+            selectedSubcategory === "todos"
+              ? "border-[#F0D58A] bg-[#F0D58A] text-black"
+              : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
+          }`}
+        >
+          Todos
+        </button>
+
+        {subcategories.map((subcategory) => (
           <button
-            onClick={() => onSelectCategory("todos")}
-            className="mb-5 text-sm text-gray-400 transition hover:text-[#F0D58A]"
+            key={subcategory}
+            type="button"
+            onClick={() =>
+              setSelectedSubcategory(
+                subcategory
+              )
+            }
+            className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold capitalize transition ${
+              selectedSubcategory === subcategory
+                ? "border-[#F0D58A] bg-[#F0D58A] text-black"
+                : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
+            }`}
           >
-            ← Volver a Inicio
+            {subcategory}
           </button>
+        ))}
+      </div>
 
-          <h2 className="text-3xl font-bold capitalize md:text-4xl">
-            {category}
-          </h2>
+      {selectedSubcategory === "todos" ? (
+        <div className="space-y-12">
+          {subcategories.map((subcategory) => {
+            const categoryProducts =
+              filteredProducts.filter(
+                (product) =>
+                  product.subcategory ===
+                  subcategory
+              )
 
-          <p className="mt-3 text-gray-400">
-            Descubre nuestras prendas.
+            if (categoryProducts.length === 0) {
+              return null
+            }
+
+            return (
+              <div key={subcategory}>
+                <div className="mb-4 flex items-end justify-between gap-4">
+                  <h2 className="text-2xl font-black capitalize md:text-3xl">
+                    {subcategory}
+                  </h2>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedSubcategory(
+                        subcategory
+                      )
+                    }
+                    className="text-sm font-semibold text-[#F0D58A]"
+                  >
+                    Ver todos
+                  </button>
+                </div>
+
+                <ProductCarousel
+                  products={categoryProducts}
+                  onSelectProduct={
+                    setSelectedProduct
+                  }
+                />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <ProductCarousel
+          products={filteredProducts}
+          onSelectProduct={setSelectedProduct}
+        />
+      )}
+
+      {filteredProducts.length === 0 && (
+        <div className="rounded-2xl border border-[#302E28] bg-[#151714] px-6 py-12 text-center">
+          <p className="text-lg font-semibold">
+            Todavía no hay productos aquí.
+          </p>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Los productos que agregues desde el
+            panel aparecerán automáticamente.
           </p>
         </div>
-
-        {categories.map((item) => (
-          <CategoryCarousel
-            key={item.id}
-            categoryId={category}
-            subcategoryId={item.id}
-            title={item.name}
-          />
-        ))}
-      </section>
+      )}
 
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          addToCart={addProductToCart}
+          onClose={() =>
+            setSelectedProduct(null)
+          }
         />
       )}
+    </section>
+  )
+}
 
-      {notification && (
-        <div className="fixed bottom-5 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border border-[#302E28] bg-[#151714] p-4 shadow-2xl">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-semibold">
-                ✓ Producto agregado
-              </p>
+function ProductCarousel({
+  products,
+  onSelectProduct,
+}) {
+  return (
+    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 scrollbar-hide">
+      {products.map((product) => {
+        const isOffer =
+          product.old_price &&
+          Number(product.old_price) >
+            Number(product.price)
 
-              <p className="mt-1 text-sm text-gray-400">
-                {notification.name} · Cantidad: {notification.quantity}
-              </p>
-            </div>
-
+        return (
+          <article
+            key={product.id}
+            className="w-[260px] min-w-[260px] snap-start overflow-hidden rounded-2xl border border-[#302E28] bg-[#151714] md:w-[280px] md:min-w-[280px]"
+          >
             <button
-              onClick={() => {
-                setNotification(null)
-                window.dispatchEvent(new Event("open-cart"))
-              }}
-              className="whitespace-nowrap rounded-full bg-[#F0D58A] px-4 py-2 text-sm font-semibold text-black"
+              type="button"
+              onClick={() =>
+                onSelectProduct(product)
+              }
+              className="block w-full text-left"
             >
-              Ver carrito
+              <div className="relative flex aspect-[4/5] items-center justify-center bg-[#111210]">
+                <span className="text-sm text-gray-600">
+                  Sin imagen
+                </span>
+
+                {product.is_new && (
+                  <span className="absolute left-3 top-3 rounded-full bg-[#F0D58A] px-3 py-1 text-xs font-black text-black">
+                    Nuevo
+                  </span>
+                )}
+
+                {isOffer && (
+                  <span className="absolute right-3 top-3 rounded-full bg-[#FF4D4D] px-3 py-1 text-xs font-black text-white">
+                    Oferta
+                  </span>
+                )}
+              </div>
+
+              <div className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  {product.subcategory}
+                </p>
+
+                <h3 className="mt-1 text-lg font-bold">
+                  {product.name}
+                </h3>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-lg font-black text-[#F0D58A]">
+                    S/{" "}
+                    {Number(
+                      product.price
+                    ).toFixed(2)}
+                  </span>
+
+                  {isOffer && (
+                    <span className="text-sm text-gray-500 line-through">
+                      S/{" "}
+                      {Number(
+                        product.old_price
+                      ).toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
             </button>
-          </div>
-        </div>
-      )}
-    </>
+
+            <div className="px-4 pb-4">
+              <button
+                type="button"
+                onClick={() =>
+                  onSelectProduct(product)
+                }
+                className="w-full rounded-xl bg-[#F0D58A] px-4 py-3 text-sm font-black text-black transition hover:brightness-110"
+              >
+                Agregar al carrito
+              </button>
+            </div>
+          </article>
+        )
+      })}
+    </div>
   )
 }
 

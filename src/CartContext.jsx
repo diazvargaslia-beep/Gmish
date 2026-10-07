@@ -6,22 +6,43 @@ export function CartProvider({ children }) {
   const [cart, setCart] = useState([])
 
   const addToCart = (product) => {
+    const quantityToAdd = product.quantity || 1
+
+    const availableStock = Number(
+      product.availableStock ??
+        product.stock ??
+        0
+    )
+
     setCart((currentCart) => {
-      const existingProduct = currentCart.find(
+      const existingIndex = currentCart.findIndex(
         (item) =>
           item.id === product.id &&
+          item.variantId === product.variantId &&
           item.selectedSize === product.selectedSize &&
           item.selectedColor === product.selectedColor
       )
 
-      if (existingProduct) {
-        return currentCart.map((item) =>
-          item.id === product.id &&
-          item.selectedSize === product.selectedSize &&
-          item.selectedColor === product.selectedColor
+      if (existingIndex !== -1) {
+        const existingProduct =
+          currentCart[existingIndex]
+
+        const newQuantity =
+          existingProduct.quantity + quantityToAdd
+
+        const finalQuantity =
+          availableStock > 0
+            ? Math.min(
+                newQuantity,
+                availableStock
+              )
+            : newQuantity
+
+        return currentCart.map((item, index) =>
+          index === existingIndex
             ? {
                 ...item,
-                quantity: item.quantity + product.quantity,
+                quantity: finalQuantity,
               }
             : item
         )
@@ -31,7 +52,12 @@ export function CartProvider({ children }) {
         ...currentCart,
         {
           ...product,
-          quantity: product.quantity || 1,
+          quantity: Math.min(
+            quantityToAdd,
+            availableStock > 0
+              ? availableStock
+              : quantityToAdd
+          ),
         },
       ]
     })
@@ -39,11 +65,29 @@ export function CartProvider({ children }) {
 
   const increaseQuantity = (index) => {
     setCart((currentCart) =>
-      currentCart.map((item, i) =>
-        i === index
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      )
+      currentCart.map((item, i) => {
+        if (i !== index) {
+          return item
+        }
+
+        const availableStock = Number(
+          item.availableStock ??
+            item.stock ??
+            0
+        )
+
+        if (
+          availableStock > 0 &&
+          item.quantity >= availableStock
+        ) {
+          return item
+        }
+
+        return {
+          ...item,
+          quantity: item.quantity + 1,
+        }
+      })
     )
   }
 
@@ -52,16 +96,23 @@ export function CartProvider({ children }) {
       currentCart
         .map((item, i) =>
           i === index
-            ? { ...item, quantity: item.quantity - 1 }
+            ? {
+                ...item,
+                quantity: item.quantity - 1,
+              }
             : item
         )
-        .filter((item) => item.quantity > 0)
+        .filter(
+          (item) => item.quantity > 0
+        )
     )
   }
 
   const removeFromCart = (index) => {
     setCart((currentCart) =>
-      currentCart.filter((_, i) => i !== index)
+      currentCart.filter(
+        (_, i) => i !== index
+      )
     )
   }
 

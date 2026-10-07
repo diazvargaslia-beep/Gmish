@@ -203,29 +203,26 @@ function StoreInfo({ onSelectCategory }) {
               </button>
 
 
-              {/* WHATSAPP */}
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              {/* FACEBOOK */}
+              <button
                 className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
               >
 
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl">
-                  💬
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl font-bold">
+                  f
                 </span>
 
                 <span>
                   <span className="block text-sm font-semibold">
-                    WhatsApp
+                    Facebook
                   </span>
 
                   <span className="block text-xs text-gray-500">
-                    921 366 147
+                    GMISH
                   </span>
                 </span>
 
-              </a>
+              </button>
 
             </div>
 
