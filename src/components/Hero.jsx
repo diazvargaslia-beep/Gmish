@@ -8,7 +8,7 @@ function Hero() {
           </p>
 
           <h1 className="mt-4 text-5xl font-bold tracking-tight text-white md:text-6xl">
-            Estilo que habla por tí
+            Estilo que habla por ti
           </h1>
 
           <p className="mt-6 max-w-lg text-lg leading-8 text-[#E7E1D2]">

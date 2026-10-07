@@ -19,7 +19,7 @@ function CategorySection({
       name: "Ofertas",
       description: "Encuentra nuestras mejores promociones",
     },
-  ];
+  ]
 
   const subcategories = {
     hombre: [
@@ -62,7 +62,7 @@ function CategorySection({
         description: "Calzado para mujer",
       },
     ],
-  };
+  }
 
   if (category === "todos") {
     return (
@@ -73,7 +73,7 @@ function CategorySection({
           </h2>
 
           <p className="mt-3 text-gray-400">
-            Encuentra tu estilo y descubre nuestras colecciones
+            Encuentra tu estilo y descubre nuestras colecciones.
           </p>
         </div>
 
@@ -99,11 +99,11 @@ function CategorySection({
           ))}
         </div>
       </section>
-    );
+    )
   }
 
   if (category === "hombre" || category === "mujer") {
-    const categories = subcategories[category];
+    const categories = subcategories[category]
 
     return (
       <section className="mx-auto max-w-7xl px-4 py-16">
@@ -146,10 +146,10 @@ function CategorySection({
           ))}
         </div>
       </section>
-    );
+    )
   }
 
-  return null;
+  return null
 }
 
-export default CategorySection;
+export default CategorySection
