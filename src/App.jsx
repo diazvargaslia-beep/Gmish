@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar"
 import Hero from "./components/Hero"
 import FeaturedProducts from "./components/FeaturedProducts"
 import CategorySection from "./components/CategorySection"
+import StoreInfo from "./components/StoreInfo"
 import { CartProvider } from "./CartContext"
 
 function App() {
@@ -54,6 +55,8 @@ function App() {
             search={search}
           />
         )}
+
+        <StoreInfo />
       </div>
     </CartProvider>
   )
