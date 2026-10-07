@@ -13,24 +13,41 @@ function StoreInfo({ onSelectCategory }) {
     }
   }
 
-  const whatsappUrl =
-    "https://wa.me/51921366147"
+  const whatsappUrl = "https://wa.me/51921366147"
 
   return (
     <>
+      {/* INFORMACIÓN */}
       <section className="mx-auto max-w-7xl px-4 py-16">
-        <div className="grid gap-6 md:grid-cols-2">
+
+        <div
+          className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-5"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
 
           {/* VISÍTANOS */}
-          <div className="rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:p-8">
+          <div className="w-[88vw] max-w-[420px] flex-shrink-0 snap-start rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:w-[420px] sm:p-8">
 
-            <p className="text-sm font-semibold uppercase tracking-wider text-[#F0D58A]">
-              Visítanos
-            </p>
+            <div className="flex items-center gap-4">
 
-            <h2 className="mt-2 text-3xl font-bold">
-              Encuéntranos
-            </h2>
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#22231F] text-2xl">
+                📍
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#F0D58A]">
+                  Visítanos
+                </p>
+
+                <h2 className="mt-1 text-2xl font-bold">
+                  Encuéntranos
+                </h2>
+              </div>
+
+            </div>
 
             <div className="mt-6 flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-[#22231F]">
               <p className="text-sm text-gray-500">
@@ -38,18 +55,22 @@ function StoreInfo({ onSelectCategory }) {
               </p>
             </div>
 
-            <div className="mt-6">
-              <p className="text-sm text-gray-400">
+            <div className="mt-5">
+
+              <p className="text-xs text-gray-500">
                 Dirección
               </p>
 
               <p className="mt-1 font-semibold">
                 Próximamente
               </p>
+
             </div>
 
             <div className="mt-5 flex aspect-[16/9] items-center justify-center overflow-hidden rounded-2xl border border-[#302E28] bg-[#0D0F0C]">
+
               <div className="text-center">
+
                 <p className="text-3xl">
                   📍
                 </p>
@@ -57,7 +78,9 @@ function StoreInfo({ onSelectCategory }) {
                 <p className="mt-2 text-sm text-gray-500">
                   Aquí aparecerá nuestro mapa
                 </p>
+
               </div>
+
             </div>
 
             <button
@@ -66,82 +89,162 @@ function StoreInfo({ onSelectCategory }) {
             >
               Cómo llegar
             </button>
+
           </div>
 
-          {/* WHATSAPP + REDES */}
-          <div className="flex flex-col gap-6">
 
-            {/* WHATSAPP */}
-            <div className="rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:p-8">
+          {/* WHATSAPP */}
+          <div className="w-[88vw] max-w-[420px] flex-shrink-0 snap-start rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:w-[420px] sm:p-8">
 
-              <p className="text-sm font-semibold uppercase tracking-wider text-[#F0D58A]">
-                WhatsApp
-              </p>
+            <div className="flex items-center gap-4">
 
-              <h2 className="mt-2 text-3xl font-bold">
-                ¿Tienes alguna consulta?
-              </h2>
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#22231F] text-2xl">
+                💬
+              </div>
 
-              <p className="mt-3 leading-7 text-gray-400">
-                Escríbenos y te ayudaremos con disponibilidad,
-                pagos, envíos o cualquier otra consulta.
-              </p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#F0D58A]">
+                  WhatsApp
+                </p>
 
+                <h2 className="mt-1 text-2xl font-bold">
+                  ¿Tienes alguna consulta?
+                </h2>
+              </div>
+
+            </div>
+
+            <p className="mt-6 leading-7 text-gray-400">
+              Escríbenos para consultar disponibilidad,
+              pagos, envíos o cualquier otra duda.
+            </p>
+
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-7 block w-full rounded-full border border-[#F0D58A] px-5 py-3.5 text-center text-sm font-bold text-[#F0D58A] transition hover:bg-[#F0D58A] hover:text-black"
+            >
+              Escríbenos por WhatsApp
+            </a>
+
+          </div>
+
+
+          {/* REDES SOCIALES */}
+          <div className="w-[88vw] max-w-[420px] flex-shrink-0 snap-start rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:w-[420px] sm:p-8">
+
+            <div className="flex items-center gap-4">
+
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#22231F] text-2xl">
+                ✨
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#F0D58A]">
+                  Redes
+                </p>
+
+                <h2 className="mt-1 text-2xl font-bold">
+                  Síguenos
+                </h2>
+              </div>
+
+            </div>
+
+            <p className="mt-6 text-sm leading-6 text-gray-400">
+              Descubre novedades, outfits y promociones.
+            </p>
+
+
+            <div className="mt-6 space-y-3">
+
+              {/* INSTAGRAM */}
+              <button
+                className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
+              >
+
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl">
+                  ◎
+                </span>
+
+                <span>
+                  <span className="block text-sm font-semibold">
+                    Instagram
+                  </span>
+
+                  <span className="block text-xs text-gray-500">
+                    @gmish
+                  </span>
+                </span>
+
+              </button>
+
+
+              {/* TIKTOK */}
+              <button
+                className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
+              >
+
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl">
+                  ♪
+                </span>
+
+                <span>
+                  <span className="block text-sm font-semibold">
+                    TikTok
+                  </span>
+
+                  <span className="block text-xs text-gray-500">
+                    @gmish
+                  </span>
+                </span>
+
+              </button>
+
+
+              {/* WHATSAPP */}
               <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-6 block w-full rounded-full border border-[#F0D58A] px-5 py-3.5 text-center text-sm font-bold text-[#F0D58A] transition hover:bg-[#F0D58A] hover:text-black"
+                className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
               >
-                Escríbenos por WhatsApp
+
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl">
+                  💬
+                </span>
+
+                <span>
+                  <span className="block text-sm font-semibold">
+                    WhatsApp
+                  </span>
+
+                  <span className="block text-xs text-gray-500">
+                    921 366 147
+                  </span>
+                </span>
+
               </a>
 
             </div>
 
-            {/* REDES */}
-            <div className="rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:p-8">
-
-              <p className="text-sm font-semibold uppercase tracking-wider text-[#F0D58A]">
-                Redes sociales
-              </p>
-
-              <h2 className="mt-2 text-3xl font-bold">
-                Síguenos en redes
-              </h2>
-
-              <p className="mt-3 leading-7 text-gray-400">
-                Descubre novedades, outfits y promociones.
-              </p>
-
-              <div className="mt-6 grid grid-cols-3 gap-3">
-
-                <button
-                  className="rounded-2xl border border-[#302E28] p-4 text-sm font-semibold transition hover:border-[#F0D58A] hover:text-[#F0D58A]"
-                >
-                  Instagram
-                </button>
-
-                <button
-                  className="rounded-2xl border border-[#302E28] p-4 text-sm font-semibold transition hover:border-[#F0D58A] hover:text-[#F0D58A]"
-                >
-                  TikTok
-                </button>
-
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-2xl border border-[#302E28] p-4 text-center text-sm font-semibold transition hover:border-[#F0D58A] hover:text-[#F0D58A]"
-                >
-                  WhatsApp
-                </a>
-
-              </div>
-            </div>
-
           </div>
+
         </div>
+
+
+        {/* INDICADOR */}
+        <div className="mt-2 flex justify-center gap-2 sm:hidden">
+
+          <span className="h-1.5 w-6 rounded-full bg-[#F0D58A]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-[#302E28]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-[#302E28]" />
+
+        </div>
+
       </section>
+
 
       {/* FOOTER */}
       <footer className="border-t border-[#302E28] bg-[#0A0C09]">
@@ -149,6 +252,7 @@ function StoreInfo({ onSelectCategory }) {
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between">
 
           <div>
+
             <p className="text-xl font-bold tracking-wide">
               GMISH
             </p>
@@ -156,7 +260,9 @@ function StoreInfo({ onSelectCategory }) {
             <p className="mt-1 text-sm text-gray-500">
               Tu estilo, tu esencia.
             </p>
+
           </div>
+
 
           <div className="flex flex-wrap gap-5 text-sm text-gray-400">
 
@@ -183,11 +289,13 @@ function StoreInfo({ onSelectCategory }) {
 
           </div>
 
+
           <div className="text-sm text-gray-500">
             © 2026 GMISH
           </div>
 
         </div>
+
       </footer>
     </>
   )
