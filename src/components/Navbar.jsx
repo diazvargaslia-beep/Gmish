@@ -1,9 +1,13 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Cart from "./Cart"
 
-function Navbar({ category, setCategory }) {
+function Navbar({
+  category,
+  setCategory,
+  search,
+  setSearch,
+}) {
   const [searchOpen, setSearchOpen] = useState(false)
-  const [search, setSearch] = useState("")
 
   const selectCategory = (value) => {
     setCategory(value)
@@ -13,6 +17,24 @@ function Navbar({ category, setCategory }) {
       behavior: "smooth",
     })
   }
+
+  const openSearch = () => {
+    setSearchOpen(true)
+  }
+
+  const closeSearch = () => {
+    setSearch("")
+    setSearchOpen(false)
+  }
+
+  useEffect(() => {
+    if (search.trim() !== "") {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      })
+    }
+  }, [search])
 
   return (
     <header className="border-b border-[#302E28] bg-[#151714]">
@@ -25,6 +47,7 @@ function Navbar({ category, setCategory }) {
             onClick={(e) => {
               e.preventDefault()
               setCategory("todos")
+              setSearch("")
               window.scrollTo({
                 top: 0,
                 behavior: "smooth",
@@ -54,10 +77,7 @@ function Navbar({ category, setCategory }) {
                 />
 
                 <button
-                  onClick={() => {
-                    setSearch("")
-                    setSearchOpen(false)
-                  }}
+                  onClick={closeSearch}
                   className="px-3 text-gray-400 hover:text-white"
                   aria-label="Cerrar búsqueda"
                 >
@@ -67,7 +87,7 @@ function Navbar({ category, setCategory }) {
               </div>
             ) : (
               <button
-                onClick={() => setSearchOpen(true)}
+                onClick={openSearch}
                 aria-label="Buscar"
                 className="text-lg text-white transition hover:text-[#F0D58A]"
               >

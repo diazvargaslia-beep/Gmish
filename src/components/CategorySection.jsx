@@ -1,63 +1,155 @@
-const categories = [
-  {
-    name: "Camisas",
-    description: "Diseños para todos los días",
-    link: "#camisas",
-  },
-  {
-    name: "Casacas",
-    description: "Capas ligeras y modernas",
-    link: "#casacas",
-  },
-  {
-    name: "Pantalones",
-    description: "Cortes clásicos y versátiles",
-    link: "#pantalones",
-  },
-]
+function CategorySection({
+  category,
+  onSelectCategory,
+  onSelectSubcategory,
+}) {
+  const mainCategories = [
+    {
+      id: "hombre",
+      name: "Hombre",
+      description: "Descubre nuestra colección para hombre",
+    },
+    {
+      id: "mujer",
+      name: "Mujer",
+      description: "Descubre nuestra colección para mujer",
+    },
+    {
+      id: "ofertas",
+      name: "Ofertas",
+      description: "Encuentra nuestras mejores promociones",
+    },
+  ];
 
-function CategorySection() {
-  return (
-    <section className="mx-auto max-w-7xl px-6 py-16">
-      <div className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-widest text-[#D4AF5A]">
-          Explora GMISH
-        </p>
+  const subcategories = {
+    hombre: [
+      {
+        id: "polos",
+        name: "Polos",
+        description: "Polos para todos los días",
+      },
+      {
+        id: "pantalones",
+        name: "Pantalones",
+        description: "Pantalones para diferentes estilos",
+      },
+    ],
 
-        <h2 className="mt-2 text-3xl font-bold text-white">
-          Compra por categoría
-        </h2>
-      </div>
+    mujer: [
+      {
+        id: "tops",
+        name: "Tops",
+        description: "Tops para diferentes estilos",
+      },
+      {
+        id: "conjuntos",
+        name: "Conjuntos",
+        description: "Conjuntos para completar tu look",
+      },
+      {
+        id: "vestidos",
+        name: "Vestidos",
+        description: "Vestidos para diferentes ocasiones",
+      },
+      {
+        id: "pantalones",
+        name: "Pantalones",
+        description: "Pantalones para mujer",
+      },
+      {
+        id: "zapatos",
+        name: "Zapatos",
+        description: "Calzado para mujer",
+      },
+    ],
+  };
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {categories.map((category) => (
-          <a
-            key={category.name}
-            href={category.link}
-            className="group"
+  if (category === "todos") {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-16">
+        <div className="mb-10 text-center">
+          <h2 className="text-3xl font-bold md:text-4xl">
+            Explora GMISH
+          </h2>
+
+          <p className="mt-3 text-gray-400">
+            Encuentra tu estilo y descubre nuestras colecciones
+          </p>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-3">
+          {mainCategories.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onSelectCategory(item.id)}
+              className="group rounded-2xl border border-[#302E28] bg-[#151714] p-8 text-left transition hover:border-[#F0D58A] hover:bg-[#1B1D19]"
+            >
+              <h3 className="text-2xl font-bold transition group-hover:text-[#F0D58A]">
+                {item.name}
+              </h3>
+
+              <p className="mt-3 text-sm text-gray-400">
+                {item.description}
+              </p>
+
+              <span className="mt-6 inline-block text-sm font-semibold text-[#F0D58A]">
+                Explorar →
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (category === "hombre" || category === "mujer") {
+    const categories = subcategories[category];
+
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-16">
+        <div className="mb-10">
+          <button
+            onClick={() => onSelectCategory("todos")}
+            className="mb-5 text-sm text-gray-400 transition hover:text-[#F0D58A]"
           >
-            <article>
-              <div className="flex aspect-[4/3] items-end rounded-xl border border-[#302E28] bg-[#1B1D1A] p-6 transition duration-300 group-hover:border-[#D4AF5A] group-hover:bg-[#20211D]">
-                <div>
-                  <h3 className="text-2xl font-semibold text-white">
-                    {category.name}
-                  </h3>
+            ← Volver a Inicio
+          </button>
 
-                  <p className="mt-1 text-sm text-[#E7E1D2]">
-                    {category.description}
-                  </p>
+          <h2 className="text-3xl font-bold capitalize md:text-4xl">
+            {category}
+          </h2>
 
-                  <span className="mt-4 inline-block text-sm font-semibold text-[#D4AF5A]">
-                    Ver categoría →
-                  </span>
-                </div>
-              </div>
-            </article>
-          </a>
-        ))}
-      </div>
-    </section>
-  )
+          <p className="mt-3 text-gray-400">
+            Elige una categoría para ver nuestras prendas.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
+          {categories.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onSelectSubcategory(item.id)}
+              className="group rounded-2xl border border-[#302E28] bg-[#151714] p-6 text-left transition hover:border-[#F0D58A] hover:bg-[#1B1D19]"
+            >
+              <h3 className="text-xl font-bold transition group-hover:text-[#F0D58A]">
+                {item.name}
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-400">
+                {item.description}
+              </p>
+
+              <span className="mt-5 inline-block text-sm font-semibold text-[#F0D58A]">
+                Ver prendas →
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return null;
 }
 
-export default CategorySection
+export default CategorySection;

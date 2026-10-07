@@ -19,7 +19,10 @@ export function CartProvider({ children }) {
           item.id === product.id &&
           item.selectedSize === product.selectedSize &&
           item.selectedColor === product.selectedColor
-            ? { ...item, quantity: item.quantity + 1 }
+            ? {
+                ...item,
+                quantity: item.quantity + product.quantity,
+              }
             : item
         )
       }
@@ -28,7 +31,7 @@ export function CartProvider({ children }) {
         ...currentCart,
         {
           ...product,
-          quantity: 1,
+          quantity: product.quantity || 1,
         },
       ]
     })

@@ -1,9 +1,18 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useCart } from "../CartContext"
 import store from "../data/store"
 
 function Cart() {
   const [cartOpen, setCartOpen] = useState(false)
+  useEffect(() => {
+  const openCart = () => setCartOpen(true)
+
+  window.addEventListener("open-cart", openCart)
+
+  return () => {
+    window.removeEventListener("open-cart", openCart)
+  }
+}, [])
 
   const {
     cart,
@@ -47,7 +56,9 @@ function Cart() {
       <button
         onClick={() => setCartOpen(true)}
         aria-label="Carrito"
-        className="text-lg text-white transition hover:text-[#F0D58A]"
+        className={`text-lg text-white transition hover:text-[#F0D58A] ${
+          totalItems > 0 ? "scale-110 text-[#F0D58A]" : ""
+        }`}
       >
         🛒
 

@@ -12,8 +12,7 @@ function Hero() {
           </h1>
 
           <p className="mt-6 max-w-lg text-lg leading-8 text-[#E7E1D2]">
-            Descubre prendas versátiles y modernas pensadas para tu estilo
-            diario.
+            Prendas versátiles y modernas pensadas para tu estilo diario
           </p>
 
           <a
