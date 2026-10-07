@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Cart from "./Cart"
 
 function Navbar({
@@ -8,33 +8,48 @@ function Navbar({
   setSearch,
 }) {
   const [searchOpen, setSearchOpen] = useState(false)
+  const [searchInput, setSearchInput] = useState(search)
 
   const selectCategory = (value) => {
     setCategory(value)
+    setSearch("")
+    setSearchInput("")
 
     window.scrollTo({
-      top: document.body.scrollHeight,
+      top: 0,
       behavior: "smooth",
     })
   }
 
   const openSearch = () => {
     setSearchOpen(true)
+    setSearchInput(search)
   }
 
   const closeSearch = () => {
     setSearch("")
+    setSearchInput("")
     setSearchOpen(false)
   }
 
-  useEffect(() => {
-    if (search.trim() !== "") {
+  const submitSearch = () => {
+    const value = searchInput.trim()
+
+    setSearch(value)
+
+    if (value !== "") {
       window.scrollTo({
-        top: document.body.scrollHeight,
+        top: 0,
         behavior: "smooth",
       })
     }
-  }, [search])
+  }
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key === "Enter") {
+      submitSearch()
+    }
+  }
 
   return (
     <header className="border-b border-[#302E28] bg-[#151714]">
@@ -42,21 +57,12 @@ function Navbar({
 
         <div className="flex h-16 items-center justify-between">
 
-          <a
-            href="/"
-            onClick={(e) => {
-              e.preventDefault()
-              setCategory("todos")
-              setSearch("")
-              window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-              })
-            }}
+          <button
+            onClick={() => selectCategory("todos")}
             className="logo-glitter text-3xl font-black italic tracking-[0.08em] md:text-4xl"
           >
             GMISH
-          </a>
+          </button>
 
           <div className="flex items-center gap-4">
 
@@ -69,16 +75,24 @@ function Navbar({
 
                 <input
                   type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                   placeholder="Buscar productos..."
                   autoFocus
                   className="w-40 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-gray-500 md:w-56"
                 />
 
                 <button
+                  onClick={submitSearch}
+                  className="px-2 text-sm font-semibold text-[#F0D58A] transition hover:text-white"
+                >
+                  Enviar
+                </button>
+
+                <button
                   onClick={closeSearch}
-                  className="px-3 text-gray-400 hover:text-white"
+                  className="px-3 text-gray-400 transition hover:text-white"
                   aria-label="Cerrar búsqueda"
                 >
                   ✕

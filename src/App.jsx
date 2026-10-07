@@ -37,7 +37,11 @@ function App() {
             <FeaturedProducts
               category="todos"
               search={search}
-              newOnly={true}
+              newOnly={search.trim() === ""}
+            />
+
+            <StoreInfo
+              onSelectCategory={selectCategory}
             />
           </>
         )}
@@ -55,8 +59,6 @@ function App() {
             search={search}
           />
         )}
-
-        <StoreInfo />
       </div>
     </CartProvider>
   )
