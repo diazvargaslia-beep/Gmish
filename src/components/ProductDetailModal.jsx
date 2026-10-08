@@ -10,7 +10,10 @@ function ProductDetailModal({
   product,
   onClose,
 }) {
-  const { addToCart } = useCart()
+  const {
+    addToCart,
+    getCartQuantity,
+  } = useCart()
 
   const [selectedSize, setSelectedSize] =
     useState("")
@@ -235,6 +238,31 @@ function ProductDetailModal({
     selectedSize,
     selectedColor,
   ])
+
+  const cartQuantity =
+    selectedVariant
+      ? getCartQuantity(
+          product.id,
+          selectedVariant.id,
+          selectedSize,
+          selectedColor
+        )
+      : 0
+
+  const stockAvailable =
+    selectedVariant
+      ? Number(selectedVariant.stock)
+      : 0
+
+  const remainingStock = Math.max(
+    stockAvailable - cartQuantity,
+    0
+  )
+
+  const canAddToCart =
+    !!selectedVariant &&
+    remainingStock > 0 &&
+    quantity <= remainingStock
 
   const availableColorsForSize =
     useMemo(() => {
@@ -464,12 +492,11 @@ function ProductDetailModal({
       return
     }
 
-    const stock = Number(
-      selectedVariant.stock
-    )
-
     setQuantity((current) =>
-      Math.min(current + 1, stock)
+      Math.min(
+        current + 1,
+        remainingStock
+      )
     )
   }
 
@@ -480,11 +507,7 @@ function ProductDetailModal({
   }
 
   const handleAddToCart = () => {
-    if (
-      !selectedSize ||
-      !selectedColor ||
-      !selectedVariant
-    ) {
+    if (!canAddToCart) {
       return
     }
 
@@ -545,7 +568,7 @@ function ProductDetailModal({
       }}
     >
       <div
-        className={`relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#141512] shadow-[0_30px_100px_rgba(0,0,0,0.65)] transition-all duration-300 md:flex-row ${
+        className={`relative flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#141512] shadow-[0_30px_100px_rgba(0,0,0,0.65)] transition-all duration-300 md:flex-row ${
           modalVisible
             ? "translate-y-0 scale-100 opacity-100"
             : "translate-y-8 scale-[0.97] opacity-0"
@@ -562,7 +585,7 @@ function ProductDetailModal({
 
         <div className="w-full overflow-y-auto md:w-[56%]">
           <div
-            className="relative aspect-[4/5] w-full overflow-hidden bg-[#0D0E0C] md:aspect-[4/4.8]"
+            className="relative aspect-[4/5.8] w-full overflow-hidden bg-[#0D0E0C] md:aspect-[4/5.8]"
             onTouchStart={
               handleTouchStart
             }
@@ -681,7 +704,7 @@ function ProductDetailModal({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-9">
+        <div className="flex-1 overflow-y-auto p-5 md:p-8">
           <div className="pr-8">
             {product.subcategory && (
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#F0D58A]/80">
@@ -689,16 +712,16 @@ function ProductDetailModal({
               </p>
             )}
 
-            <h2 className="mt-2.5 text-[30px] font-black leading-[1.05] tracking-tight text-white md:text-[38px]">
+            <h2 className="mt-2 text-[30px] font-black leading-[1.05] tracking-tight text-white md:text-[38px]">
               {product.name}
             </h2>
 
-            <p className="mt-3 max-w-xl text-[13px] leading-6 text-white/45">
+            <p className="mt-2.5 max-w-xl text-[13px] leading-6 text-white/45">
               {product.description ||
                 "Sin descripción disponible."}
             </p>
 
-            <div className="mt-4 flex items-end gap-3">
+            <div className="mt-3 flex items-end gap-3">
               <span className="text-[25px] font-black tracking-tight text-[#F0D58A]">
                 S/{" "}
                 {Number(
@@ -717,7 +740,7 @@ function ProductDetailModal({
             </div>
           </div>
 
-          <div className="my-5 h-px bg-white/[0.07]" />
+          <div className="my-4 h-px bg-white/[0.07]" />
 
           {colors.length > 0 && (
             <div>
@@ -733,7 +756,7 @@ function ProductDetailModal({
                 )}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-3.5">
+              <div className="mt-3 flex flex-wrap gap-3.5">
                 {availableColorsForSize.map(
                   (color) => {
                     const isSelected =
@@ -780,7 +803,7 @@ function ProductDetailModal({
           )}
 
           {sizes.length > 0 && (
-            <div className="mt-5">
+            <div className="mt-4">
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-bold text-white/90">
                   Talla
@@ -793,7 +816,7 @@ function ProductDetailModal({
                 )}
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2.5">
+              <div className="mt-2.5 flex flex-wrap gap-2.5">
                 {availableSizesForColor.map(
                   (size) => {
                     const isSelected =
@@ -831,7 +854,7 @@ function ProductDetailModal({
 
           {selectedVariant && (
             <div
-              className={`mt-4 flex items-center justify-between rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3 transition-all duration-300 ${
+              className={`mt-3 flex items-center justify-between rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-2.5 transition-all duration-300 ${
                 selectionPulse
                   ? "scale-[1.015] border-[#F0D58A]/30"
                   : "scale-100"
@@ -842,26 +865,27 @@ function ProductDetailModal({
               </span>
 
               <span className="text-xs font-bold text-white/85">
-                {selectedVariant.stock}{" "}
-                {Number(
-                  selectedVariant.stock
-                ) === 1
-                  ? "unidad"
-                  : "unidades"}
+                {remainingStock}{" "}
+                {remainingStock === 1
+                  ? "unidad disponible"
+                  : "unidades disponibles"}
               </span>
             </div>
           )}
 
-          <div className="mt-5">
+          <div className="mt-4">
             <p className="text-[13px] font-bold text-white/90">
               Cantidad
             </p>
 
-            <div className="mt-2.5 flex w-fit items-center overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.025]">
+            <div className="mt-2 flex w-fit items-center overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.025]">
               <button
                 type="button"
                 onClick={decreaseQuantity}
-                className="flex h-11 w-11 items-center justify-center text-lg text-white/60 transition-all duration-200 hover:bg-white/[0.06] hover:text-white active:scale-90"
+                disabled={
+                  quantity <= 1
+                }
+                className="flex h-11 w-11 items-center justify-center text-lg text-white/60 transition-all duration-200 hover:bg-white/[0.06] hover:text-white active:scale-90 disabled:cursor-not-allowed disabled:opacity-25"
               >
                 −
               </button>
@@ -876,9 +900,7 @@ function ProductDetailModal({
                 disabled={
                   !selectedVariant ||
                   quantity >=
-                    Number(
-                      selectedVariant.stock
-                    )
+                    remainingStock
                 }
                 className="flex h-11 w-11 items-center justify-center text-lg text-white/60 transition-all duration-200 hover:bg-white/[0.06] hover:text-white active:scale-90 disabled:cursor-not-allowed disabled:opacity-25"
               >
@@ -890,19 +912,23 @@ function ProductDetailModal({
           <button
             type="button"
             onClick={handleAddToCart}
-            disabled={!selectedVariant}
-            className={`mt-6 w-full rounded-2xl px-5 py-4 text-sm font-black tracking-wide transition-all duration-300 ${
+            disabled={!canAddToCart}
+            className={`mt-4 w-full rounded-2xl px-5 py-4 text-sm font-black tracking-wide transition-all duration-300 ${
               added
                 ? "scale-[1.015] bg-green-500 text-white shadow-[0_10px_35px_rgba(34,197,94,0.18)]"
-                : "bg-[#F0D58A] text-black hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_10px_35px_rgba(240,213,138,0.14)] active:translate-y-0 active:scale-[0.98]"
-            } disabled:cursor-not-allowed disabled:bg-white/[0.07] disabled:text-white/25 disabled:shadow-none`}
+                : canAddToCart
+                  ? "bg-[#F0D58A] text-black hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_10px_35px_rgba(240,213,138,0.14)] active:translate-y-0 active:scale-[0.98]"
+                  : "bg-white/[0.07] text-white/25"
+            } disabled:cursor-not-allowed disabled:shadow-none`}
           >
             {added
               ? "✓ Agregado al carrito"
               : !selectedSize ||
                   !selectedColor
                 ? "Elige talla y color"
-                : "Agregar al carrito"}
+                : remainingStock <= 0
+                  ? "Stock agotado"
+                  : "Agregar al carrito"}
           </button>
         </div>
       </div>

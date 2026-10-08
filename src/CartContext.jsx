@@ -21,8 +21,30 @@ export function CartProvider({ children }) {
     }, 3000)
   }
 
+  const getCartQuantity = (
+    productId,
+    variantId,
+    selectedSize,
+    selectedColor
+  ) => {
+    const item = cart.find(
+      (product) =>
+        product.productId === productId &&
+        product.variantId === variantId &&
+        product.selectedSize === selectedSize &&
+        product.selectedColor === selectedColor
+    )
+
+    return item?.quantity || 0
+  }
+
   const addToCart = (product) => {
-    const quantityToAdd = product.quantity || 1
+    const quantityToAdd = Number(
+      product.quantity || 1
+    )
+
+    const productId =
+      product.productId ?? product.id
 
     const availableStock = Number(
       product.availableStock ??
@@ -33,13 +55,16 @@ export function CartProvider({ children }) {
     let addedSuccessfully = false
 
     setCart((currentCart) => {
-      const existingIndex = currentCart.findIndex(
-        (item) =>
-          item.id === product.id &&
-          item.variantId === product.variantId &&
-          item.selectedSize === product.selectedSize &&
-          item.selectedColor === product.selectedColor
-      )
+      const existingIndex =
+        currentCart.findIndex(
+          (item) =>
+            item.productId === productId &&
+            item.variantId === product.variantId &&
+            item.selectedSize ===
+              product.selectedSize &&
+            item.selectedColor ===
+              product.selectedColor
+        )
 
       if (existingIndex !== -1) {
         const existingProduct =
@@ -66,14 +91,27 @@ export function CartProvider({ children }) {
 
         addedSuccessfully = true
 
-        return currentCart.map((item, index) =>
-          index === existingIndex
-            ? {
-                ...item,
-                quantity: finalQuantity,
-              }
-            : item
+        return currentCart.map(
+          (item, index) =>
+            index === existingIndex
+              ? {
+                  ...item,
+                  quantity: finalQuantity,
+                }
+              : item
         )
+      }
+
+      const finalQuantity =
+        availableStock > 0
+          ? Math.min(
+              quantityToAdd,
+              availableStock
+            )
+          : quantityToAdd
+
+      if (finalQuantity <= 0) {
+        return currentCart
       }
 
       addedSuccessfully = true
@@ -82,12 +120,8 @@ export function CartProvider({ children }) {
         ...currentCart,
         {
           ...product,
-          quantity: Math.min(
-            quantityToAdd,
-            availableStock > 0
-              ? availableStock
-              : quantityToAdd
-          ),
+          productId,
+          quantity: finalQuantity,
         },
       ]
     })
@@ -169,17 +203,19 @@ export function CartProvider({ children }) {
       value={{
         cart,
         addToCart,
+        getCartQuantity,
         increaseQuantity,
         decreaseQuantity,
         removeFromCart,
         clearCart,
+        goToCart,
         cartNotification,
       }}
     >
       {children}
 
       {cartNotification && (
-        <div className="fixed bottom-6 left-1/2 z-[200] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
+        <div className="fixed bottom-6 left-1/2 z-[300] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#F0D58A]/30 bg-[#151714] px-4 py-3 shadow-2xl">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#78B87A] text-sm font-black text-white">
