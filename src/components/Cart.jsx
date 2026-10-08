@@ -1,26 +1,16 @@
-import { useEffect, useState } from "react"
 import { useCart } from "../CartContext"
 import store from "../data/store"
 
 function Cart() {
-  const [cartOpen, setCartOpen] = useState(false)
-
-  useEffect(() => {
-    const openCart = () => setCartOpen(true)
-
-    window.addEventListener("open-cart", openCart)
-
-    return () => {
-      window.removeEventListener("open-cart", openCart)
-    }
-  }, [])
-
   const {
     cart,
     increaseQuantity,
     decreaseQuantity,
     removeFromCart,
     clearCart,
+    cartOpen,
+    openCart,
+    closeCart,
   } = useCart()
 
   const total = cart.reduce(
@@ -56,7 +46,7 @@ function Cart() {
   return (
     <>
       <button
-        onClick={() => setCartOpen(true)}
+        onClick={openCart}
         aria-label="Carrito"
         className={`text-lg text-white transition hover:text-[#F0D58A] ${
           totalItems > 0
@@ -75,8 +65,8 @@ function Cart() {
 
       {cartOpen && (
         <div
-          className="fixed inset-0 z-[150] bg-black/60"
-          onClick={() => setCartOpen(false)}
+          className="fixed inset-0 z-[250] bg-black/60"
+          onClick={closeCart}
         >
           <div
             className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto bg-[#151714] p-6 text-white shadow-xl"
@@ -90,7 +80,7 @@ function Cart() {
               </h2>
 
               <button
-                onClick={() => setCartOpen(false)}
+                onClick={closeCart}
                 className="text-xl text-gray-400 transition hover:text-white"
                 aria-label="Cerrar carrito"
               >
@@ -109,7 +99,7 @@ function Cart() {
                 <div className="space-y-4">
                   {cart.map((product, index) => (
                     <div
-                      key={`${product.id}-${index}`}
+                      key={`${product.productId || product.id}-${product.variantId}-${product.selectedSize}-${product.selectedColor}`}
                       className="rounded-xl border border-[#302E28] p-4"
                     >
                       <div className="flex items-start justify-between">
@@ -179,6 +169,7 @@ function Cart() {
                 <div className="mt-8 border-t border-[#302E28] pt-5">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
+
                     <span>
                       S/ {total}
                     </span>

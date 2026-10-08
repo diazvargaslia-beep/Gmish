@@ -6,6 +6,7 @@ export function CartProvider({ children }) {
   const [cart, setCart] = useState([])
   const [cartNotification, setCartNotification] =
     useState(null)
+  const [cartOpen, setCartOpen] = useState(false)
 
   const showCartNotification = (product) => {
     setCartNotification({
@@ -29,22 +30,20 @@ export function CartProvider({ children }) {
   ) => {
     const item = cart.find(
       (product) =>
-        product.productId === productId &&
+        (product.productId || product.id) === productId &&
         product.variantId === variantId &&
         product.selectedSize === selectedSize &&
         product.selectedColor === selectedColor
     )
 
-    return item?.quantity || 0
+    return item ? item.quantity : 0
   }
 
   const addToCart = (product) => {
-    const quantityToAdd = Number(
-      product.quantity || 1
+    const quantityToAdd = Math.max(
+      Number(product.quantity) || 1,
+      1
     )
-
-    const productId =
-      product.productId ?? product.id
 
     const availableStock = Number(
       product.availableStock ??
@@ -55,11 +54,16 @@ export function CartProvider({ children }) {
     let addedSuccessfully = false
 
     setCart((currentCart) => {
+      const productId =
+        product.productId || product.id
+
       const existingIndex =
         currentCart.findIndex(
           (item) =>
-            item.productId === productId &&
-            item.variantId === product.variantId &&
+            (item.productId || item.id) ===
+              productId &&
+            item.variantId ===
+              product.variantId &&
             item.selectedSize ===
               product.selectedSize &&
             item.selectedColor ===
@@ -102,6 +106,8 @@ export function CartProvider({ children }) {
         )
       }
 
+      addedSuccessfully = true
+
       const finalQuantity =
         availableStock > 0
           ? Math.min(
@@ -110,17 +116,10 @@ export function CartProvider({ children }) {
             )
           : quantityToAdd
 
-      if (finalQuantity <= 0) {
-        return currentCart
-      }
-
-      addedSuccessfully = true
-
       return [
         ...currentCart,
         {
           ...product,
-          productId,
           quantity: finalQuantity,
         },
       ]
@@ -190,12 +189,13 @@ export function CartProvider({ children }) {
     setCart([])
   }
 
-  const goToCart = () => {
+  const openCart = () => {
     setCartNotification(null)
+    setCartOpen(true)
+  }
 
-    window.dispatchEvent(
-      new Event("open-cart")
-    )
+  const closeCart = () => {
+    setCartOpen(false)
   }
 
   return (
@@ -203,13 +203,15 @@ export function CartProvider({ children }) {
       value={{
         cart,
         addToCart,
-        getCartQuantity,
         increaseQuantity,
         decreaseQuantity,
         removeFromCart,
         clearCart,
-        goToCart,
         cartNotification,
+        cartOpen,
+        openCart,
+        closeCart,
+        getCartQuantity,
       }}
     >
       {children}
@@ -229,7 +231,7 @@ export function CartProvider({ children }) {
 
             <button
               type="button"
-              onClick={goToCart}
+              onClick={openCart}
               className="flex-shrink-0 rounded-full bg-[#F0D58A] px-4 py-2 text-xs font-black text-black transition hover:bg-white"
             >
               Ver carrito

@@ -583,9 +583,10 @@ function ProductDetailModal({
           ✕
         </button>
 
-        <div className="w-full overflow-y-auto md:w-[56%]">
+        {/* GALERÍA */}
+        <div className="w-full shrink-0 overflow-y-auto md:w-[56%]">
           <div
-            className="relative aspect-[4/5.8] w-full overflow-hidden bg-[#0D0E0C] md:aspect-[4/5.8]"
+            className="relative h-[72vh] min-h-[500px] w-full overflow-hidden bg-[#0D0E0C] md:h-[78vh] md:min-h-[560px]"
             onTouchStart={
               handleTouchStart
             }
@@ -679,7 +680,7 @@ function ProductDetailModal({
               {displayedImages.map(
                 (image, index) => (
                   <button
-                    key={`${image}-thumb-${index}`}
+                    key={`${image}-${index}-thumb`}
                     type="button"
                     onClick={() =>
                       changeImage(index)
@@ -704,6 +705,7 @@ function ProductDetailModal({
           )}
         </div>
 
+        {/* INFORMACIÓN */}
         <div className="flex-1 overflow-y-auto p-5 md:p-8">
           <div className="pr-8">
             {product.subcategory && (
