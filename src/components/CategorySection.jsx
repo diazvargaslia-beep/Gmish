@@ -12,41 +12,42 @@ function CategorySection({
   const [selectedProduct, setSelectedProduct] =
     useState(null)
 
-  const subcategories =
-    category === "hombre"
-      ? ["polos", "pantalones"]
-      : [
-          "tops",
-          "conjuntos",
-          "vestidos",
-          "pantalones",
-          "zapatos",
-        ]
+  const categoryProducts = useMemo(() => {
+    return products.filter(
+      (product) => product.category === category
+    )
+  }, [products, category])
+
+  const subcategories = useMemo(() => {
+    const values = categoryProducts
+      .map((product) => product.subcategory)
+      .filter(Boolean)
+      .map((subcategory) =>
+        String(subcategory).trim().toLowerCase()
+      )
+
+    return [...new Set(values)]
+  }, [categoryProducts])
 
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      if (product.category !== category) {
-        return false
-      }
+    if (selectedSubcategory === "todos") {
+      return categoryProducts
+    }
 
-      if (
-        selectedSubcategory !== "todos" &&
-        product.subcategory !==
-          selectedSubcategory
-      ) {
-        return false
-      }
-
-      return true
-    })
+    return categoryProducts.filter(
+      (product) =>
+        String(product.subcategory || "")
+          .trim()
+          .toLowerCase() === selectedSubcategory
+    )
   }, [
-    products,
-    category,
+    categoryProducts,
     selectedSubcategory,
   ])
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 md:py-14">
+
       <div className="mb-8">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#F0D58A]">
           Colección
@@ -57,58 +58,69 @@ function CategorySection({
         </h1>
       </div>
 
-      <div className="mb-10 flex gap-3 overflow-x-auto pb-2">
-        <button
-          type="button"
-          onClick={() =>
-            setSelectedSubcategory("todos")
-          }
-          className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold transition ${
-            selectedSubcategory === "todos"
-              ? "border-[#F0D58A] bg-[#F0D58A] text-black"
-              : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
-          }`}
-        >
-          Todos
-        </button>
+      {subcategories.length > 0 && (
+        <div className="mb-10 flex gap-3 overflow-x-auto pb-2">
 
-        {subcategories.map((subcategory) => (
           <button
-            key={subcategory}
             type="button"
             onClick={() =>
-              setSelectedSubcategory(
-                subcategory
-              )
+              setSelectedSubcategory("todos")
             }
-            className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold capitalize transition ${
-              selectedSubcategory === subcategory
+            className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold transition ${
+              selectedSubcategory === "todos"
                 ? "border-[#F0D58A] bg-[#F0D58A] text-black"
                 : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
             }`}
           >
-            {subcategory}
+            Todos
           </button>
-        ))}
-      </div>
+
+          {subcategories.map((subcategory) => (
+            <button
+              key={subcategory}
+              type="button"
+              onClick={() =>
+                setSelectedSubcategory(
+                  subcategory
+                )
+              }
+              className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold capitalize transition ${
+                selectedSubcategory === subcategory
+                  ? "border-[#F0D58A] bg-[#F0D58A] text-black"
+                  : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
+              }`}
+            >
+              {subcategory}
+            </button>
+          ))}
+
+        </div>
+      )}
 
       {selectedSubcategory === "todos" ? (
         <div className="space-y-12">
+
           {subcategories.map((subcategory) => {
-            const categoryProducts =
-              filteredProducts.filter(
+            const productsInSubcategory =
+              categoryProducts.filter(
                 (product) =>
-                  product.subcategory ===
+                  String(
+                    product.subcategory || ""
+                  )
+                    .trim()
+                    .toLowerCase() ===
                   subcategory
               )
 
-            if (categoryProducts.length === 0) {
+            if (productsInSubcategory.length === 0) {
               return null
             }
 
             return (
               <div key={subcategory}>
+
                 <div className="mb-4 flex items-end justify-between gap-4">
+
                   <h2 className="text-2xl font-black capitalize md:text-3xl">
                     {subcategory}
                   </h2>
@@ -124,17 +136,46 @@ function CategorySection({
                   >
                     Ver todos
                   </button>
+
                 </div>
 
                 <ProductCarousel
-                  products={categoryProducts}
+                  products={productsInSubcategory}
                   onSelectProduct={
                     setSelectedProduct
                   }
                 />
+
               </div>
             )
           })}
+
+          {/* PRODUCTOS SIN SUBCATEGORÍA */}
+          {categoryProducts.some(
+            (product) =>
+              !product.subcategory
+          ) && (
+            <div>
+
+              <div className="mb-4">
+                <h2 className="text-2xl font-black md:text-3xl">
+                  Otros
+                </h2>
+              </div>
+
+              <ProductCarousel
+                products={categoryProducts.filter(
+                  (product) =>
+                    !product.subcategory
+                )}
+                onSelectProduct={
+                  setSelectedProduct
+                }
+              />
+
+            </div>
+          )}
+
         </div>
       ) : (
         <ProductCarousel
@@ -143,8 +184,9 @@ function CategorySection({
         />
       )}
 
-      {filteredProducts.length === 0 && (
+      {categoryProducts.length === 0 && (
         <div className="rounded-2xl border border-[#302E28] bg-[#151714] px-6 py-12 text-center">
+
           <p className="text-lg font-semibold">
             Todavía no hay productos aquí.
           </p>
@@ -153,6 +195,7 @@ function CategorySection({
             Los productos que agregues desde el
             panel aparecerán automáticamente.
           </p>
+
         </div>
       )}
 
@@ -164,6 +207,7 @@ function CategorySection({
           }
         />
       )}
+
     </section>
   )
 }
@@ -174,6 +218,7 @@ function ProductCarousel({
 }) {
   return (
     <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 scrollbar-hide">
+
       {products.map((product) => {
         const isOffer =
           product.old_price &&
@@ -185,6 +230,7 @@ function ProductCarousel({
             key={product.id}
             className="w-[260px] min-w-[260px] snap-start overflow-hidden rounded-2xl border border-[#302E28] bg-[#151714] md:w-[280px] md:min-w-[280px]"
           >
+
             <button
               type="button"
               onClick={() =>
@@ -192,7 +238,9 @@ function ProductCarousel({
               }
               className="block w-full text-left"
             >
+
               <div className="relative flex aspect-[4/5] items-center justify-center bg-[#111210]">
+
                 <span className="text-sm text-gray-600">
                   Sin imagen
                 </span>
@@ -208,11 +256,13 @@ function ProductCarousel({
                     Oferta
                   </span>
                 )}
+
               </div>
 
               <div className="p-4">
+
                 <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  {product.subcategory}
+                  {product.subcategory || "Producto"}
                 </p>
 
                 <h3 className="mt-1 text-lg font-bold">
@@ -220,6 +270,7 @@ function ProductCarousel({
                 </h3>
 
                 <div className="mt-3 flex items-center gap-2">
+
                   <span className="text-lg font-black text-[#F0D58A]">
                     S/{" "}
                     {Number(
@@ -235,11 +286,15 @@ function ProductCarousel({
                       ).toFixed(2)}
                     </span>
                   )}
+
                 </div>
+
               </div>
+
             </button>
 
             <div className="px-4 pb-4">
+
               <button
                 type="button"
                 onClick={() =>
@@ -249,10 +304,13 @@ function ProductCarousel({
               >
                 Agregar al carrito
               </button>
+
             </div>
+
           </article>
         )
       })}
+
     </div>
   )
 }

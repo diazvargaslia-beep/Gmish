@@ -4,6 +4,22 @@ const CartContext = createContext()
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([])
+  const [cartNotification, setCartNotification] =
+    useState(null)
+
+  const showCartNotification = (product) => {
+    setCartNotification({
+      message: `${product.name} agregado al carrito`,
+    })
+
+    if (navigator.vibrate) {
+      navigator.vibrate(80)
+    }
+
+    setTimeout(() => {
+      setCartNotification(null)
+    }, 3000)
+  }
 
   const addToCart = (product) => {
     const quantityToAdd = product.quantity || 1
@@ -13,6 +29,8 @@ export function CartProvider({ children }) {
         product.stock ??
         0
     )
+
+    let addedSuccessfully = false
 
     setCart((currentCart) => {
       const existingIndex = currentCart.findIndex(
@@ -28,7 +46,8 @@ export function CartProvider({ children }) {
           currentCart[existingIndex]
 
         const newQuantity =
-          existingProduct.quantity + quantityToAdd
+          existingProduct.quantity +
+          quantityToAdd
 
         const finalQuantity =
           availableStock > 0
@@ -37,6 +56,15 @@ export function CartProvider({ children }) {
                 availableStock
               )
             : newQuantity
+
+        if (
+          finalQuantity ===
+          existingProduct.quantity
+        ) {
+          return currentCart
+        }
+
+        addedSuccessfully = true
 
         return currentCart.map((item, index) =>
           index === existingIndex
@@ -47,6 +75,8 @@ export function CartProvider({ children }) {
             : item
         )
       }
+
+      addedSuccessfully = true
 
       return [
         ...currentCart,
@@ -61,6 +91,12 @@ export function CartProvider({ children }) {
         },
       ]
     })
+
+    setTimeout(() => {
+      if (addedSuccessfully) {
+        showCartNotification(product)
+      }
+    }, 0)
   }
 
   const increaseQuantity = (index) => {
@@ -120,6 +156,14 @@ export function CartProvider({ children }) {
     setCart([])
   }
 
+  const goToCart = () => {
+    setCartNotification(null)
+
+    window.dispatchEvent(
+      new Event("open-cart")
+    )
+  }
+
   return (
     <CartContext.Provider
       value={{
@@ -129,9 +173,34 @@ export function CartProvider({ children }) {
         decreaseQuantity,
         removeFromCart,
         clearCart,
+        cartNotification,
       }}
     >
       {children}
+
+      {cartNotification && (
+        <div className="fixed bottom-6 left-1/2 z-[200] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#F0D58A]/30 bg-[#151714] px-4 py-3 shadow-2xl">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#78B87A] text-sm font-black text-white">
+                ✓
+              </span>
+
+              <span className="truncate text-sm font-semibold text-white">
+                {cartNotification.message}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={goToCart}
+              className="flex-shrink-0 rounded-full bg-[#F0D58A] px-4 py-2 text-xs font-black text-black transition hover:bg-white"
+            >
+              Ver carrito
+            </button>
+          </div>
+        </div>
+      )}
     </CartContext.Provider>
   )
 }

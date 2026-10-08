@@ -9,7 +9,14 @@ export async function getProducts() {
         id,
         size,
         color,
-        stock
+        color_hex,
+        color_image_url,
+        stock,
+        product_variant_images (
+          id,
+          image_url,
+          position
+        )
       ),
       product_images (
         id,
@@ -33,7 +40,11 @@ export async function getProducts() {
     })
 
   if (error) {
-    console.error("Error cargando productos:", error)
+    console.error(
+      "Error cargando productos:",
+      error
+    )
+
     throw error
   }
 

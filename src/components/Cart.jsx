@@ -4,15 +4,16 @@ import store from "../data/store"
 
 function Cart() {
   const [cartOpen, setCartOpen] = useState(false)
+
   useEffect(() => {
-  const openCart = () => setCartOpen(true)
+    const openCart = () => setCartOpen(true)
 
-  window.addEventListener("open-cart", openCart)
+    window.addEventListener("open-cart", openCart)
 
-  return () => {
-    window.removeEventListener("open-cart", openCart)
-  }
-}, [])
+    return () => {
+      window.removeEventListener("open-cart", openCart)
+    }
+  }, [])
 
   const {
     cart,
@@ -23,7 +24,8 @@ function Cart() {
   } = useCart()
 
   const total = cart.reduce(
-    (sum, product) => sum + product.price * product.quantity,
+    (sum, product) =>
+      sum + Number(product.price) * product.quantity,
     0
   )
 
@@ -35,7 +37,7 @@ function Cart() {
   const sendToWhatsApp = () => {
     const orderLines = cart.map(
       (product) =>
-        `• ${product.name} | Talla: ${product.selectedSize} | Color: ${product.selectedColor} | Cantidad: ${product.quantity} | S/${product.price * product.quantity}`
+        `• ${product.name} | Talla: ${product.selectedSize} | Color: ${product.selectedColor} | Cantidad: ${product.quantity} | S/${Number(product.price) * product.quantity}`
     )
 
     const message = [
@@ -57,7 +59,9 @@ function Cart() {
         onClick={() => setCartOpen(true)}
         aria-label="Carrito"
         className={`text-lg text-white transition hover:text-[#F0D58A] ${
-          totalItems > 0 ? "scale-110 text-[#F0D58A]" : ""
+          totalItems > 0
+            ? "scale-110 text-[#F0D58A]"
+            : ""
         }`}
       >
         🛒
@@ -70,12 +74,17 @@ function Cart() {
       </button>
 
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60">
-
-          <div className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto bg-[#151714] p-6 text-white shadow-xl">
-
+        <div
+          className="fixed inset-0 z-[150] bg-black/60"
+          onClick={() => setCartOpen(false)}
+        >
+          <div
+            className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto bg-[#151714] p-6 text-white shadow-xl"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
             <div className="flex items-center justify-between border-b border-[#302E28] pb-4">
-
               <h2 className="text-xl font-bold">
                 Tu carrito
               </h2>
@@ -87,7 +96,6 @@ function Cart() {
               >
                 ✕
               </button>
-
             </div>
 
             {cart.length === 0 ? (
@@ -98,48 +106,50 @@ function Cart() {
               </div>
             ) : (
               <div className="mt-6">
-
                 <div className="space-y-4">
-
                   {cart.map((product, index) => (
                     <div
                       key={`${product.id}-${index}`}
                       className="rounded-xl border border-[#302E28] p-4"
                     >
-
                       <div className="flex items-start justify-between">
-
                         <div>
                           <h3 className="font-semibold">
                             {product.name}
                           </h3>
 
                           <p className="mt-1 text-sm text-gray-400">
-                            Talla: {product.selectedSize}
+                            Talla:{" "}
+                            {product.selectedSize}
                           </p>
 
                           <p className="text-sm text-gray-400">
-                            Color: {product.selectedColor}
+                            Color:{" "}
+                            {product.selectedColor}
                           </p>
 
                           <p className="mt-2 font-semibold text-[#F0D58A]">
-                            S/ {product.price * product.quantity}
+                            S/{" "}
+                            {Number(product.price) *
+                              product.quantity}
                           </p>
                         </div>
 
                         <button
-                          onClick={() => removeFromCart(index)}
+                          onClick={() =>
+                            removeFromCart(index)
+                          }
                           className="text-sm text-gray-400 transition hover:text-red-400"
                         >
                           Eliminar
                         </button>
-
                       </div>
 
                       <div className="mt-4 flex items-center gap-3">
-
                         <button
-                          onClick={() => decreaseQuantity(index)}
+                          onClick={() =>
+                            decreaseQuantity(index)
+                          }
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-[#302E28] text-lg transition hover:border-[#F0D58A]"
                         >
                           −
@@ -150,7 +160,9 @@ function Cart() {
                         </span>
 
                         <button
-                          onClick={() => increaseQuantity(index)}
+                          onClick={() =>
+                            increaseQuantity(index)
+                          }
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-[#302E28] text-lg transition hover:border-[#F0D58A]"
                         >
                           +
@@ -159,19 +171,17 @@ function Cart() {
                         <span className="ml-2 text-sm text-gray-400">
                           S/ {product.price} c/u
                         </span>
-
                       </div>
-
                     </div>
                   ))}
-
                 </div>
 
                 <div className="mt-8 border-t border-[#302E28] pt-5">
-
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>S/ {total}</span>
+                    <span>
+                      S/ {total}
+                    </span>
                   </div>
 
                   <button
@@ -187,14 +197,10 @@ function Cart() {
                   >
                     Vaciar carrito
                   </button>
-
                 </div>
-
               </div>
             )}
-
           </div>
-
         </div>
       )}
     </>

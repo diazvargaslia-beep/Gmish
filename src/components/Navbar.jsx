@@ -65,8 +65,10 @@ function Navbar({
     <header className="border-b border-[#302E28] bg-[#151714]">
       <div className="mx-auto max-w-7xl px-4 py-4">
 
+        {/* PARTE SUPERIOR */}
         <div className="flex h-16 items-center justify-between">
 
+          {/* LOGO */}
           <button
             onClick={() => selectCategory("todos")}
             className="logo-glitter text-3xl font-black italic tracking-[0.08em] md:text-4xl"
@@ -74,6 +76,7 @@ function Navbar({
             GMISH
           </button>
 
+          {/* BUSCADOR + CARRITO */}
           <div className="flex items-center gap-4">
 
             {searchOpen ? (
@@ -81,7 +84,6 @@ function Navbar({
                 onSubmit={submitSearch}
                 className="flex items-center rounded-full border border-[#302E28] bg-[#111210]"
               >
-
                 <span className="pl-3">
                   🔍
                 </span>
@@ -106,7 +108,6 @@ function Navbar({
                 >
                   ✕
                 </button>
-
               </form>
             ) : (
               <button
@@ -123,8 +124,10 @@ function Navbar({
           </div>
         </div>
 
+        {/* NAVEGACIÓN PRINCIPAL */}
         <nav className="flex items-center justify-center gap-5 overflow-x-auto pt-3 md:gap-8">
 
+          {/* INICIO */}
           <button
             onClick={() => selectCategory("todos")}
             className={`whitespace-nowrap text-sm font-semibold transition ${
@@ -136,6 +139,7 @@ function Navbar({
             Inicio
           </button>
 
+          {/* HOMBRE */}
           <button
             onClick={() => selectCategory("hombre")}
             className={`whitespace-nowrap text-sm font-semibold transition ${
@@ -147,6 +151,7 @@ function Navbar({
             Hombre
           </button>
 
+          {/* MUJER */}
           <button
             onClick={() => selectCategory("mujer")}
             className={`whitespace-nowrap text-sm font-semibold transition ${
@@ -158,6 +163,7 @@ function Navbar({
             Mujer
           </button>
 
+          {/* OFERTAS */}
           <button
             onClick={() => selectCategory("ofertas")}
             className={`whitespace-nowrap text-sm font-semibold transition ${

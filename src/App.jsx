@@ -92,6 +92,7 @@ function App() {
   return (
     <CartProvider>
       <div className="min-h-screen bg-[#0D0F0C] text-white">
+
         <Navbar
           category={category}
           setCategory={selectCategory}
@@ -99,6 +100,7 @@ function App() {
           setSearch={setSearch}
         />
 
+        {/* INICIO */}
         {category === "todos" && (
           <>
             <Hero />
@@ -116,14 +118,37 @@ function App() {
           </>
         )}
 
-        {(category === "hombre" || category === "mujer") && (
+        {/* HOMBRE */}
+        {category === "hombre" && (
           <CategorySection
-            category={category}
+            category="hombre"
             onSelectCategory={selectCategory}
             products={products}
           />
         )}
 
+        {/* MUJER */}
+        {category === "mujer" && (
+          <section className="flex min-h-[60vh] items-center justify-center px-6 py-20">
+            <div className="text-center">
+
+              <p className="logo-glitter text-4xl font-black italic tracking-[0.08em] md:text-5xl">
+                GMISH
+              </p>
+
+              <h2 className="mt-6 text-2xl font-semibold text-white md:text-3xl">
+                Mujer
+              </h2>
+
+              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-400">
+                Próximamente encontrarás nuestra colección para mujer.
+              </p>
+
+            </div>
+          </section>
+        )}
+
+        {/* OFERTAS */}
         {category === "ofertas" && (
           <FeaturedProducts
             category="ofertas"
@@ -132,6 +157,7 @@ function App() {
             products={products}
           />
         )}
+
       </div>
     </CartProvider>
   )
