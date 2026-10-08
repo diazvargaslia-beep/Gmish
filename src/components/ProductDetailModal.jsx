@@ -560,9 +560,9 @@ function ProductDetailModal({
           ✕
         </button>
 
-        <div className="w-full overflow-y-auto md:w-[52%]">
+        <div className="w-full overflow-y-auto md:w-[56%]">
           <div
-            className="relative aspect-[4/5] w-full overflow-hidden bg-[#0D0E0C]"
+            className="relative aspect-[4/5] w-full overflow-hidden bg-[#0D0E0C] md:aspect-[4/4.8]"
             onTouchStart={
               handleTouchStart
             }
@@ -693,7 +693,12 @@ function ProductDetailModal({
               {product.name}
             </h2>
 
-            <div className="mt-5 flex items-end gap-3">
+            <p className="mt-3 max-w-xl text-[13px] leading-6 text-white/45">
+              {product.description ||
+                "Sin descripción disponible."}
+            </p>
+
+            <div className="mt-4 flex items-end gap-3">
               <span className="text-[25px] font-black tracking-tight text-[#F0D58A]">
                 S/{" "}
                 {Number(
@@ -712,7 +717,7 @@ function ProductDetailModal({
             </div>
           </div>
 
-          <div className="my-7 h-px bg-white/[0.07]" />
+          <div className="my-5 h-px bg-white/[0.07]" />
 
           {colors.length > 0 && (
             <div>
@@ -775,7 +780,7 @@ function ProductDetailModal({
           )}
 
           {sizes.length > 0 && (
-            <div className="mt-9">
+            <div className="mt-5">
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-bold text-white/90">
                   Talla
@@ -788,7 +793,7 @@ function ProductDetailModal({
                 )}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2.5">
+              <div className="mt-3 flex flex-wrap gap-2.5">
                 {availableSizesForColor.map(
                   (size) => {
                     const isSelected =
@@ -826,7 +831,7 @@ function ProductDetailModal({
 
           {selectedVariant && (
             <div
-              className={`mt-6 flex items-center justify-between rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3 transition-all duration-300 ${
+              className={`mt-4 flex items-center justify-between rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3 transition-all duration-300 ${
                 selectionPulse
                   ? "scale-[1.015] border-[#F0D58A]/30"
                   : "scale-100"
@@ -847,12 +852,12 @@ function ProductDetailModal({
             </div>
           )}
 
-          <div className="mt-8">
+          <div className="mt-5">
             <p className="text-[13px] font-bold text-white/90">
               Cantidad
             </p>
 
-            <div className="mt-3.5 flex w-fit items-center overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.025]">
+            <div className="mt-2.5 flex w-fit items-center overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.025]">
               <button
                 type="button"
                 onClick={decreaseQuantity}
@@ -882,22 +887,11 @@ function ProductDetailModal({
             </div>
           </div>
 
-          <div className="mt-8">
-            <p className="text-[13px] font-bold text-white/90">
-              Descripción
-            </p>
-
-            <p className="mt-3 text-[13px] leading-6 text-white/45">
-              {product.description ||
-                "Sin descripción disponible."}
-            </p>
-          </div>
-
           <button
             type="button"
             onClick={handleAddToCart}
             disabled={!selectedVariant}
-            className={`mt-8 w-full rounded-2xl px-5 py-4 text-sm font-black tracking-wide transition-all duration-300 ${
+            className={`mt-6 w-full rounded-2xl px-5 py-4 text-sm font-black tracking-wide transition-all duration-300 ${
               added
                 ? "scale-[1.015] bg-green-500 text-white shadow-[0_10px_35px_rgba(34,197,94,0.18)]"
                 : "bg-[#F0D58A] text-black hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_10px_35px_rgba(240,213,138,0.14)] active:translate-y-0 active:scale-[0.98]"
