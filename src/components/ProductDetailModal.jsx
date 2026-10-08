@@ -586,7 +586,7 @@ function ProductDetailModal({
         {/* GALERÍA */} 
         <div className="w-full shrink-0 overflow-y-auto md:w-[56%]"> 
           <div 
-            className="relative h-[50vh] min-h-[280px] w-full overflow-hidden bg-[#0D0E0C] md:h-[78vh] md:min-h-[560px]" 
+            className="relative h-[40vh] min-h-[240px] w-full overflow-hidden bg-[#0D0E0C] md:h-[78vh] md:min-h-[560px]" 
             onTouchStart={ 
               handleTouchStart 
             } 
