@@ -568,7 +568,7 @@ function ProductDetailModal({
       }} 
     > 
       <div 
-        className={`relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#141512] shadow-[0_30px_100px_rgba(0,0,0,0.65)] transition-all duration-300 md:flex-row ${ 
+        className={`relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-y-auto rounded-[28px] border border-white/[0.08] bg-[#141512] shadow-[0_30px_100px_rgba(0,0,0,0.65)] transition-all duration-300 md:flex-row md:overflow-hidden ${ 
           modalVisible 
             ? "translate-y-0 scale-100 opacity-100" 
             : "translate-y-8 scale-[0.97] opacity-0" 
@@ -584,7 +584,7 @@ function ProductDetailModal({
         </button> 
  
         {/* GALERÍA */} 
-        <div className="w-full shrink-0 overflow-y-auto md:w-[56%]"> 
+        <div className="w-full shrink-0 overflow-visible md:w-[56%] md:overflow-y-auto"> 
           <div 
             className="relative h-[40vh] min-h-[240px] w-full overflow-hidden bg-[#0D0E0C] md:h-[78vh] md:min-h-[560px]" 
             onTouchStart={ 
@@ -706,7 +706,7 @@ function ProductDetailModal({
         </div> 
  
         {/* INFORMACIÓN */} 
-        <div className="flex-1 overflow-y-auto p-5 md:p-8"> 
+        <div className="flex-1 overflow-visible p-5 md:overflow-y-auto md:p-8"> 
           <div className="pr-8"> 
             {product.subcategory && ( 
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#F0D58A]/80"> 
