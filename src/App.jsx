@@ -16,6 +16,11 @@ function Tienda() {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [errorProductos, setErrorProductos] = useState("");
+  const [portadas, setPortadas] = useState({
+    inicio: "",
+    hombre: "",
+    mujer: "",
+  });
 
   const [subcategoriasSeleccionadas, setSubcategoriasSeleccionadas] =
     useState({
@@ -115,6 +120,49 @@ function Tienda() {
       window.removeEventListener("popstate", revisarRuta);
     };
   }, []);
+
+  
+  // Cargar las portadas guardadas en Supabase.
+  useEffect(() => {
+    let cancelado = false;
+
+    async function cargarPortadas() {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("setting_key, setting_value")
+        .in("setting_key", ["inicio", "hombre", "mujer"]);
+
+      if (cancelado) return;
+
+      if (error) {
+        console.error("Error al cargar portadas:", error);
+        return;
+      }
+
+      const portadasGuardadas = {
+        inicio: "",
+        hombre: "",
+        mujer: "",
+      };
+
+      (data || []).forEach((fila) => {
+        if (fila.setting_key in portadasGuardadas) {
+          portadasGuardadas[fila.setting_key] =
+            fila.setting_value || "";
+        }
+      });
+
+      setPortadas(portadasGuardadas);
+    }
+
+    if (!esAdmin) {
+      cargarPortadas();
+    }
+
+    return () => {
+      cancelado = true;
+    };
+  }, [esAdmin]);
 
   // Cargar productos activos desde Supabase.
   useEffect(() => {
@@ -573,7 +621,15 @@ function Tienda() {
 
       <main className="contenido-tienda">
         {pagina === "inicio" && (
-          <section className="hero-content">
+          
+          <section
+            className="hero-content"
+            style={{
+              "--portada-inicio": portadas.inicio
+                ? `url("${portadas.inicio}")`
+                : "url('/gmish-bg.jpg')",
+            }}
+          >
             <div className="portada-texto">
               <p className="portada-etiqueta">G’MISH COLLECTION</p>
               <h1 className="brand-name">G’MISH</h1>
@@ -616,7 +672,8 @@ function Tienda() {
                 onClick={() => irA("hombre")}
               >
                 <img
-                  src="/hombre.jpg"
+                  
+                  src={portadas.hombre || "/hombre.jpg"}
                   alt="Colección de hombre"
                   onError={(evento) => {
                     evento.currentTarget.style.display = "none";
@@ -640,8 +697,8 @@ function Tienda() {
                 className="categoria-boton"
                 onClick={() => irA("mujer")}
               >
-                <img
-                  src="/mujer.jpg"
+                <img                  
+                  src={portadas.mujer || "/mujer.jpg"}
                   alt="Colección de mujer"
                   onError={(evento) => {
                     evento.currentTarget.style.display = "none";

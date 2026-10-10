@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import ProductsAdmin from "./ProductsAdmin";
@@ -10,6 +11,15 @@ const secciones = [
   { id: "estadisticas", nombre: "Estadísticas", icono: "↗" },
   { id: "configuracion", nombre: "Configuración", icono: "⚙" },
 ];
+
+const tarjeta =
+  "rounded-2xl border border-[#303030] bg-[#141414]";
+
+const botonPrincipal =
+  "rounded-xl border border-[#454545] bg-[#222222] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#303030] disabled:cursor-not-allowed disabled:opacity-40";
+
+const campo =
+  "w-full rounded-xl border border-[#383838] bg-[#0d0d0d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#777777] focus:border-[#76509a] focus:ring-1 focus:ring-[#76509a]/30";
 
 export default function Admin() {
   const [sesion, setSesion] = useState(null);
@@ -24,37 +34,43 @@ export default function Admin() {
   useEffect(() => {
     let activo = true;
 
-    async function iniciar() {
-      const { data } = await supabase.auth.getSession();
+    async function cargarSesion() {
+      const { data, error: errorSesion } =
+        await supabase.auth.getSession();
 
       if (!activo) return;
 
-      setSesion(data.session);
-
-      if (data.session) {
-        const { error: errorConsulta } = await supabase
-          .from("products")
-          .select("id")
-          .limit(1);
-
-        if (activo) setConectado(!errorConsulta);
+      if (errorSesion) {
+        setError("No se pudo comprobar la sesión.");
       }
 
-      if (activo) setCargando(false);
+      setSesion(data?.session ?? null);
+      setCargando(false);
+
+      if (data?.session) {
+        comprobarConexion();
+      }
     }
 
-    iniciar();
+    cargarSesion();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_evento, nuevaSesion) => {
-        setSesion(nuevaSesion);
-        if (!nuevaSesion) setConectado(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_evento, nuevaSesion) => {
+      if (!activo) return;
+
+      setSesion(nuevaSesion);
+
+      if (nuevaSesion) {
+        comprobarConexion();
+      } else {
+        setConectado(false);
       }
-    );
+    });
 
     return () => {
       activo = false;
-      listener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -67,11 +83,12 @@ export default function Admin() {
     setConectado(!errorConsulta);
   }
 
-  async function iniciarSesion(evento) {
-    evento.preventDefault();
+  async function iniciarSesion(e) {
+    e.preventDefault();
     setError("");
+    setCargando(true);
 
-    const { data, error: errorLogin } =
+    const { error: errorLogin } =
       await supabase.auth.signInWithPassword({
         email,
         password,
@@ -79,115 +96,146 @@ export default function Admin() {
 
     if (errorLogin) {
       setError("No se pudo iniciar sesión. Revisa tus datos.");
+      setCargando(false);
       return;
     }
 
-    setSesion(data.session);
-    await comprobarConexion();
+    setCargando(false);
   }
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
     setSesion(null);
     setConectado(false);
+    setMenuAbierto(false);
+    setSeccion("inicio");
   }
 
-  if (cargando) {
+  function cambiarSeccion(id) {
+    setSeccion(id);
+    setMenuAbierto(false);
+  }
+
+  if (cargando && !sesion) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-neutral-500">
-        Cargando GMISH...
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#0b0b0b] px-5 text-white">
+        <div className="text-center">
+          <div className="mx-auto mb-5 h-8 w-8 animate-spin rounded-full border-2 border-[#383838] border-t-[#76509a]" />
+          <p className="text-sm text-gray-400">Cargando...</p>
+        </div>
+      </main>
     );
   }
 
   if (!sesion) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-5">
+      <main className="flex min-h-screen items-center justify-center bg-[#0b0b0b] px-5 py-10 text-white">
         <form
           onSubmit={iniciarSesion}
-          className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
+          className="w-full max-w-md rounded-3xl border border-[#303030] bg-[#141414] p-7 sm:p-10"
         >
-          <p className="mb-2 text-xs tracking-[0.3em] text-neutral-500">
-            GMISH COLLECTION
-          </p>
+          <div className="mb-9 text-center">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#49345d] bg-[#261535] text-3xl font-bold text-white">
+              G
+            </div>
 
-          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-neutral-900">
-            Administración
-          </h1>
+            <h1 className="text-2xl font-bold tracking-[0.2em]">
+              GMISH
+            </h1>
 
-          <p className="mb-7 text-sm text-neutral-500">
-            Inicia sesión para administrar tu tienda.
-          </p>
+            <p className="mt-3 text-xs tracking-[0.18em] text-gray-400">
+              COLLECTION · ADMINISTRACIÓN
+            </p>
+          </div>
 
-          <label className="mb-2 block text-sm text-neutral-700">
-            Correo electrónico
-          </label>
+          <div className="space-y-6">
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-3 block text-sm text-gray-300"
+              >
+                Correo electrónico
+              </label>
 
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="username"
-            className="mb-4 w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-neutral-900"
-            placeholder="Tu correo"
-          />
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={campo}
+                placeholder="tu@correo.com"
+                required
+              />
+            </div>
 
-          <label className="mb-2 block text-sm text-neutral-700">
-            Contraseña
-          </label>
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-3 block text-sm text-gray-300"
+              >
+                Contraseña
+              </label>
 
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            className="mb-4 w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-neutral-900"
-            placeholder="Tu contraseña"
-          />
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={campo}
+                placeholder="Tu contraseña"
+                required
+              />
+            </div>
+          </div>
 
           {error && (
-            <p className="mb-4 text-sm text-red-600">{error}</p>
+            <p className="mt-5 rounded-xl border border-red-900/60 bg-red-950/30 p-4 text-sm text-red-300">
+              {error}
+            </p>
           )}
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-neutral-900 px-4 py-3 text-sm font-medium text-white hover:bg-neutral-700"
+            disabled={cargando}
+            className="mt-7 w-full rounded-xl border border-[#654783] bg-[#261535] px-5 py-4 font-semibold text-white transition hover:bg-[#38204d] disabled:opacity-50"
           >
-            Iniciar sesión
+            {cargando ? "Ingresando..." : "Iniciar sesión"}
           </button>
         </form>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-neutral-900">
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-neutral-200 bg-white px-4 sm:px-7">
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#0b0b0b] text-white">
+      <header className="fixed inset-x-0 top-0 z-40 flex h-[76px] items-center justify-between border-b border-[#303030] bg-[#0b0b0b] px-5 sm:px-8">
+        <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => setMenuAbierto(!menuAbierto)}
-            className="rounded-lg border border-neutral-200 px-3 py-2 text-xl hover:bg-neutral-100"
-            aria-label="Abrir menú"
+            aria-label={menuAbierto ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuAbierto}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#303030] bg-[#111111] text-2xl text-white transition hover:bg-[#222222]"
           >
-            ☰
+            {menuAbierto ? "×" : "☰"}
           </button>
 
-          <span className="text-lg font-semibold tracking-[0.15em]">
-            GMISH
-          </span>
-
-          <span className="hidden text-sm text-neutral-400 sm:inline">
-            / Administración
-          </span>
+          <div>
+            <h1 className="text-lg font-bold tracking-[0.12em]">
+              GMISH
+            </h1>
+            <p className="mt-1 text-[10px] tracking-[0.18em] text-gray-500">
+              ADMINISTRACIÓN
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={cerrarSesion}
-          className="rounded-lg border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-100"
+          className="rounded-xl border border-[#303030] bg-[#151515] px-4 py-3 text-sm text-gray-300 transition hover:bg-[#292929] hover:text-white"
         >
           Cerrar sesión
         </button>
@@ -198,138 +246,184 @@ export default function Admin() {
           type="button"
           aria-label="Cerrar menú"
           onClick={() => setMenuAbierto(false)}
-          className="fixed inset-0 z-20 bg-black/20"
+          className="fixed inset-0 z-40 bg-black/70"
         />
       )}
 
       <aside
-        className={`fixed bottom-0 left-0 top-16 z-30 w-72 border-r border-neutral-200 bg-white p-4 transition-transform duration-200 ${
+        className={`fixed bottom-0 left-0 top-[76px] z-50 w-[280px] max-w-[85vw] border-r border-[#49345d] bg-[#1b1026] transition-transform duration-300 ${
           menuAbierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <p className="mb-4 px-3 text-xs font-medium uppercase tracking-widest text-neutral-400">
-          Menú principal
-        </p>
-
-        <nav className="space-y-1">
-          {secciones.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setSeccion(item.id);
-                setMenuAbierto(false);
-              }}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
-                seccion === item.id
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
-              }`}
-            >
-              <span className="w-6 text-center text-lg">
-                {item.icono}
-              </span>
-              {item.nombre}
-            </button>
-          ))}
-        </nav>
-
-        <div className="absolute bottom-5 left-4 right-4 rounded-xl bg-neutral-50 p-4">
-          <p className="text-sm font-medium">GMISH Collection</p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Panel de administración
+        <div className="border-b border-[#49345d] px-6 py-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+            Menú principal
           </p>
         </div>
+
+        <nav className="space-y-3 p-4">
+          {secciones.map((item) => {
+            const activo = seccion === item.id;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => cambiarSeccion(item.id)}
+                className={`flex w-full items-center gap-4 rounded-xl border px-4 py-4 text-left transition ${
+                  activo
+                    ? "border-[#654783] bg-[#38204d] text-white"
+                    : "border-transparent text-gray-300 hover:bg-[#2b1b3b] hover:text-white"
+                }`}
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-black/20 text-lg">
+                  {item.icono}
+                </span>
+
+                <span className="text-sm font-medium">
+                  {item.nombre}
+                </span>
+
+                {activo && (
+                  <span className="ml-auto h-2 w-2 rounded-full bg-[#a78bca]" />
+                )}
+              </button>
+            );
+          })}
+        </nav>
       </aside>
 
-      <main className="mx-auto max-w-7xl p-4 sm:p-7">
-        <div className="mb-7">
-          <p className="text-xs uppercase tracking-[0.2em] text-neutral-400">
-            GMISH / Panel
-          </p>
+      <main className="min-h-screen px-5 pb-10 pt-[108px] sm:px-8 sm:pb-12 sm:pt-[116px] lg:px-12 xl:px-16">
+        <div className="mx-auto max-w-[1400px]">
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-5">
+            <div>
+              <h2 className="text-2xl font-semibold sm:text-3xl">
+                {secciones.find((item) => item.id === seccion)?.nombre}
+              </h2>
+              <div className="mt-4 h-1 w-12 rounded-full bg-[#76509a]" />
+            </div>
 
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-            {secciones.find((item) => item.id === seccion)?.nombre}
-          </h1>
+            <div className="flex items-center gap-3 rounded-full border border-[#303030] bg-[#141414] px-4 py-3">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  conectado ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
+              <span className="text-xs text-gray-400">
+                {conectado
+                  ? "Base de datos conectada"
+                  : "Base de datos desconectada"}
+              </span>
+            </div>
+          </div>
 
-          <p className="mt-2 text-sm text-neutral-500">
-            Administra tu tienda desde un solo lugar.
-          </p>
-        </div>
+          {seccion === "inicio" && (
+            <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
+              {secciones
+                .filter((item) => item.id !== "inicio")
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => cambiarSeccion(item.id)}
+                    className={`${tarjeta} group flex min-h-40 items-center gap-5 p-6 text-left transition hover:border-[#654783] hover:bg-[#19141e] sm:p-7`}
+                  >
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#49345d] bg-[#261535] text-2xl text-white transition group-hover:bg-[#38204d]">
+                      {item.icono}
+                    </span>
 
-        <div
-          className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
-            conectado
-              ? "border-neutral-200 bg-white text-neutral-700"
-              : "border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          <span className="mr-2 inline-block h-2 w-2 rounded-full bg-current" />
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-white">
+                        {item.nombre}
+                      </h3>
+                      <p className="mt-2 text-sm text-gray-500">
+                        Abrir sección
+                      </p>
+                    </div>
 
-          {conectado
-            ? "Conexión con la base de datos activa"
-            : "No se pudo comprobar la conexión con la base de datos"}
-        </div>
+                    <span className="ml-auto text-xl text-gray-500">
+                      ›
+                    </span>
+                  </button>
+                ))}
+            </section>
+          )}
 
-        {seccion === "inicio" && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              ["Productos", "Administra prendas, tallas y stock.", "productos"],
-              ["Pedidos y ventas", "Organiza los pedidos de tus clientes.", "pedidos"],
-              ["Portadas", "Cambia las imágenes principales de la tienda.", "portadas"],
-              ["Estadísticas", "Consulta el rendimiento de tu negocio.", "estadisticas"],
-              ["Configuración", "Ajustes generales de la tienda.", "configuracion"],
-            ].map(([titulo, descripcion, destino]) => (
-              <button
-                key={destino}
-                type="button"
-                onClick={() => setSeccion(destino)}
-                className="rounded-2xl border border-neutral-200 bg-white p-5 text-left transition hover:border-neutral-400"
-              >
-                <h2 className="font-medium">{titulo}</h2>
-
-                <p className="mt-2 text-sm leading-6 text-neutral-500">
-                  {descripcion}
+          {seccion === "productos" && (
+            conectado ? (
+              <div className="rounded-2xl">
+                <ProductsAdmin />
+              </div>
+            ) : (
+              <section className={`${tarjeta} p-6 sm:p-8`}>
+                <h3 className="text-lg font-semibold">
+                  No se pudo conectar
+                </h3>
+                <p className="mt-3 text-sm text-gray-400">
+                  Comprueba la conexión con la base de datos.
                 </p>
+                <button
+                  type="button"
+                  onClick={comprobarConexion}
+                  className={`${botonPrincipal} mt-6`}
+                >
+                  Reintentar conexión
+                </button>
+              </section>
+            )
+          )}
 
-                <span className="mt-4 inline-block text-sm text-neutral-700">
-                  Abrir sección →
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+          {seccion === "portadas" && (
+            <PortadasAdmin
+              tarjeta={tarjeta}
+              campo={campo}
+              botonPrincipal={botonPrincipal}
+            />
+          )}
 
-        {seccion === "productos" && (
-          conectado ? (
-            <ProductsAdmin />
-          ) : (
-            <p className="rounded-xl border border-neutral-200 bg-white p-5 text-sm text-neutral-600">
-              Revisa la conexión con Supabase antes de administrar productos.
-            </p>
-          )
-        )}
+          {seccion === "pedidos" && (
+            <section className={`${tarjeta} p-7 sm:p-9`}>
+              <h3 className="text-lg font-semibold">
+                Pedidos y ventas
+              </h3>
+              <p className="mt-3 text-sm text-gray-400">
+                Esta sección todavía está pendiente de implementación.
+              </p>
+            </section>
+          )}
 
-        {seccion === "portadas" && <PortadasAdmin />}
+          {seccion === "estadisticas" && (
+            <section className={`${tarjeta} p-7 sm:p-9`}>
+              <h3 className="text-lg font-semibold">
+                Estadísticas
+              </h3>
+              <p className="mt-3 text-sm text-gray-400">
+                Esta sección todavía está pendiente de implementación.
+              </p>
+            </section>
+          )}
 
-        {["pedidos", "estadisticas", "configuracion"].includes(seccion) && (
-          <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-            <h2 className="text-lg font-medium">
-              {secciones.find((item) => item.id === seccion)?.nombre}
-            </h2>
+          {seccion === "configuracion" && (
+            <section className={`${tarjeta} p-7 sm:p-9`}>
+              <h3 className="text-lg font-semibold">
+                Configuración
+              </h3>
+              <p className="mt-3 text-sm text-gray-400">
+                Esta sección todavía está pendiente de implementación.
+              </p>
+            </section>
+          )}
 
-            <p className="mt-2 text-sm text-neutral-500">
-              Esta sección todavía está pendiente. Primero configuraremos
-              las portadas y después conectaremos las demás funciones.
-            </p>
-          </div>
-        )}
+          <footer className="mt-14 border-t border-[#252525] pt-6 text-center text-xs text-gray-600">
+            GMISH COLLECTION © {new Date().getFullYear()}
+          </footer>
+        </div>
       </main>
     </div>
   );
 }
 
-function PortadasAdmin() {
+function PortadasAdmin({ tarjeta, campo, botonPrincipal }) {
   const [portadas, setPortadas] = useState({
     inicio: "",
     hombre: "",
@@ -345,69 +439,94 @@ function PortadasAdmin() {
   const definiciones = [
     {
       id: "inicio",
-      titulo: "Portada principal",
-      descripcion: "Imagen grande de la página de inicio.",
+      nombre: "Portada principal",
+      descripcion: "Imagen principal de la tienda.",
     },
     {
       id: "hombre",
-      titulo: "Portada de Hombre",
-      descripcion: "Imagen de la sección de prendas para hombre.",
+      nombre: "Portada de hombre",
+      descripcion: "Imagen de la sección masculina.",
     },
     {
       id: "mujer",
-      titulo: "Portada de Mujer",
-      descripcion: "Imagen de la sección de prendas para mujer.",
+      nombre: "Portada de mujer",
+      descripcion: "Imagen de la sección femenina.",
     },
   ];
 
   useEffect(() => {
+    let activo = true;
+
     async function cargarPortadas() {
+      setCargando(true);
+
       const { data, error: errorConsulta } = await supabase
         .from("store_settings")
-        .select("setting_key, setting_value");
+        .select("setting_key, setting_value")
+        .in("setting_key", ["inicio", "hombre", "mujer"]);
+
+      if (!activo) return;
 
       if (errorConsulta) {
-        console.error("Error al cargar portadas:", errorConsulta);
+        setError("No se pudieron cargar las portadas guardadas.");
+      } else {
+        const resultado = {
+          inicio: "",
+          hombre: "",
+          mujer: "",
+        };
 
-        setError(
-          `Error de Supabase: ${errorConsulta.message} (código: ${
-            errorConsulta.code || "desconocido"
-          })`
-        );
-
-        setCargando(false);
-        return;
-      }
-
-      const nuevas = {
-        inicio: "",
-        hombre: "",
-        mujer: "",
-      };
-
-      for (const fila of data || []) {
-        if (
-          Object.prototype.hasOwnProperty.call(
-            nuevas,
-            fila.setting_key
-          )
-        ) {
-          nuevas[fila.setting_key] = fila.setting_value || "";
+        for (const fila of data ?? []) {
+          resultado[fila.setting_key] = fila.setting_value ?? "";
         }
+
+        setPortadas(resultado);
       }
 
-      setPortadas(nuevas);
       setCargando(false);
     }
 
     cargarPortadas();
+
+    return () => {
+      activo = false;
+    };
   }, []);
+
+  function seleccionarArchivo(id, archivo) {
+    setMensaje("");
+    setError("");
+
+    if (!archivo) {
+      setArchivos((anterior) => ({
+        ...anterior,
+        [id]: null,
+      }));
+      return;
+    }
+
+    if (!archivo.type.startsWith("image/")) {
+      setError("Selecciona un archivo de imagen válido.");
+      return;
+    }
+
+    if (archivo.size > 5 * 1024 * 1024) {
+      setError("La imagen no debe superar los 5 MB.");
+      return;
+    }
+
+    setArchivos((anterior) => ({
+      ...anterior,
+      [id]: archivo,
+    }));
+  }
 
   async function guardarPortada(id) {
     const archivo = archivos[id];
 
     if (!archivo) {
-      setError("Primero selecciona una imagen.");
+      setError("Selecciona una imagen antes de guardar.");
+      setMensaje("");
       return;
     }
 
@@ -419,40 +538,65 @@ function PortadasAdmin() {
       const extension =
         archivo.name.split(".").pop()?.toLowerCase() || "jpg";
 
-      const nombreArchivo = `${id}-${Date.now()}.${extension}`;
-      const ruta = `portadas/${nombreArchivo}`;
+      const ruta = `portadas/${id}-${Date.now()}.${extension}`;
 
       const { error: errorSubida } = await supabase.storage
         .from("product-images")
         .upload(ruta, archivo, {
           cacheControl: "3600",
           upsert: false,
-          contentType: archivo.type || "image/jpeg",
+          contentType: archivo.type,
         });
 
       if (errorSubida) {
         throw errorSubida;
       }
 
-      const { data: urlData } = supabase.storage
+      const { data: datosPublicos } = supabase.storage
         .from("product-images")
         .getPublicUrl(ruta);
 
-      const url = urlData.publicUrl;
+      const url = datosPublicos?.publicUrl;
 
-      const { error: errorGuardado } = await supabase
+      if (!url) {
+        throw new Error("No se pudo obtener la URL de la imagen.");
+      }
+
+      const { data: existente, error: errorBusqueda } = await supabase
         .from("store_settings")
-        .upsert(
-          {
+        .select("id")
+        .eq("setting_key", id)
+        .maybeSingle();
+
+      if (errorBusqueda) {
+        throw errorBusqueda;
+      }
+
+      if (existente) {
+        const { error: errorActualizacion } = await supabase
+          .from("store_settings")
+          .update({
+            setting_value: url,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("setting_key", id);
+
+        if (errorActualizacion) {
+          throw errorActualizacion;
+        }
+      } else {
+        const { error: errorInsercion } = await supabase
+          .from("store_settings")
+          .insert({
+            store_name: "GMISH",
             setting_key: id,
             setting_value: url,
             updated_at: new Date().toISOString(),
-          },
-          { onConflict: "setting_key" }
-        );
+          });
 
-      if (errorGuardado) {
-        throw errorGuardado;
+        if (errorInsercion) {
+          throw errorInsercion;
+        }
       }
 
       setPortadas((anterior) => ({
@@ -465,14 +609,11 @@ function PortadasAdmin() {
         [id]: null,
       }));
 
-      setMensaje("La imagen se guardó correctamente.");
-    } catch (errorGuardar) {
-      console.error("Error al guardar portada:", errorGuardar);
-
+      setMensaje("Portada guardada correctamente.");
+    } catch (e) {
       setError(
-        `Error al guardar: ${errorGuardar.message || "Error desconocido"} (código: ${
-          errorGuardar.code || "desconocido"
-        })`
+        e?.message ||
+          "No se pudo guardar la portada. Inténtalo nuevamente."
       );
     } finally {
       setGuardando("");
@@ -481,113 +622,105 @@ function PortadasAdmin() {
 
   if (cargando) {
     return (
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+      <div className={`${tarjeta} p-8 text-center text-sm text-gray-400`}>
         Cargando portadas...
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-5">
-        <h2 className="text-lg font-medium">Imágenes de la tienda</h2>
-
-        <p className="mt-2 text-sm leading-6 text-neutral-500">
-          Selecciona una imagen, revisa la vista previa y guárdala.
-          Las imágenes se subirán a Supabase Storage.
+    <section>
+      <div className="mb-7">
+        <h3 className="text-lg font-semibold">Imágenes de la tienda</h3>
+        <p className="mt-3 text-sm text-gray-400">
+          Administra las imágenes principales de GMISH.
         </p>
       </div>
 
       {mensaje && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <p className="mb-5 rounded-xl border border-green-900/60 bg-green-950/30 p-4 text-sm text-green-300">
           {mensaje}
-        </div>
+        </p>
       )}
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <p className="mb-5 rounded-xl border border-red-900/60 bg-red-950/30 p-4 text-sm text-red-300">
           {error}
-        </div>
+        </p>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        {definiciones.map((item) => (
-          <div
-            key={item.id}
-            className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
-          >
-            <div className="border-b border-neutral-100 p-5">
-              <h3 className="font-medium">{item.titulo}</h3>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:gap-7">
+        {definiciones.map((portada) => {
+          const archivo = archivos[portada.id];
+          const vistaPrevia = archivo
+            ? URL.createObjectURL(archivo)
+            : portadas[portada.id];
 
-              <p className="mt-1 text-sm text-neutral-500">
-                {item.descripcion}
-              </p>
-            </div>
-
-            <div className="p-5">
-              <div className="mb-4 flex aspect-[16/9] items-center justify-center overflow-hidden rounded-xl bg-neutral-100">
-                {archivos[item.id] ? (
-                  <img
-                    src={URL.createObjectURL(archivos[item.id])}
-                    alt={`Vista previa de ${item.titulo}`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : portadas[item.id] ? (
-                  <img
-                    src={portadas[item.id]}
-                    alt={item.titulo}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="px-4 text-center text-sm text-neutral-400">
-                    Todavía no hay una imagen configurada
-                  </div>
-                )}
+          return (
+            <article
+              key={portada.id}
+              className={`${tarjeta} overflow-hidden`}
+            >
+              <div className="border-b border-[#303030] p-6 sm:p-7">
+                <h4 className="font-semibold">{portada.nombre}</h4>
+                <p className="mt-2 text-sm text-gray-500">
+                  {portada.descripcion}
+                </p>
               </div>
 
-              <label className="mb-3 block text-sm font-medium text-neutral-700">
-                Elegir imagen
-              </label>
+              <div className="space-y-5 p-6 sm:p-7">
+                <div className="flex aspect-[16/9] items-center justify-center overflow-hidden rounded-xl border border-[#303030] bg-[#0b0b0b]">
+                  {vistaPrevia ? (
+                    <img
+                      src={vistaPrevia}
+                      alt={portada.nombre}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center text-gray-600">
+                      <span className="text-4xl">▧</span>
+                      <p className="mt-3 text-sm">Sin imagen</p>
+                    </div>
+                  )}
+                </div>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(evento) => {
-                  const archivo = evento.target.files?.[0];
+                <div>
+                  <label className="mb-3 block text-sm text-gray-300">
+                    Seleccionar imagen
+                  </label>
 
-                  if (!archivo) return;
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      seleccionarArchivo(
+                        portada.id,
+                        e.target.files?.[0] ?? null
+                      )
+                    }
+                    className={`${campo} file:mr-3 file:rounded-lg file:border-0 file:bg-[#261535] file:px-3 file:py-2 file:text-sm file:text-white`}
+                  />
 
-                  if (archivo.size > 5 * 1024 * 1024) {
-                    setError("La imagen debe pesar menos de 5 MB.");
-                    evento.target.value = "";
-                    return;
-                  }
+                  <p className="mt-3 text-xs text-gray-500">
+                    Formatos de imagen. Máximo 5 MB.
+                  </p>
+                </div>
 
-                  setError("");
-                  setMensaje("");
-
-                  setArchivos((anterior) => ({
-                    ...anterior,
-                    [item.id]: archivo,
-                  }));
-                }}
-                className="block w-full text-sm text-neutral-600 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-4 file:py-2 file:font-medium hover:file:bg-neutral-200"
-              />
-
-              <button
-                type="button"
-                onClick={() => guardarPortada(item.id)}
-                disabled={!archivos[item.id] || guardando === item.id}
-                className="mt-4 w-full rounded-xl bg-neutral-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {guardando === item.id
-                  ? "Guardando imagen..."
-                  : "Guardar portada"}
-              </button>
-            </div>
-          </div>
-        ))}
+                <button
+                  type="button"
+                  onClick={() => guardarPortada(portada.id)}
+                  disabled={!archivo || guardando === portada.id}
+                  className={`${botonPrincipal} w-full`}
+                >
+                  {guardando === portada.id
+                    ? "Guardando..."
+                    : "Guardar portada"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 }

@@ -297,9 +297,15 @@ img {
   min-height: min(760px, calc(100svh - 150px));
   padding: 3rem 1.5rem;
   overflow: hidden;
-  background:
-    linear-gradient(rgba(18, 17, 15, 0.25), rgba(18, 17, 15, 0.48)),
-    url('/gmish-bg.jpg') center / cover no-repeat;
+    background-image:
+    linear-gradient(
+      rgba(18, 17, 15, 0.25),
+      rgba(18, 17, 15, 0.48)
+    ),
+    var(--portada-inicio, url('/gmish-bg.jpg'));
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
   color: white;
   text-align: center;
 }
@@ -1239,5 +1245,242 @@ img {
   .categoria-contenedor-deslizable .producto-card {
     flex-basis: 165px;
     width: 165px;
+  }
+}
+
+/* =========================================
+   GMISH ADMIN: FONDO, MÁRGENES Y ESPACIADO
+   ========================================= */
+
+.admin-page {
+  min-height: 100vh;
+  width: 100%;
+  padding: 20px;
+  background: #090909 !important;
+  color: #f5f5f5;
+}
+
+/* Botón para volver a la tienda */
+.admin-page > .boton-interior {
+  display: inline-flex;
+  margin: 0 0 24px 0;
+  padding: 12px 18px;
+  border: 1px solid #383838;
+  border-radius: 10px;
+  background: #151515;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-page > .boton-interior:hover {
+  background: #242424;
+  border-color: #6d28d9;
+  color: #ffffff;
+}
+
+/* Evitar franjas claras dentro del administrador */
+.admin-page,
+.admin-page * {
+  box-sizing: border-box;
+}
+
+.admin-page > #root,
+.admin-page main,
+.admin-page section {
+  max-width: 100%;
+}
+
+/* Separación general entre elementos del panel */
+.admin-page button,
+.admin-page input,
+.admin-page select,
+.admin-page textarea {
+  max-width: 100%;
+}
+
+/* Tarjetas con espacio y bordes discretos */
+.admin-page .rounded-2xl,
+.admin-page .rounded-xl {
+  box-sizing: border-box;
+}
+
+/* Ajustes para pantallas pequeñas */
+@media (max-width: 650px) {
+  .admin-page {
+    padding: 12px;
+  }
+
+  .admin-page > .boton-interior {
+    margin-bottom: 18px;
+    padding: 11px 14px;
+    font-size: 0.68rem;
+  }
+}
+
+/* ===== AJUSTE DE ESPACIOS DEL ADMINISTRADOR ===== */
+
+.admin-page {
+  width: 100%;
+  min-height: 100vh;
+  padding: 24px 32px !important;
+  background: #090909 !important;
+  color: #f5f5f5 !important;
+}
+
+/* Botón para regresar a la tienda */
+.admin-page > .boton-interior {
+  margin: 0 0 28px 0 !important;
+}
+
+/* Separación de los bordes de la pantalla */
+.admin-page > div:not(.boton-interior) {
+  width: 100%;
+}
+
+/* Panel principal: espacio arriba, abajo y a los lados */
+.admin-page main {
+  padding: 32px 24px 48px !important;
+}
+
+/* Separación vertical entre tarjetas */
+.admin-page main section {
+  margin-bottom: 28px;
+}
+
+/* Tarjetas del inicio: contenido centrado verticalmente */
+.admin-page main section > button {
+  display: flex;
+  align-items: center !important;
+  justify-content: center;
+  gap: 18px !important;
+  min-height: 180px !important;
+  padding: 28px !important;
+  margin-bottom: 8px;
+  text-align: center !important;
+}
+
+/* Centrar los iconos dentro de sus cuadros */
+.admin-page main section > button > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+/* Centrar los textos dentro de las tarjetas */
+.admin-page main section > button > div {
+  flex: 1;
+  min-width: 0;
+  text-align: center !important;
+}
+
+/* Separar los títulos del contenido */
+.admin-page main h2,
+.admin-page main h3,
+.admin-page main h4 {
+  line-height: 1.5;
+}
+
+/* Más aire en las tarjetas de productos y portadas */
+.admin-page main article {
+  margin-bottom: 24px;
+}
+
+/* Centrar el contenido de los botones del panel */
+.admin-page main button {
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mantener el menú lateral alineado a la izquierda */
+.admin-page aside nav button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* Espaciado adaptable a móviles */
+@media (max-width: 650px) {
+  .admin-page {
+    padding: 14px !important;
+  }
+
+  .admin-page main {
+    padding: 26px 8px 36px !important;
+  }
+
+  .admin-page main section > button {
+    min-height: 140px !important;
+    padding: 20px 14px !important;
+    gap: 12px !important;
+  }
+}
+
+/* ===== MÁS ESPACIO EN EL ADMINISTRADOR GMISH ===== */
+
+/* Separación entre títulos, subtítulos y contenido */
+.admin-page main h2 {
+  margin-bottom: 18px !important;
+  line-height: 1.5 !important;
+}
+
+.admin-page main h3 {
+  margin-bottom: 16px !important;
+  line-height: 1.5 !important;
+}
+
+/* Más espacio debajo de los textos descriptivos */
+.admin-page main p {
+  line-height: 1.7 !important;
+}
+
+/* Más distancia entre el encabezado de cada sección y sus botones */
+.admin-page main section {
+  margin-top: 30px !important;
+  margin-bottom: 36px !important;
+}
+
+/* Separación entre botones y tarjetas */
+.admin-page main section.grid {
+  gap: 28px !important;
+  row-gap: 32px !important;
+}
+
+/* Más espacio dentro de las tarjetas del inicio */
+.admin-page main section.grid > button {
+  min-height: 200px !important;
+  padding: 30px 26px !important;
+  gap: 20px !important;
+}
+
+/* Espacio entre el subtítulo y los botones que vienen después */
+.admin-page main section > div:first-child {
+  margin-bottom: 28px !important;
+}
+
+/* Evitar que el contenido quede apretado en pantallas pequeñas */
+@media (max-width: 650px) {
+  .admin-page main h2 {
+    margin-bottom: 14px !important;
+  }
+
+  .admin-page main section {
+    margin-top: 24px !important;
+    margin-bottom: 30px !important;
+  }
+
+  .admin-page main section.grid {
+    gap: 20px !important;
+    row-gap: 24px !important;
+  }
+
+  .admin-page main section.grid > button {
+    min-height: 170px !important;
+    padding: 24px 18px !important;
+  }
+
+  .admin-page main section > div:first-child {
+    margin-bottom: 22px !important;
   }
 }
