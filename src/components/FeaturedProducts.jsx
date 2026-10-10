@@ -1,61 +1,121 @@
-import { useMemo, useState, useRef } from "react"
-import ProductDetailModal from "./ProductDetailModal"
+
+import { useMemo, useState, useRef } from "react";
+import ProductDetailModal from "./ProductDetailModal";
 
 function FeaturedProducts({
-  category,
-  search,
-  newOnly,
+  category = "todos",
+  search = "",
+  newOnly = false,
   products = [],
+  layout = "grid",
+  showSort = false,
 }) {
-  const [selectedProduct, setSelectedProduct] = useState(null)
-  const [carouselIndexes, setCarouselIndexes] = useState({})
-  const [dragging, setDragging] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [carouselIndexes, setCarouselIndexes] = useState({});
+  const [dragging, setDragging] = useState(false);
+  const [sortMode, setSortMode] = useState("default");
 
-  const dragStartX = useRef(0)
-  const dragCurrentX = useRef(0)
+  const dragStartX = useRef(0);
+  const dragStartY = useRef(0);
+  const dragCurrentX = useRef(0);
+  const dragCurrentY = useRef(0);
+  const movedRef = useRef(false);
 
   const filteredProducts = useMemo(() => {
-    const searchText = search.trim().toLowerCase()
+    const searchText = String(search || "").trim().toLowerCase();
 
-    return products.filter((product) => {
+    let result = products.filter((product) => {
       const matchesCategory =
         category === "todos" ||
         product.category === category ||
         (category === "ofertas" &&
           product.old_price &&
-          Number(product.old_price) >
-            Number(product.price))
+          Number(product.old_price) > Number(product.price));
+
+      const name = String(product.name || "").toLowerCase();
+      const subcategory = String(product.subcategory || "").toLowerCase();
+      const description = String(product.description || "").toLowerCase();
 
       const matchesSearch =
-        searchText === "" ||
-        product.name
-          .toLowerCase()
-          .includes(searchText) ||
-        product.subcategory
-          .toLowerCase()
-          .includes(searchText)
+        !searchText ||
+        name.includes(searchText) ||
+        subcategory.includes(searchText) ||
+        description.includes(searchText);
 
       const matchesNew =
-        !newOnly || product.is_new === true
+        !newOnly || product.is_new === true || product.is_new === 1;
+
+      return matchesCategory && matchesSearch && matchesNew;
+    });
+
+    if (sortMode === "offers") {
+      result = result.filter(
+        (product) =>
+          Number(product.old_price) > Number(product.price)
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      if (sortMode === "price-asc") {
+        return Number(a.price || 0) - Number(b.price || 0);
+      }
+
+      if (sortMode === "price-desc") {
+        return Number(b.price || 0) - Number(a.price || 0);
+      }
+
+      if (sortMode === "offers") {
+        const discountA =
+          Number(a.old_price) > Number(a.price)
+            ? (Number(a.old_price) - Number(a.price)) /
+              Number(a.old_price)
+            : 0;
+
+        const discountB =
+          Number(b.old_price) > Number(b.price)
+            ? (Number(b.old_price) - Number(b.price)) /
+              Number(b.old_price)
+            : 0;
+
+        return discountB - discountA;
+      }
+
+      if (sortMode === "best-sellers") {
+        const salesA = Number(
+          a.units_sold ?? a.sales_count ?? a.sold_count ?? 0
+        );
+
+        const salesB = Number(
+          b.units_sold ?? b.sales_count ?? b.sold_count ?? 0
+        );
+
+        return salesB - salesA;
+      }
+
+            if (sortMode === "new-in") {
+        const nuevoA = a.is_new === true || a.is_new === 1;
+        const nuevoB = b.is_new === true || b.is_new === 1;
+
+        if (nuevoA !== nuevoB) {
+          return Number(nuevoB) - Number(nuevoA);
+        }
+
+        return (
+          new Date(b.created_at || 0).getTime() -
+          new Date(a.created_at || 0).getTime()
+        );
+      }
 
       return (
-        matchesCategory &&
-        matchesSearch &&
-        matchesNew
-      )
-    })
-  }, [
-    products,
-    category,
-    search,
-    newOnly,
-  ])
+        new Date(b.created_at || 0).getTime() -
+        new Date(a.created_at || 0).getTime()
+      );
+    });
+  }, [products, category, search, newOnly, sortMode]);
 
   const getColorImages = (product) => {
-    const variants =
-      product.product_variants || []
-
-    const uniqueColors = new Map()
+    const variants = product.product_variants || [];
+    const uniqueColors = new Map();
 
     variants.forEach((variant) => {
       if (
@@ -66,369 +126,286 @@ function FeaturedProducts({
         uniqueColors.set(variant.color, {
           name: variant.color,
           imageUrl: variant.color_image_url,
-          hex:
-            variant.color_hex ||
-            "#777777",
-        })
+          hex: variant.color_hex || "#b8b1a5",
+        });
       }
-    })
+    });
 
-    return [...uniqueColors.values()]
-  }
+    return [...uniqueColors.values()];
+  };
 
-  const moveCarousel = (
-    productId,
-    direction,
-    total
-  ) => {
-    if (total <= 1) return
+  const moveCarousel = (productId, direction, total) => {
+    if (total <= 1) return;
 
     setCarouselIndexes((current) => {
-      const currentIndex =
-        current[productId] || 0
+      const currentIndex = current[productId] || 0;
+      const nextIndex = (currentIndex + direction + total) % total;
 
-      let nextIndex =
-        currentIndex + direction
+      return { ...current, [productId]: nextIndex };
+    });
+  };
 
-      if (nextIndex < 0) {
-        nextIndex = total - 1
-      }
-
-      if (nextIndex >= total) {
-        nextIndex = 0
-      }
-
-      return {
-        ...current,
-        [productId]: nextIndex,
-      }
-    })
-  }
-
-  const selectCarouselImage = (
-    productId,
-    index
-  ) => {
+  const selectCarouselImage = (productId, index) => {
     setCarouselIndexes((current) => ({
       ...current,
       [productId]: index,
-    }))
-  }
+    }));
+  };
 
-  const handlePointerDown = (event) => {
-    setDragging(true)
-    dragStartX.current = event.clientX
-    dragCurrentX.current = event.clientX
+  function handlePointerDown(event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
 
-    event.currentTarget.setPointerCapture(
-      event.pointerId
-    )
-  }
+    movedRef.current = false;
+    setDragging(true);
 
-  const handlePointerMove = (event) => {
-    if (!dragging) return
-
-    dragCurrentX.current = event.clientX
-  }
-
-  const handlePointerUp = (
-    event,
-    productId,
-    total
-  ) => {
-    if (!dragging) return
-
-    const difference =
-      dragStartX.current -
-      dragCurrentX.current
-
-    if (Math.abs(difference) > 40) {
-      moveCarousel(
-        productId,
-        difference > 0 ? 1 : -1,
-        total
-      )
-    }
-
-    setDragging(false)
+    dragStartX.current = event.clientX;
+    dragStartY.current = event.clientY;
+    dragCurrentX.current = event.clientX;
+    dragCurrentY.current = event.clientY;
 
     try {
-      event.currentTarget.releasePointerCapture(
-        event.pointerId
-      )
+      event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
-      // El puntero ya fue liberado.
+      // El navegador puede haber liberado el puntero.
     }
   }
 
-  const handlePointerCancel = () => {
-    setDragging(false)
+  function handlePointerMove(event) {
+    if (!dragging) return;
+
+    dragCurrentX.current = event.clientX;
+    dragCurrentY.current = event.clientY;
+
+    const differenceX = Math.abs(
+      dragCurrentX.current - dragStartX.current
+    );
+
+    const differenceY = Math.abs(
+      dragCurrentY.current - dragStartY.current
+    );
+
+    if (differenceX > 10 || differenceY > 10) {
+      movedRef.current = true;
+    }
   }
 
-  const getRelativePosition = (
-    index,
-    activeIndex,
-    total
-  ) => {
-    let difference =
-      index - activeIndex
+  function handlePointerUp(event, productId, total) {
+    const differenceX = dragStartX.current - dragCurrentX.current;
+    const differenceY = dragStartY.current - dragCurrentY.current;
 
-    if (difference > total / 2) {
-      difference -= total
+    const horizontalSwipe =
+      Math.abs(differenceX) > 40 &&
+      Math.abs(differenceX) > Math.abs(differenceY);
+
+    if (horizontalSwipe) {
+      moveCarousel(productId, differenceX > 0 ? 1 : -1, total);
     }
 
-    if (difference < -total / 2) {
-      difference += total
-    }
+    setDragging(false);
 
-    return difference
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // El puntero ya se liberó.
+    }
   }
+
+  function openProduct(product) {
+    if (movedRef.current) {
+      movedRef.current = false;
+      return;
+    }
+
+    setSelectedProduct(product);
+  }
+
+  const getRelativePosition = (index, activeIndex, total) => {
+    let difference = index - activeIndex;
+
+    if (difference > total / 2) difference -= total;
+    if (difference < -total / 2) difference += total;
+
+    return difference;
+  };
 
   return (
-    <section
-      id="productos"
-      className="mx-auto max-w-7xl px-4 py-12 md:py-16"
-    >
-      <div className="mb-6">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#F0D58A]">
-          {category === "ofertas"
-            ? "Ofertas"
-            : newOnly
-              ? "Últimas novedades"
-              : "Productos"}
-        </p>
+    <>
+      {showSort && (
+        <div
+          className="gmish-ordenar"
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: "10px",
+            margin: "20px 0",
+          }}
+        >
+          <label
+            htmlFor="gmish-orden-productos"
+            style={{ fontSize: "13px" }}
+          >
+            Ordenar por
+          </label>
 
-        <h2 className="mt-2 text-3xl font-black md:text-4xl">
-          {category === "ofertas"
-            ? "Ofertas GMISH"
-            : newOnly
-              ? "Lo último"
-              : "Nuestros productos"}
-        </h2>
-      </div>
+          <select
+            id="gmish-orden-productos"
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value)}
+            style={{
+              maxWidth: "100%",
+              padding: "10px 12px",
+              border: "1px solid #dedede",
+              borderRadius: "4px",
+              background: "#fff",
+              color: "#151515",
+              fontSize: "13px",
+            }}
+          >
+            <option value="price-asc">Precio: menor a mayor</option>
+            <option value="price-desc">Precio: mayor a menor</option>
+            <option value="offers">Ofertas</option>
+            <option value="best-sellers">Más vendidos</option>
+            <option value="new-in">New In</option>
+          </select>
+        </div>
+      )}
 
       {filteredProducts.length === 0 ? (
-        <div className="rounded-2xl border border-[#302E28] bg-[#151714] px-6 py-12 text-center">
-          <p className="text-lg font-semibold">
-            No encontramos productos.
-          </p>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Prueba con otra búsqueda.
+        <div className="catalogo-vacio">
+          <span className="catalogo-vacio-icono">⌕</span>
+          <h2>No encontramos prendas</h2>
+          <p>
+            Prueba con otra búsqueda o vuelve a explorar la colección.
           </p>
         </div>
       ) : (
-        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        <div
+          className={`productos-grid ${
+            layout === "horizontal"
+              ? "productos-grid-horizontal"
+              : "productos-grid-catalogo"
+          }`}
+        >
           {filteredProducts.map((product) => {
             const isOffer =
-              product.old_price &&
-              Number(product.old_price) >
-                Number(product.price)
+              Number(product.old_price) > Number(product.price);
 
-            const colorImages =
-              getColorImages(product)
+            const colorImages = getColorImages(product);
 
-            const productImages =
-              product.product_images || []
+            const productImages = [
+              ...(product.product_images || []),
+            ].sort(
+              (a, b) =>
+                Number(a.position || 0) - Number(b.position || 0)
+            );
 
-            const firstProductImage =
-              [...productImages]
-                .sort(
-                  (a, b) =>
-                    Number(a.position || 0) -
-                    Number(b.position || 0)
-                )
-                .find(
-                  (image) =>
-                    image.image_url
-                )
+            const regularImages = productImages
+              .filter((image) => image.image_url)
+              .map((image) => ({
+                name: "",
+                imageUrl: image.image_url,
+                hex: "#b8b1a5",
+              }));
 
             const images =
-              colorImages.length > 0
-                ? colorImages
-                : firstProductImage
-                  ? [
-                      {
-                        name: "",
-                        imageUrl:
-                          firstProductImage.image_url,
-                        hex: "#777777",
-                      },
-                    ]
-                  : []
+              colorImages.length > 0 ? colorImages : regularImages;
 
-            const total = images.length
-
+            const total = images.length;
             const activeIndex =
-              carouselIndexes[product.id] || 0
+              (carouselIndexes[product.id] || 0) % (total || 1);
 
             return (
-              <article
-                key={product.id}
-                className="w-[260px] min-w-[260px] snap-start overflow-hidden rounded-2xl border border-[#302E28] bg-[#151714] md:w-[280px] md:min-w-[280px]"
-              >
+              <article className="producto-card" key={product.id}>
                 <div
-                  className="relative aspect-[4/5] w-full overflow-hidden bg-[#111210]"
+                  className="producto-imagen-contenedor"
                   style={{
-                    perspective: "1000px",
                     touchAction: "pan-y",
-                    cursor:
-                      total > 1
-                        ? dragging
-                          ? "grabbing"
-                          : "grab"
-                        : "default",
+                    cursor: "pointer",
                   }}
-                  onPointerDown={
-                    total > 1
-                      ? handlePointerDown
-                      : undefined
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={(event) =>
+                    handlePointerUp(event, product.id, total)
                   }
-                  onPointerMove={
-                    total > 1
-                      ? handlePointerMove
-                      : undefined
-                  }
-                  onPointerUp={
-                    total > 1
-                      ? (event) =>
-                          handlePointerUp(
-                            event,
-                            product.id,
-                            total
-                          )
-                      : undefined
-                  }
-                  onPointerCancel={
-                    total > 1
-                      ? handlePointerCancel
-                      : undefined
-                  }
+                  onPointerCancel={() => setDragging(false)}
+                  onClick={() => openProduct(product)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Ver detalles de ${product.name}`}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openProduct(product);
+                    }
+                  }}
                 >
                   {total === 0 ? (
-                    <div className="flex h-full items-center justify-center">
-                      <span className="text-sm text-gray-600">
-                        Sin imagen
-                      </span>
+                    <div className="producto-sin-imagen">
+                      <span>GMISH</span>
                     </div>
                   ) : total === 1 ? (
                     <img
                       src={images[0].imageUrl}
                       alt={product.name}
+                      className="producto-imagen"
                       draggable="false"
-                      className="h-full w-full select-none object-cover"
                     />
                   ) : (
-                    <div className="relative h-full w-full">
-                      {images.map(
-                        (image, index) => {
-                          const position =
-                            getRelativePosition(
-                              index,
-                              activeIndex,
-                              total
-                            )
+                    <div className="producto-carrusel">
+                      {images.map((image, index) => {
+                        const position = getRelativePosition(
+                          index,
+                          activeIndex,
+                          total
+                        );
 
-                          const isCenter =
-                            position === 0
+                        let transform = "translateX(0) scale(.55)";
+                        let opacity = 0;
+                        let zIndex = 1;
 
-                          const isLeft =
-                            position === -1
-
-                          const isRight =
-                            position === 1
-
-                          const isLeftBack =
-                            position === -2
-
-                          const isRightBack =
-                            position === 2
-
-                          let transform =
-                            "translateX(0) translateZ(-200px) scale(0.45)"
-
-                          let opacity = 0
-                          let zIndex = 1
-
-                          if (isCenter) {
-                            transform =
-                              "translateX(0) translateZ(80px) scale(1)"
-                            opacity = 1
-                            zIndex = 30
-                          }
-
-                          if (isLeft) {
-                            transform =
-                              "translateX(-32%) translateZ(-30px) scale(0.78) rotateY(8deg)"
-                            opacity = 0.55
-                            zIndex = 20
-                          }
-
-                          if (isRight) {
-                            transform =
-                              "translateX(32%) translateZ(-30px) scale(0.78) rotateY(-8deg)"
-                            opacity = 0.55
-                            zIndex = 20
-                          }
-
-                          if (isLeftBack) {
-                            transform =
-                              "translateX(-55%) translateZ(-120px) scale(0.58) rotateY(12deg)"
-                            opacity = 0.2
-                            zIndex = 10
-                          }
-
-                          if (isRightBack) {
-                            transform =
-                              "translateX(55%) translateZ(-120px) scale(0.58) rotateY(-12deg)"
-                            opacity = 0.2
-                            zIndex = 10
-                          }
-
-                          return (
-                            <img
-                              key={`${image.name}-${index}`}
-                              src={
-                                image.imageUrl
-                              }
-                              alt={`${product.name} ${image.name}`}
-                              draggable="false"
-                              onClick={() => {
-                                if (
-                                  isLeft ||
-                                  isRight
-                                ) {
-                                  selectCarouselImage(
-                                    product.id,
-                                    index
-                                  )
-                                }
-                              }}
-                              className="absolute inset-0 h-full w-full select-none object-cover transition-all duration-500 ease-out"
-                              style={{
-                                transform,
-                                opacity,
-                                zIndex,
-                                pointerEvents:
-                                  opacity > 0
-                                    ? "auto"
-                                    : "none",
-                              }}
-                            />
-                          )
+                        if (position === 0) {
+                          transform = "translateX(0) scale(1)";
+                          opacity = 1;
+                          zIndex = 3;
+                        } else if (position === -1) {
+                          transform = "translateX(-27%) scale(.8)";
+                          opacity = 0.5;
+                          zIndex = 2;
+                        } else if (position === 1) {
+                          transform = "translateX(27%) scale(.8)";
+                          opacity = 0.5;
+                          zIndex = 2;
                         }
-                      )}
+
+                        return (
+                          <img
+                            key={`${image.name}-${index}`}
+                            src={image.imageUrl}
+                            alt={
+                              image.name
+                                ? `${product.name}, ${image.name}`
+                                : product.name
+                            }
+                            draggable="false"
+                            className="producto-carrusel-imagen"
+                            style={{ transform, opacity, zIndex }}
+                          />
+                        );
+                      })}
                     </div>
                   )}
 
                   {product.is_new && (
-                    <span className="absolute left-3 top-3 z-[60] rounded-full bg-[#F0D58A] px-3 py-1 text-xs font-black text-black">
+                    <span className="producto-etiqueta producto-etiqueta-nuevo">
                       Nuevo
                     </span>
                   )}
 
                   {isOffer && (
-                    <span className="absolute right-3 top-3 z-[60] rounded-full bg-[#FF4D4D] px-3 py-1 text-xs font-black text-white">
+                    <span className="producto-etiqueta producto-etiqueta-oferta">
                       Oferta
                     </span>
                   )}
@@ -437,125 +414,84 @@ function FeaturedProducts({
                     <>
                       <button
                         type="button"
-                        onPointerDown={(event) =>
-                          event.stopPropagation()
-                        }
-                        onClick={(event) => {
-                          event.stopPropagation()
-
-                          moveCarousel(
-                            product.id,
-                            -1,
-                            total
-                          )
-                        }}
-                        className="absolute left-2 top-1/2 z-[100] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-2xl text-white shadow-lg transition hover:bg-black"
+                        className="producto-flecha producto-flecha-izquierda"
                         aria-label="Imagen anterior"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          moveCarousel(product.id, -1, total);
+                        }}
                       >
                         ‹
                       </button>
 
                       <button
                         type="button"
-                        onPointerDown={(event) =>
-                          event.stopPropagation()
-                        }
+                        className="producto-flecha producto-flecha-derecha"
+                        aria-label="Imagen siguiente"
+                        onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
-                          event.stopPropagation()
-
-                          moveCarousel(
-                            product.id,
-                            1,
-                            total
-                          )
+                          event.stopPropagation();
+                          moveCarousel(product.id, 1, total);
                         }}
-                        className="absolute right-2 top-1/2 z-[100] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-2xl text-white shadow-lg transition hover:bg-black"
-                        aria-label="Siguiente imagen"
                       >
                         ›
                       </button>
 
-                      <div className="absolute bottom-3 left-1/2 z-[100] flex -translate-x-1/2 gap-1.5">
-                        {images.map(
-                          (
-                            image,
-                            index
-                          ) => (
-                            <button
-                              key={`${image.name}-dot-${index}`}
-                              type="button"
-                              onPointerDown={(event) =>
-                                event.stopPropagation()
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation()
-
-                                selectCarouselImage(
-                                  product.id,
-                                  index
-                                )
-                              }}
-                              className={`h-2 rounded-full transition-all ${
-                                activeIndex ===
-                                index
-                                  ? "w-5 bg-[#F0D58A]"
-                                  : "w-2 bg-white/50"
-                              }`}
-                              aria-label={`Mostrar imagen ${index + 1}`}
-                            />
-                          )
-                        )}
+                      <div className="producto-puntos">
+                        {images.map((image, index) => (
+                          <button
+                            key={`${image.name}-dot-${index}`}
+                            type="button"
+                            aria-label={`Mostrar imagen ${index + 1}`}
+                            className={`producto-punto ${
+                              activeIndex === index ? "activo" : ""
+                            }`}
+                            onPointerDown={(event) =>
+                              event.stopPropagation()
+                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectCarouselImage(product.id, index);
+                            }}
+                          />
+                        ))}
                       </div>
                     </>
                   )}
                 </div>
 
-                <div
-                  onClick={() =>
-                    setSelectedProduct(product)
-                  }
-                  className="cursor-pointer p-4"
+                <button
+                  type="button"
+                  className="producto-informacion"
+                  onClick={() => setSelectedProduct(product)}
                 >
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    {product.subcategory}
-                  </p>
+                  {product.subcategory && (
+                    <span className="producto-subcategoria">
+                      {product.subcategory}
+                    </span>
+                  )}
 
-                  <h3 className="mt-1 text-lg font-bold">
-                    {product.name}
-                  </h3>
+                  <h3 className="producto-nombre">{product.name}</h3>
 
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-lg font-black text-[#F0D58A]">
-                      S/{" "}
-                      {Number(
-                        product.price
-                      ).toFixed(2)}
+                  <div className="producto-precios">
+                    <span className="producto-precio">
+                      S/ {Number(product.price).toFixed(2)}
                     </span>
 
                     {isOffer && (
-                      <span className="text-sm text-gray-500 line-through">
-                        S/{" "}
-                        {Number(
-                          product.old_price
-                        ).toFixed(2)}
+                      <span className="producto-precio-anterior">
+                        S/ {Number(product.old_price).toFixed(2)}
                       </span>
                     )}
                   </div>
-                </div>
 
-                <div className="px-4 pb-4">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedProduct(product)
-                    }
-                    className="w-full rounded-xl bg-[#F0D58A] px-4 py-3 text-sm font-black text-black transition hover:brightness-110"
-                  >
-                    Agregar al carrito
-                  </button>
-                </div>
+                  <span className="producto-ver-detalle">
+                    Ver producto ↗
+                  </span>
+                </button>
               </article>
-            )
+            );
           })}
         </div>
       )}
@@ -563,13 +499,11 @@ function FeaturedProducts({
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
-          onClose={() =>
-            setSelectedProduct(null)
-          }
+          onClose={() => setSelectedProduct(null)}
         />
       )}
-    </section>
-  )
+    </>
+  );
 }
 
-export default FeaturedProducts
+export default FeaturedProducts;

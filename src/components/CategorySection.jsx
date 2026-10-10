@@ -1,112 +1,133 @@
 
-import { useMemo, useState } from "react"
-import FeaturedProducts from "./FeaturedProducts"
+import { useMemo } from "react";
+import FeaturedProducts from "./FeaturedProducts";
 
 function CategorySection({
   category,
-  onSelectCategory,
   products = [],
+  selectedSubcategory = "todos",
+  onSelectSubcategory,
 }) {
-  const [selectedSubcategory, setSelectedSubcategory] =
-    useState("todos")
-
   const categoryProducts = useMemo(() => {
     return products.filter(
-      (product) => product.category === category
-    )
-  }, [products, category])
+      (product) =>
+        String(product.category || "").trim().toLowerCase() ===
+        String(category || "").trim().toLowerCase()
+    );
+  }, [products, category]);
 
   const subcategories = useMemo(() => {
-    const values = categoryProducts
-      .map((product) => product.subcategory)
-      .filter(Boolean)
-      .map((subcategory) =>
-        String(subcategory).trim().toLowerCase()
-      )
+    const uniqueSubcategories = new Map();
 
-    return [...new Set(values)]
-  }, [categoryProducts])
+    categoryProducts.forEach((product) => {
+      const original = String(product.subcategory || "").trim();
 
-  const filteredProducts = useMemo(() => {
-    if (selectedSubcategory === "todos") {
-      return categoryProducts
+      if (!original) return;
+
+      const normalized = original.toLocaleLowerCase("es");
+
+      if (!uniqueSubcategories.has(normalized)) {
+        uniqueSubcategories.set(normalized, original);
+      }
+    });
+
+    return [...uniqueSubcategories.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1], "es"))
+      .map(([value, label]) => ({ value, label }));
+  }, [categoryProducts]);
+
+  function seleccionarSubcategoria(value) {
+    if (onSelectSubcategory) {
+      onSelectSubcategory(value);
     }
+  }
 
-    return categoryProducts.filter(
-      (product) =>
-        String(product.subcategory || "")
-          .trim()
-          .toLowerCase() === selectedSubcategory
-    )
-  }, [categoryProducts, selectedSubcategory])
+  const filteredProducts =
+    selectedSubcategory === "todos"
+      ? categoryProducts
+      : categoryProducts.filter(
+          (product) =>
+            String(product.subcategory || "")
+              .trim()
+              .toLocaleLowerCase("es") ===
+            String(selectedSubcategory).trim().toLocaleLowerCase("es")
+        );
 
-  return (
-    <section className="mx-auto max-w-7xl px-4 py-10 md:py-14">
-      <div className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#F0D58A]">
-          Colección
-        </p>
-
-        <h1 className="mt-2 text-3xl font-black capitalize md:text-5xl">
-          {category}
-        </h1>
-      </div>
-
-      {subcategories.length > 0 && (
-        <div className="mb-10 flex gap-3 overflow-x-auto pb-2">
-          <button
-            type="button"
-            onClick={() => setSelectedSubcategory("todos")}
-            className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold transition ${
-              selectedSubcategory === "todos"
-                ? "border-[#F0D58A] bg-[#F0D58A] text-black"
-                : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
-            }`}
-          >
-            Todos
-          </button>
-
-          {subcategories.map((subcategory) => (
-            <button
-              key={subcategory}
-              type="button"
-              onClick={() => setSelectedSubcategory(subcategory)}
-              className={`whitespace-nowrap rounded-full border px-5 py-2 text-sm font-semibold capitalize transition ${
-                selectedSubcategory === subcategory
-                  ? "border-[#F0D58A] bg-[#F0D58A] text-black"
-                  : "border-[#302E28] bg-[#151714] text-gray-300 hover:border-[#F0D58A]"
-              }`}
-            >
-              {subcategory}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {categoryProducts.length === 0 ? (
-        <div className="rounded-2xl border border-[#302E28] bg-[#151714] px-6 py-12 text-center">
-          <p className="text-lg font-semibold">
-            Todavía no hay productos aquí.
-          </p>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Los productos que agregues desde el panel aparecerán automáticamente.
+  if (categoryProducts.length === 0) {
+    return (
+      <section className="categoria-pagina">
+        <div className="catalogo-vacio">
+          <span className="catalogo-vacio-icono">⌕</span>
+          <h2>Próximamente</h2>
+          <p>
+            Estamos preparando nuevas prendas para esta colección.
           </p>
         </div>
-      ) : (
+      </section>
+    );
+  }
+
+  if (selectedSubcategory !== "todos") {
+    return (
+      <section className="categoria-pagina">
         <FeaturedProducts
-          category={category}
-          search={
-            selectedSubcategory === "todos"
-              ? ""
-              : selectedSubcategory
-          }
+          category="todos"
+          search=""
           newOnly={false}
           products={filteredProducts}
+          layout="grid"
+          showSort={true}
         />
-      )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="categoria-pagina">
+      <div className="categoria-listado-por-tipo">
+        {subcategories.map((subcategory) => {
+          const productsInSubcategory = categoryProducts.filter(
+            (product) =>
+              String(product.subcategory || "")
+                .trim()
+                .toLocaleLowerCase("es") === subcategory.value
+          );
+
+          if (productsInSubcategory.length === 0) return null;
+
+          return (
+            <section
+              className="categoria-bloque-horizontal"
+              key={subcategory.value}
+            >
+              <div className="categoria-encabezado-fila">
+                <h2>{subcategory.label}</h2>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    seleccionarSubcategoria(subcategory.value)
+                  }
+                >
+                  Ver todos <span aria-hidden="true">→</span>
+                </button>
+              </div>
+
+              <div className="categoria-contenedor-deslizable">
+                <FeaturedProducts
+                  category="todos"
+                  search=""
+                  newOnly={false}
+                  products={productsInSubcategory}
+                  layout="horizontal"
+                />
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </section>
-  )
+  );
 }
 
-export default CategorySection
+export default CategorySection;

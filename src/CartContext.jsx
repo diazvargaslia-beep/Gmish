@@ -1,26 +1,25 @@
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useState } from "react";
 
-const CartContext = createContext()
+const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  const [cart, setCart] = useState([])
-  const [cartNotification, setCartNotification] =
-    useState(null)
-  const [cartOpen, setCartOpen] = useState(false)
+  const [cart, setCart] = useState([]);
+  const [cartNotification, setCartNotification] = useState(null);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const showCartNotification = (product) => {
     setCartNotification({
       message: `${product.name} agregado al carrito`,
-    })
+    });
 
-    if (navigator.vibrate) {
-      navigator.vibrate(80)
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(80);
     }
 
     setTimeout(() => {
-      setCartNotification(null)
-    }, 3000)
-  }
+      setCartNotification(null);
+    }, 3000);
+  };
 
   const getCartQuantity = (
     productId,
@@ -34,169 +33,132 @@ export function CartProvider({ children }) {
         product.variantId === variantId &&
         product.selectedSize === selectedSize &&
         product.selectedColor === selectedColor
-    )
+    );
 
-    return item ? item.quantity : 0
-  }
+    return item ? item.quantity : 0;
+  };
 
   const addToCart = (product) => {
     const quantityToAdd = Math.max(
       Number(product.quantity) || 1,
       1
-    )
+    );
 
     const availableStock = Number(
-      product.availableStock ??
-        product.stock ??
-        0
-    )
+      product.availableStock ?? product.stock ?? 0
+    );
 
-    let addedSuccessfully = false
+    let addedSuccessfully = false;
 
     setCart((currentCart) => {
-      const productId =
-        product.productId || product.id
+      const productId = product.productId || product.id;
 
-      const existingIndex =
-        currentCart.findIndex(
-          (item) =>
-            (item.productId || item.id) ===
-              productId &&
-            item.variantId ===
-              product.variantId &&
-            item.selectedSize ===
-              product.selectedSize &&
-            item.selectedColor ===
-              product.selectedColor
-        )
+      const existingIndex = currentCart.findIndex(
+        (item) =>
+          (item.productId || item.id) === productId &&
+          item.variantId === product.variantId &&
+          item.selectedSize === product.selectedSize &&
+          item.selectedColor === product.selectedColor
+      );
 
       if (existingIndex !== -1) {
-        const existingProduct =
-          currentCart[existingIndex]
+        const existingProduct = currentCart[existingIndex];
 
         const newQuantity =
-          existingProduct.quantity +
-          quantityToAdd
+          existingProduct.quantity + quantityToAdd;
 
         const finalQuantity =
           availableStock > 0
-            ? Math.min(
-                newQuantity,
-                availableStock
-              )
-            : newQuantity
+            ? Math.min(newQuantity, availableStock)
+            : newQuantity;
 
-        if (
-          finalQuantity ===
-          existingProduct.quantity
-        ) {
-          return currentCart
+        if (finalQuantity === existingProduct.quantity) {
+          return currentCart;
         }
 
-        addedSuccessfully = true
+        addedSuccessfully = true;
 
-        return currentCart.map(
-          (item, index) =>
-            index === existingIndex
-              ? {
-                  ...item,
-                  quantity: finalQuantity,
-                }
-              : item
-        )
+        return currentCart.map((item, index) =>
+          index === existingIndex
+            ? { ...item, quantity: finalQuantity }
+            : item
+        );
       }
 
-      addedSuccessfully = true
+      addedSuccessfully = true;
 
       const finalQuantity =
         availableStock > 0
-          ? Math.min(
-              quantityToAdd,
-              availableStock
-            )
-          : quantityToAdd
+          ? Math.min(quantityToAdd, availableStock)
+          : quantityToAdd;
 
       return [
         ...currentCart,
-        {
-          ...product,
-          quantity: finalQuantity,
-        },
-      ]
-    })
+        { ...product, quantity: finalQuantity },
+      ];
+    });
 
     setTimeout(() => {
       if (addedSuccessfully) {
-        showCartNotification(product)
+        showCartNotification(product);
       }
-    }, 0)
-  }
+    }, 0);
+  };
 
   const increaseQuantity = (index) => {
     setCart((currentCart) =>
       currentCart.map((item, i) => {
-        if (i !== index) {
-          return item
-        }
+        if (i !== index) return item;
 
         const availableStock = Number(
-          item.availableStock ??
-            item.stock ??
-            0
-        )
+          item.availableStock ?? item.stock ?? 0
+        );
 
         if (
           availableStock > 0 &&
           item.quantity >= availableStock
         ) {
-          return item
+          return item;
         }
 
         return {
           ...item,
           quantity: item.quantity + 1,
-        }
+        };
       })
-    )
-  }
+    );
+  };
 
   const decreaseQuantity = (index) => {
     setCart((currentCart) =>
       currentCart
         .map((item, i) =>
           i === index
-            ? {
-                ...item,
-                quantity: item.quantity - 1,
-              }
+            ? { ...item, quantity: item.quantity - 1 }
             : item
         )
-        .filter(
-          (item) => item.quantity > 0
-        )
-    )
-  }
+        .filter((item) => item.quantity > 0)
+    );
+  };
 
   const removeFromCart = (index) => {
     setCart((currentCart) =>
-      currentCart.filter(
-        (_, i) => i !== index
-      )
-    )
-  }
+      currentCart.filter((_, i) => i !== index)
+    );
+  };
 
   const clearCart = () => {
-    setCart([])
-  }
+    setCart([]);
+  };
 
   const openCart = () => {
-    setCartNotification(null)
-    setCartOpen(true)
-  }
+    setCartNotification(null);
+    setCartOpen(true);
+  };
 
   const closeCart = () => {
-    setCartOpen(false)
-  }
+    setCartOpen(false);
+  };
 
   return (
     <CartContext.Provider
@@ -218,13 +180,13 @@ export function CartProvider({ children }) {
 
       {cartNotification && (
         <div className="fixed bottom-6 left-1/2 z-[300] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#F0D58A]/30 bg-[#151714] px-4 py-3 shadow-2xl">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#e9e3d9] bg-[#fffefa] px-4 py-3 text-[#292821] shadow-xl">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#78B87A] text-sm font-black text-white">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e7eee1] text-sm font-bold text-[#49613f]">
                 ✓
               </span>
 
-              <span className="truncate text-sm font-semibold text-white">
+              <span className="truncate text-sm font-medium">
                 {cartNotification.message}
               </span>
             </div>
@@ -232,7 +194,7 @@ export function CartProvider({ children }) {
             <button
               type="button"
               onClick={openCart}
-              className="flex-shrink-0 rounded-full bg-[#F0D58A] px-4 py-2 text-xs font-black text-black transition hover:bg-white"
+              className="shrink-0 rounded-full bg-[#292821] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#454238]"
             >
               Ver carrito
             </button>
@@ -240,9 +202,9 @@ export function CartProvider({ children }) {
         </div>
       )}
     </CartContext.Provider>
-  )
+  );
 }
 
 export function useCart() {
-  return useContext(CartContext)
+  return useContext(CartContext);
 }

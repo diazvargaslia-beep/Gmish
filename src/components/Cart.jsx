@@ -1,5 +1,5 @@
-import { useCart } from "../CartContext"
-import store from "../data/store"
+import { useCart } from "../CartContext";
+import store from "../data/store";
 
 function Cart() {
   const {
@@ -9,193 +9,256 @@ function Cart() {
     removeFromCart,
     clearCart,
     cartOpen,
-    openCart,
     closeCart,
-  } = useCart()
+  } = useCart();
 
   const total = cart.reduce(
     (sum, product) =>
       sum + Number(product.price) * product.quantity,
     0
-  )
+  );
 
   const totalItems = cart.reduce(
     (sum, product) => sum + product.quantity,
     0
-  )
+  );
 
   const sendToWhatsApp = () => {
+    if (cart.length === 0) return;
+
     const orderLines = cart.map(
       (product) =>
-        `• ${product.name} | Talla: ${product.selectedSize} | Color: ${product.selectedColor} | Cantidad: ${product.quantity} | S/${Number(product.price) * product.quantity}`
-    )
+        `• ${product.name} | Talla: ${product.selectedSize} | Color: ${product.selectedColor} | Cantidad: ${product.quantity} | Subtotal: S/${(
+          Number(product.price) * product.quantity
+        ).toFixed(2)}`
+    );
 
     const message = [
-      "Hola, quiero realizar este pedido:",
+      "Hola, quiero realizar este pedido en GMISH:",
       "",
       ...orderLines,
       "",
-      `Total: S/${total}`,
-    ].join("\n")
+      `Total: S/${total.toFixed(2)}`,
+    ].join("\n");
 
-    const url = `https://wa.me/${store.whatsapp}?text=${encodeURIComponent(message)}`
+    const url = `https://wa.me/${store.whatsapp}?text=${encodeURIComponent(
+      message
+    )}`;
 
-    window.open(url, "_blank")
-  }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <>
-      <button
-        onClick={openCart}
-        aria-label="Carrito"
-        className={`text-lg text-white transition hover:text-[#F0D58A] ${
-          totalItems > 0
-            ? "scale-110 text-[#F0D58A]"
-            : ""
-        }`}
-      >
-        🛒
-
-        {totalItems > 0 && (
-          <span className="ml-1 text-xs text-[#F0D58A]">
-            {totalItems}
-          </span>
-        )}
-      </button>
-
       {cartOpen && (
         <div
-          className="fixed inset-0 z-[250] bg-black/60"
+          className="fixed inset-0 z-[250] bg-black/35 backdrop-blur-[2px]"
           onClick={closeCart}
         >
-          <div
-            className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto bg-[#151714] p-6 text-white shadow-xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Tu carrito de compras"
+            className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#e9e3d9] bg-[#fffefa] text-[#292821] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#302E28] pb-4">
-              <h2 className="text-xl font-bold">
-                Tu carrito
-              </h2>
+            <div className="flex items-center justify-between border-b border-[#e9e3d9] px-6 py-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#8c8578]">
+                  GMISH COLLECTION
+                </p>
+
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                  Tu carrito
+                  <span className="ml-2 text-sm font-normal text-[#898274]">
+                    ({totalItems})
+                  </span>
+                </h2>
+              </div>
 
               <button
+                type="button"
                 onClick={closeCart}
-                className="text-xl text-gray-400 transition hover:text-white"
                 aria-label="Cerrar carrito"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e9e3d9] text-xl text-[#49463f] transition hover:bg-[#f2eee6]"
               >
-                ✕
+                ×
               </button>
             </div>
 
             {cart.length === 0 ? (
-              <div className="flex h-[70%] items-center justify-center text-center text-gray-400">
-                <p>
-                  Tu carrito está vacío.
+              <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f2eee6] text-2xl">
+                  ♡
+                </div>
+
+                <h3 className="mt-5 text-lg font-medium">
+                  Tu carrito está vacío
+                </h3>
+
+                <p className="mt-2 max-w-xs text-sm leading-6 text-[#827b70]">
+                  Descubre nuestra colección y encuentra algo que vaya contigo.
                 </p>
+
+                <button
+                  type="button"
+                  onClick={closeCart}
+                  className="mt-6 rounded-full bg-[#292821] px-7 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-[#454238]"
+                >
+                  Seguir comprando
+                </button>
               </div>
             ) : (
-              <div className="mt-6">
-                <div className="space-y-4">
+              <>
+                <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
                   {cart.map((product, index) => (
-                    <div
+                    <article
                       key={`${product.productId || product.id}-${product.variantId}-${product.selectedSize}-${product.selectedColor}`}
-                      className="rounded-xl border border-[#302E28] p-4"
+                      className="rounded-2xl border border-[#e9e3d9] bg-white p-4"
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold">
-                            {product.name}
-                          </h3>
+                      <div className="flex gap-4">
+                        {product.image ? (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="h-28 w-20 shrink-0 rounded-xl bg-[#f5f1e9] object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f5f1e9] text-xs text-[#918979]">
+                            GMISH
+                          </div>
+                        )}
 
-                          <p className="mt-1 text-sm text-gray-400">
-                            Talla:{" "}
-                            {product.selectedSize}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-sm font-semibold leading-5">
+                              {product.name}
+                            </h3>
+
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(index)}
+                              aria-label={`Eliminar ${product.name}`}
+                              className="text-xs text-[#8b8376] underline underline-offset-4 transition hover:text-red-600"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+
+                          <p className="mt-2 text-xs text-[#777064]">
+                            Talla: {product.selectedSize || "No seleccionada"}
                           </p>
 
-                          <p className="text-sm text-gray-400">
-                            Color:{" "}
-                            {product.selectedColor}
-                          </p>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-[#777064]">
+                            <span>Color:</span>
 
-                          <p className="mt-2 font-semibold text-[#F0D58A]">
+                            {product.selectedColorHex && (
+                              <span
+                                className="h-3 w-3 rounded-full border border-black/10"
+                                style={{
+                                  backgroundColor:
+                                    product.selectedColorHex,
+                                }}
+                              />
+                            )}
+
+                            <span>
+                              {product.selectedColor || "No seleccionado"}
+                            </span>
+                          </div>
+
+                          <p className="mt-3 font-semibold text-[#292821]">
                             S/{" "}
-                            {Number(product.price) *
-                              product.quantity}
+                            {(
+                              Number(product.price) * product.quantity
+                            ).toFixed(2)}
                           </p>
                         </div>
-
-                        <button
-                          onClick={() =>
-                            removeFromCart(index)
-                          }
-                          className="text-sm text-gray-400 transition hover:text-red-400"
-                        >
-                          Eliminar
-                        </button>
                       </div>
 
-                      <div className="mt-4 flex items-center gap-3">
-                        <button
-                          onClick={() =>
-                            decreaseQuantity(index)
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#302E28] text-lg transition hover:border-[#F0D58A]"
-                        >
-                          −
-                        </button>
+                      <div className="mt-4 flex items-center justify-between border-t border-[#eee9e0] pt-3">
+                        <div className="flex items-center overflow-hidden rounded-full border border-[#e4ded3]">
+                          <button
+                            type="button"
+                            onClick={() => decreaseQuantity(index)}
+                            aria-label="Disminuir cantidad"
+                            className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-[#f2eee6]"
+                          >
+                            −
+                          </button>
 
-                        <span className="min-w-5 text-center">
-                          {product.quantity}
-                        </span>
+                          <span className="min-w-9 text-center text-sm">
+                            {product.quantity}
+                          </span>
 
-                        <button
-                          onClick={() =>
-                            increaseQuantity(index)
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#302E28] text-lg transition hover:border-[#F0D58A]"
-                        >
-                          +
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => increaseQuantity(index)}
+                            aria-label="Aumentar cantidad"
+                            disabled={
+                              Number(
+                                product.availableStock ??
+                                  product.stock ??
+                                  0
+                              ) > 0 &&
+                              product.quantity >=
+                                Number(
+                                  product.availableStock ??
+                                    product.stock
+                                )
+                            }
+                            className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-[#f2eee6] disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            +
+                          </button>
+                        </div>
 
-                        <span className="ml-2 text-sm text-gray-400">
-                          S/ {product.price} c/u
+                        <span className="text-xs text-[#827b70]">
+                          S/ {Number(product.price).toFixed(2)} c/u
                         </span>
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
 
-                <div className="mt-8 border-t border-[#302E28] pt-5">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
+                <div className="border-t border-[#e9e3d9] bg-[#fffefa] px-6 py-5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-[#777064]">
+                      Total del pedido
+                    </span>
 
-                    <span>
-                      S/ {total}
+                    <span className="text-2xl font-semibold tracking-tight">
+                      S/ {total.toFixed(2)}
                     </span>
                   </div>
 
+                  <p className="mt-2 text-xs leading-5 text-[#898274]">
+                    Confirma tu pedido por WhatsApp para coordinar la compra.
+                  </p>
+
                   <button
+                    type="button"
                     onClick={sendToWhatsApp}
-                    className="mt-5 w-full rounded-full bg-[#25D366] px-4 py-3 font-semibold text-black transition hover:opacity-90"
+                    className="mt-5 w-full rounded-full bg-[#292821] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#454238] active:scale-[0.99]"
                   >
-                    Pedir por WhatsApp
+                    Continuar por WhatsApp ↗
                   </button>
 
                   <button
+                    type="button"
                     onClick={clearCart}
-                    className="mt-3 w-full rounded-full border border-[#302E28] px-4 py-2 text-sm text-gray-300 transition hover:bg-[#22231F]"
+                    className="mt-3 w-full py-2 text-xs text-[#827b70] underline underline-offset-4 transition hover:text-red-600"
                   >
                     Vaciar carrito
                   </button>
                 </div>
-              </div>
+              </>
             )}
-          </div>
+          </aside>
         </div>
       )}
     </>
-  )
+  );
 }
 
-export default Cart
+export default Cart;

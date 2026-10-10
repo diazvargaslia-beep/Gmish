@@ -1,16 +1,32 @@
+
 @import "tailwindcss";
 
-.logo-glitter {
-  background: linear-gradient(
-    120deg,
-    #950707 0%,
-    hsla(26, 95%, 49%, 0.758) 25%,
-    #d4b228 50%,
-    #9c4c1a 75%,
-    #5c0600 100%
-  );
+/* GMISH: separación del nombre, precio y descripción */
+.detalle-producto-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+/* GMISH: separación entre las secciones del detalle */
+.detalle-producto-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .detalle-producto-cabecera {
+    gap: 20px;
+  }
+
+  .detalle-producto-info {
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .detalle-producto-cabecera {
+    gap: 24px;
+  }
 }
