@@ -1,27 +1,72 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import ProductsAdmin from "./ProductsAdmin";
 
+/* =========================================================
+   SECCIONES Y PERMISOS
+========================================================= */
+
 const secciones = [
-  { id: "inicio", nombre: "Inicio", icono: "⌂" },
-  { id: "productos", nombre: "Productos", icono: "▦" },
-  { id: "pedidos", nombre: "Pedidos y ventas", icono: "▤" },
-  { id: "portadas", nombre: "Portadas", icono: "▧" },
-  { id: "estadisticas", nombre: "Estadísticas", icono: "↗" },
-  { id: "configuracion", nombre: "Configuración", icono: "⚙" },
+  {
+    id: "inicio",
+    nombre: "Inicio",
+    icono: "⌂",
+    acceso: ["principal", "secundario"],
+  },
+  {
+    id: "productos",
+    nombre: "Productos",
+    icono: "▦",
+    acceso: ["principal", "secundario"],
+  },
+  {
+    id: "pedidos",
+    nombre: "Pedidos y ventas",
+    icono: "▤",
+    acceso: ["principal"],
+  },
+  {
+    id: "portadas",
+    nombre: "Portadas",
+    icono: "▧",
+    acceso: ["principal"],
+  },
+  {
+    id: "estadisticas",
+    nombre: "Estadísticas",
+    icono: "↗",
+    acceso: ["principal"],
+  },
+  {
+    id: "configuracion",
+    nombre: "Configuración",
+    icono: "⚙",
+    acceso: ["principal"],
+  },
 ];
 
+/* =========================================================
+   ESTILOS
+========================================================= */
+
 const tarjeta =
-  "rounded-2xl border border-[#303030] bg-[#141414]";
+  "rounded-2xl border border-[#29233a] bg-[#17151f] shadow-[0_12px_40px_rgba(0,0,0,0.25)]";
 
 const botonPrincipal =
-  "rounded-xl border border-[#454545] bg-[#222222] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#303030] disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded-xl border border-[#332b46] bg-[#1b1824] px-5 py-3 text-sm font-semibold text-[#e8e3f0] transition hover:border-[#8b5cf6] hover:bg-[#211c2d] disabled:cursor-not-allowed disabled:opacity-40";
 
 const botonMorado =
-  "w-full rounded-xl bg-[#76509a] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#8660aa] disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded-xl bg-[#7c3aed] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#8b5cf6] disabled:cursor-not-allowed disabled:opacity-40";
 
 const campo =
-  "w-full rounded-xl border border-[#383838] bg-[#0d0d0d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#777777] focus:border-[#76509a] focus:ring-1 focus:ring-[#76509a]/30";
+  "w-full rounded-xl border border-[#342c45] bg-[#121019] px-4 py-3 text-sm text-[#f4f0f8] outline-none transition placeholder:text-[#777080] focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20";
+
+const etiqueta =
+  "mb-2 block text-sm font-semibold text-[#d9d3e2]";
+
+/* =========================================================
+   UTILIDADES
+========================================================= */
 
 function obtenerSeccionDesdeUrl() {
   const hash = window.location.hash.replace("#", "").trim();
@@ -33,9 +78,34 @@ function obtenerSeccionDesdeUrl() {
   return existe ? hash : "inicio";
 }
 
-export default function Admin() {
+function formatearPrecio(valor) {
+  const numero = Number(valor || 0);
+
+  return `S/ ${numero.toFixed(2)}`;
+}
+
+function formatearFechaHora(fecha) {
+  if (!fecha) return "-";
+
+  return new Date(fecha).toLocaleString("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/* =========================================================
+   COMPONENTE PRINCIPAL
+========================================================= */
+
+function Admin() {
   const [sesion, setSesion] = useState(null);
+  const [rol, setRol] = useState(null);
+
   const [cargando, setCargando] = useState(true);
+  const [cargandoRol, setCargandoRol] = useState(false);
   const [conectado, setConectado] = useState(false);
 
   const [email, setEmail] = useState("");
@@ -49,61 +119,42 @@ export default function Admin() {
 
   const [menuAbierto, setMenuAbierto] = useState(false);
 
-  useEffect(() => {
-    if (!window.location.hash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}#inicio`
-      );
+  /* =====================================================
+     SECCIONES SEGÚN ROL
+  ===================================================== */
 
-      setSeccion("inicio");
-    }
+  const seccionesVisibles = useMemo(() => {
+    if (!rol) return [];
 
-    function manejarCambioDeHistorial() {
-      const nuevaSeccion =
-        obtenerSeccionDesdeUrl();
-
-      setSeccion(nuevaSeccion);
-      setMenuAbierto(false);
-    }
-
-    window.addEventListener(
-      "hashchange",
-      manejarCambioDeHistorial
+    return secciones.filter((item) =>
+      item.acceso.includes(rol)
     );
+  }, [rol]);
 
-    return () => {
-      window.removeEventListener(
-        "hashchange",
-        manejarCambioDeHistorial
-      );
-    };
-  }, []);
+  /* =====================================================
+     SESIÓN
+  ===================================================== */
 
   useEffect(() => {
     let activo = true;
 
     async function cargarSesion() {
+      setCargando(true);
+
       const {
-        data,
-        error: errorSesion,
+        data: { session },
       } = await supabase.auth.getSession();
 
       if (!activo) return;
 
-      if (errorSesion) {
-        setError(
-          "No se pudo comprobar la sesión."
-        );
+      setSesion(session);
+
+      if (session?.user) {
+        await cargarRolUsuario(session.user.id);
+        await comprobarConexion();
       }
 
-      setSesion(data?.session ?? null);
       setCargando(false);
-
-      if (data?.session) {
-        comprobarConexion();
-      }
     }
 
     cargarSesion();
@@ -111,14 +162,16 @@ export default function Admin() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_evento, nuevaSesion) => {
+      async (_event, nuevaSesion) => {
         if (!activo) return;
 
         setSesion(nuevaSesion);
 
-        if (nuevaSesion) {
-          comprobarConexion();
+        if (nuevaSesion?.user) {
+          await cargarRolUsuario(nuevaSesion.user.id);
+          await comprobarConexion();
         } else {
+          setRol(null);
           setConectado(false);
         }
       }
@@ -130,230 +183,380 @@ export default function Admin() {
     };
   }, []);
 
+  /* =====================================================
+     HISTORIAL DEL NAVEGADOR
+  ===================================================== */
+
+  useEffect(() => {
+    function sincronizarConUrl() {
+      const nuevaSeccion = obtenerSeccionDesdeUrl();
+
+      setSeccion(nuevaSeccion);
+      setMenuAbierto(false);
+    }
+
+    window.addEventListener(
+      "hashchange",
+      sincronizarConUrl
+    );
+
+    window.addEventListener(
+      "popstate",
+      sincronizarConUrl
+    );
+
+    return () => {
+      window.removeEventListener(
+        "hashchange",
+        sincronizarConUrl
+      );
+
+      window.removeEventListener(
+        "popstate",
+        sincronizarConUrl
+      );
+    };
+  }, []);
+
+  /* =====================================================
+     CARGAR ROL
+  ===================================================== */
+
+  async function cargarRolUsuario(userId) {
+    setCargandoRol(true);
+    setError("");
+
+    const { data, error: errorRol } = await supabase
+      .from("admin_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (errorRol) {
+      console.error(errorRol);
+
+      setRol(null);
+
+      setError(
+        "No se pudo comprobar el rol de administrador."
+      );
+
+      setCargandoRol(false);
+      return null;
+    }
+
+    if (!data?.role) {
+      setRol(null);
+
+      setError(
+        "Esta cuenta no tiene un rol de administrador asignado."
+      );
+
+      setCargandoRol(false);
+
+      await supabase.auth.signOut();
+
+      return null;
+    }
+
+    setRol(data.role);
+    setCargandoRol(false);
+
+    return data.role;
+  }
+
+  /* =====================================================
+     PROTEGER SECCIÓN
+  ===================================================== */
+
+  useEffect(() => {
+    if (!rol) return;
+
+    const permitida = seccionesVisibles.some(
+      (item) => item.id === seccion
+    );
+
+    if (!permitida) {
+      cambiarSeccion("inicio", true);
+    }
+  }, [rol, seccion, seccionesVisibles]);
+
+  /* =====================================================
+     CONEXIÓN
+  ===================================================== */
+
   async function comprobarConexion() {
-    const {
-      error: errorConsulta,
-    } = await supabase
+    const { error: errorConexion } = await supabase
       .from("products")
       .select("id")
       .limit(1);
 
-    setConectado(!errorConsulta);
+    setConectado(!errorConexion);
   }
 
-  async function iniciarSesion(e) {
-    e.preventDefault();
+  /* =====================================================
+     LOGIN
+  ===================================================== */
+
+  async function iniciarSesion(event) {
+    event.preventDefault();
 
     setError("");
-    setCargando(true);
 
-    const {
-      error: errorLogin,
-    } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (errorLogin) {
+    if (!email.trim() || !password) {
       setError(
-        "No se pudo iniciar sesión. Revisa tus datos."
+        "Completa el correo y la contraseña."
       );
-
-      setCargando(false);
       return;
     }
 
-    setCargando(false);
+    const { data, error: errorLogin } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+    if (errorLogin) {
+      setError(errorLogin.message);
+      return;
+    }
+
+    if (data?.user) {
+      await cargarRolUsuario(data.user.id);
+      await comprobarConexion();
+    }
   }
+
+  /* =====================================================
+     CERRAR SESIÓN
+  ===================================================== */
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
 
     setSesion(null);
-    setConectado(false);
+    setRol(null);
     setMenuAbierto(false);
-
-    window.history.replaceState(
-      null,
-      "",
-      "/admin"
-    );
-
     setSeccion("inicio");
+
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}${window.location.search}#inicio`
+    );
   }
 
-  function cambiarSeccion(id) {
-    if (id === seccion) {
-      setMenuAbierto(false);
-      return;
-    }
+  /* =====================================================
+     CAMBIAR SECCIÓN
+  ===================================================== */
 
-    window.location.hash = id;
+  function cambiarSeccion(id, reemplazar = false) {
+    const permitida = seccionesVisibles.some(
+      (item) => item.id === id
+    );
+
+    if (!permitida) {
+      id = "inicio";
+    }
 
     setSeccion(id);
     setMenuAbierto(false);
+
+    const nuevaUrl =
+      `${window.location.pathname}` +
+      `${window.location.search}#${id}`;
+
+    if (reemplazar) {
+      window.history.replaceState(
+        { seccion: id },
+        "",
+        nuevaUrl
+      );
+    } else {
+      window.history.pushState(
+        { seccion: id },
+        "",
+        nuevaUrl
+      );
+    }
   }
 
-  function volverATienda() {
-    window.location.href = "/";
-  }
+  /* =====================================================
+     LOADING
+  ===================================================== */
 
-  if (cargando) {
+  if (cargando || cargandoRol) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0b0b0b] text-white">
-        <div className="text-center">
-          <div className="mb-3 text-3xl font-black tracking-[0.25em] text-[#a879d1]">
-            GMISH
+      <div className="flex min-h-screen items-center justify-center bg-[#0f0d15] px-6">
+        <div className="w-full max-w-sm text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#7c3aed] text-2xl font-black text-white shadow-[0_0_35px_rgba(124,58,237,0.35)]">
+            G
           </div>
 
-          <p className="text-sm text-[#888888]">
-            Cargando panel...
+          <p className="text-sm font-semibold text-[#eee9f5]">
+            Cargando GMISH...
+          </p>
+
+          <p className="mt-2 text-xs text-[#81798e]">
+            Preparando el panel administrativo
           </p>
         </div>
       </div>
     );
   }
 
+  /* =====================================================
+     LOGIN
+  ===================================================== */
+
   if (!sesion) {
     return (
-      <div className="min-h-screen bg-[#0b0b0b] px-5 py-10 text-white">
-        <div className="mx-auto flex min-h-[80vh] max-w-md items-center justify-center">
-          <div className="w-full rounded-3xl border border-[#303030] bg-[#141414] p-7 shadow-2xl">
-            <div className="mb-8 text-center">
-              <div className="mb-2 text-3xl font-black tracking-[0.3em] text-[#a879d1]">
-                GMISH
+      <div className="flex min-h-screen items-center justify-center bg-[#0f0d15] px-5 py-12">
+        <div className="mx-auto w-full max-w-md">
+          <div
+            className={`${tarjeta} overflow-hidden`}
+          >
+            <div className="border-b border-[#29233a] px-8 py-10 text-center">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#7c3aed] text-2xl font-black text-white shadow-[0_0_35px_rgba(124,58,237,0.35)]">
+                G
               </div>
 
-              <h1 className="text-xl font-bold">
-                Panel administrativo
+              <h1 className="text-2xl font-black tracking-tight text-white">
+                GMISH
               </h1>
 
-              <p className="mt-2 text-sm text-[#858585]">
-                Inicia sesión para administrar
-                la tienda.
+              <p className="mt-2 text-sm text-[#91889d]">
+                Panel administrativo
               </p>
             </div>
 
             <form
               onSubmit={iniciarSesion}
-              className="space-y-4"
+              className="space-y-6 px-8 py-9"
             >
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#cccccc]">
-                  Correo
+                <label className={etiqueta}>
+                  Correo electrónico
                 </label>
 
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) =>
-                    setEmail(e.target.value)
+                  onChange={(event) =>
+                    setEmail(event.target.value)
                   }
-                  placeholder="tu@email.com"
+                  placeholder="correo@ejemplo.com"
                   className={campo}
-                  required
+                  autoComplete="email"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#cccccc]">
+                <label className={etiqueta}>
                   Contraseña
                 </label>
 
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) =>
-                    setPassword(e.target.value)
+                  onChange={(event) =>
+                    setPassword(event.target.value)
                   }
                   placeholder="••••••••"
                   className={campo}
-                  required
+                  autoComplete="current-password"
                 />
               </div>
 
               {error && (
-                <div className="rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+                <div className="rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm leading-5 text-red-300">
                   {error}
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={cargando}
-                className={botonMorado}
+                className={`${botonMorado} w-full py-3.5`}
               >
-                {cargando
-                  ? "Ingresando..."
-                  : "Iniciar sesión"}
+                Iniciar sesión
               </button>
             </form>
-
-            <button
-              type="button"
-              onClick={volverATienda}
-              className="mt-5 w-full text-sm text-[#999999] transition hover:text-white"
-            >
-              ← Volver a la tienda
-            </button>
           </div>
+
+          <p className="mt-6 text-center text-xs text-[#696170]">
+            GMISH · Panel privado
+          </p>
         </div>
       </div>
     );
   }
 
+  /* =====================================================
+     PANEL PRINCIPAL
+  ===================================================== */
+
   return (
-    <div className="min-h-screen bg-[#0b0b0b] text-white">
-      <header className="sticky top-0 z-50 border-b border-[#292929] bg-[#101010]/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#0f0d15] text-[#eee9f5]">
+      {/* HEADER */}
+
+      <header className="sticky top-0 z-50 border-b border-[#29233a] bg-[#121019]/95 shadow-[0_8px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+        <div className="mx-auto flex h-20 w-full max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
+          {/* IZQUIERDA */}
+
+          <div className="flex min-w-0 items-center gap-4">
             <button
               type="button"
               onClick={() =>
                 setMenuAbierto(!menuAbierto)
               }
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#303030] bg-[#171717] text-xl transition hover:bg-[#222222]"
+              className="flex h-11 w-11 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border border-[#342c45] bg-[#181520] transition hover:border-[#8b5cf6] hover:bg-[#211c2d]"
               aria-label="Abrir menú"
             >
-              ☰
+              <span className="h-0.5 w-5 rounded-full bg-[#ddd5e7]" />
+              <span className="h-0.5 w-5 rounded-full bg-[#ddd5e7]" />
+              <span className="h-0.5 w-5 rounded-full bg-[#ddd5e7]" />
             </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                cambiarSeccion("inicio")
-              }
-              className="font-black tracking-[0.25em] text-[#a879d1]"
-            >
-              GMISH
-            </button>
+            <div className="min-w-0">
+              <p className="text-lg font-black tracking-[0.18em] text-white">
+                GMISH
+              </p>
+
+              <p className="hidden text-[10px] font-medium uppercase tracking-widest text-[#746b80] sm:block">
+                Panel administrativo
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div
-              className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs sm:flex ${
-                conectado
-                  ? "border-green-900/60 bg-green-950/30 text-green-300"
-                  : "border-red-900/60 bg-red-950/30 text-red-300"
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  conectado
-                    ? "bg-green-400"
-                    : "bg-red-400"
-                }`}
-              />
+          {/* CENTRO */}
 
+          <div className="hidden items-center gap-3 md:flex">
+            <div
+              className={`h-2.5 w-2.5 rounded-full ${
+                conectado
+                  ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]"
+                  : "bg-red-500"
+              }`}
+            />
+
+            <span className="text-xs font-semibold text-[#8e8599]">
               {conectado
                 ? "Base de datos conectada"
                 : "Sin conexión"}
-            </div>
+            </span>
+          </div>
+
+          {/* DERECHA */}
+
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="hidden rounded-full border border-[#3b3150] bg-[#211a2e] px-3 py-1.5 text-xs font-bold capitalize text-[#b993ff] sm:block">
+              {rol}
+            </span>
 
             <button
               type="button"
               onClick={cerrarSesion}
-              className="rounded-xl border border-[#383838] bg-[#171717] px-3 py-2 text-xs font-semibold text-[#cccccc] transition hover:bg-[#222222] hover:text-white"
+              className="rounded-xl border border-[#342c45] px-4 py-2.5 text-xs font-bold text-[#9c94a5] transition hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-400"
             >
               Cerrar sesión
             </button>
@@ -361,35 +564,45 @@ export default function Admin() {
         </div>
       </header>
 
+      {/* MENÚ */}
+
       {menuAbierto && (
         <>
-          <div
-            className="fixed inset-0 z-40 bg-black/60"
-            onClick={() =>
-              setMenuAbierto(false)
-            }
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setMenuAbierto(false)}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]"
           />
 
-          <aside className="fixed left-0 top-16 z-50 h-[calc(100vh-4rem)] w-[280px] border-r border-[#303030] bg-[#111111] p-4 shadow-2xl">
-            <div className="mb-4 px-2 text-xs font-bold uppercase tracking-[0.2em] text-[#666666]">
-              Administración
+          <aside className="fixed left-1/2 top-24 z-50 w-[calc(100%-32px)] max-w-sm -translate-x-1/2 rounded-2xl border border-[#342c45] bg-[#17151f] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.55)]">
+            <div className="mb-3 px-3 py-3 text-center">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Administración
+              </p>
             </div>
 
             <nav className="space-y-2">
-              {secciones.map((item) => (
+              {seccionesVisibles.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() =>
                     cambiarSeccion(item.id)
                   }
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  className={`flex w-full items-center gap-4 rounded-xl px-4 py-4 text-left text-sm font-semibold transition ${
                     seccion === item.id
-                      ? "bg-[#76509a] text-white"
-                      : "text-[#b5b5b5] hover:bg-[#1d1d1d] hover:text-white"
+                      ? "bg-[#2a1d3e] text-[#b993ff]"
+                      : "text-[#bcb4c7] hover:bg-[#211c2d] hover:text-white"
                   }`}
                 >
-                  <span className="flex w-6 justify-center text-lg">
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base ${
+                      seccion === item.id
+                        ? "bg-[#7c3aed] text-white"
+                        : "bg-[#211c2d] text-[#8f849e]"
+                    }`}
+                  >
                     {item.icono}
                   </span>
 
@@ -397,54 +610,57 @@ export default function Admin() {
                 </button>
               ))}
             </nav>
-
-            <div className="mt-8 border-t border-[#292929] pt-5">
-              <button
-                type="button"
-                onClick={volverATienda}
-                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#999999] transition hover:bg-[#1d1d1d] hover:text-white"
-              >
-                <span className="text-lg">
-                  ↗
-                </span>
-
-                <span>Ver tienda</span>
-              </button>
-            </div>
           </aside>
         </>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+      {/* CONTENIDO */}
+
+      <main className="mx-auto w-full max-w-5xl px-5 py-12 sm:px-8 sm:py-14">
         {seccion === "inicio" && (
           <InicioAdmin
+            rol={rol}
+            conectado={conectado}
             cambiarSeccion={cambiarSeccion}
+            seccionesVisibles={seccionesVisibles}
           />
         )}
 
         {seccion === "productos" && (
-          <ProductsAdmin />
+          <div className="mx-auto w-full max-w-5xl">
+            <ProductsAdmin rol={rol} />
+          </div>
         )}
 
-        {seccion === "pedidos" && (
-          <PedidosAdmin />
-        )}
+        {seccion === "pedidos" &&
+          rol === "principal" && <PedidosAdmin />}
 
-        {seccion === "portadas" && (
-          <PortadasAdmin />
-        )}
+        {seccion === "portadas" &&
+          rol === "principal" && <PortadasAdmin />}
 
-        {seccion === "estadisticas" && (
-          <EstadisticasAdmin />
-        )}
+        {seccion === "estadisticas" &&
+          rol === "principal" && (
+            <EstadisticasAdmin />
+          )}
 
-        {seccion === "configuracion" && (
-          <ConfiguracionAdmin />
-        )}
+        {seccion === "configuracion" &&
+          rol === "principal" && (
+            <ConfiguracionAdmin />
+          )}
       </main>
 
-      <footer className="border-t border-[#242424] px-4 py-7 text-center text-xs text-[#666666]">
-        © 2026 GMISH. Panel administrativo.
+      {/* FOOTER */}
+
+      <footer className="mx-auto mt-6 w-full max-w-5xl border-t border-[#29233a] px-5 py-10 sm:px-8">
+        <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row">
+          <p className="text-xs font-semibold text-[#696170]">
+            © {new Date().getFullYear()} GMISH
+          </p>
+
+          <p className="text-xs text-[#514a5a]">
+            Panel administrativo
+          </p>
+        </div>
       </footer>
     </div>
   );
@@ -452,71 +668,84 @@ export default function Admin() {
 
 /* =========================================================
    INICIO
-   ========================================================= */
+========================================================= */
 
-function InicioAdmin({ cambiarSeccion }) {
+function InicioAdmin({
+  rol,
+  conectado,
+  cambiarSeccion,
+  seccionesVisibles,
+}) {
+  const tarjetas = seccionesVisibles.filter(
+    (item) => item.id !== "inicio"
+  );
+
   return (
-    <section>
-      <div className="mb-8">
-        <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-          Panel administrativo
-        </p>
+    <section className="w-full">
+      <div className="mx-auto w-full max-w-4xl text-center">
+        <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
+          Panel GMISH
+        </span>
 
-        <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-          Bienvenida a GMISH
+        <h1 className="mt-6 text-3xl font-black tracking-tight text-white sm:text-4xl">
+          Bienvenida al administrador
         </h1>
 
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#858585]">
-          Administra tus productos, pedidos,
-          portadas, estadísticas y contenido
-          de la tienda desde aquí.
+        <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-[#91889d]">
+          Gestiona productos, pedidos, portadas,
+          estadísticas y configuración desde un solo lugar.
         </p>
-      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {secciones
-          .filter(
-            (item) => item.id !== "inicio"
-          )
-          .map((item) => (
+        <div className="mt-6 flex justify-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#342c45] bg-[#17151f] px-4 py-2.5 text-xs font-semibold text-[#91889d]">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                conectado
+                  ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                  : "bg-red-500"
+              }`}
+            />
+
+            {conectado
+              ? "Supabase conectado"
+              : "Revisar conexión"}
+          </span>
+        </div>
+
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {tarjetas.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() =>
                 cambiarSeccion(item.id)
               }
-              className={`${tarjeta} group p-5 text-left transition hover:-translate-y-0.5 hover:border-[#76509a]`}
+              className={`${tarjeta} group flex min-h-[190px] flex-col items-center justify-center p-7 text-center transition duration-200 hover:-translate-y-1 hover:border-[#6d4ca0] hover:shadow-[0_18px_50px_rgba(124,58,237,0.14)]`}
             >
-              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#21182a] text-2xl text-[#b98bdd]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#241b32] text-xl text-[#a978ff] transition group-hover:bg-[#7c3aed] group-hover:text-white">
                 {item.icono}
               </div>
 
-              <h2 className="text-lg font-bold">
+              <h2 className="mt-5 text-base font-bold text-white">
                 {item.nombre}
               </h2>
 
-              <p className="mt-2 text-sm leading-6 text-[#777777]">
-                {item.id === "productos" &&
-                  "Administra prendas, precios, tallas, colores y stock."}
-
-                {item.id === "pedidos" &&
-                  "Revisa y gestiona los pedidos y ventas de GMISH."}
-
-                {item.id === "portadas" &&
-                  "Administra las portadas principal, Hombre y Mujer."}
-
-                {item.id === "estadisticas" &&
-                  "Consulta el rendimiento y las ventas de GMISH."}
-
-                {item.id === "configuracion" &&
-                  "Administra datos, contenido, redes, contacto y campañas."}
+              <p className="mt-2 text-xs leading-5 text-[#81798e]">
+                Administrar esta sección.
               </p>
-
-              <div className="mt-5 text-sm font-semibold text-[#a879d1] transition group-hover:text-[#c69ce2]">
-                Abrir sección →
-              </div>
             </button>
           ))}
+        </div>
+
+        <div className="mx-auto mt-10 max-w-md rounded-2xl border border-[#342c45] bg-[#17151f] p-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#766d80]">
+            Cuenta actual
+          </p>
+
+          <p className="mt-3 text-sm font-bold capitalize text-[#b993ff]">
+            {rol}
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -524,96 +753,311 @@ function InicioAdmin({ cambiarSeccion }) {
 
 /* =========================================================
    PEDIDOS
-   ========================================================= */
+========================================================= */
 
 function PedidosAdmin() {
+  const [pedidos, setPedidos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [filtro, setFiltro] = useState("todos");
+
+  useEffect(() => {
+    cargarPedidos();
+  }, []);
+
+  async function cargarPedidos() {
+    setCargando(true);
+    setError("");
+
+    const { data, error: errorPedidos } =
+      await supabase
+        .from("orders")
+        .select(`
+          *,
+          order_items (
+            id,
+            quantity,
+            unit_price,
+            size,
+            color,
+            subtotal,
+            product_id
+          )
+        `)
+        .order("created_at", {
+          ascending: false,
+        });
+
+    if (errorPedidos) {
+      console.error(errorPedidos);
+
+      setError(
+        "No se pudieron cargar los pedidos."
+      );
+
+      setCargando(false);
+      return;
+    }
+
+    setPedidos(data || []);
+    setCargando(false);
+  }
+
+  async function cambiarEstado(id, estado) {
+    const estadosPermitidos = [
+      "pendiente",
+      "enviado",
+      "entregado",
+      "cancelado",
+    ];
+
+    if (!estadosPermitidos.includes(estado)) {
+      return;
+    }
+
+    const fecha = new Date().toISOString();
+
+    const { error: errorActualizar } =
+      await supabase
+        .from("orders")
+        .update({
+          status: estado,
+          updated_at: fecha,
+        })
+        .eq("id", id);
+
+    if (errorActualizar) {
+      console.error(errorActualizar);
+
+      alert(
+        "No se pudo actualizar el pedido."
+      );
+
+      return;
+    }
+
+    setPedidos((actuales) =>
+      actuales.map((pedido) =>
+        pedido.id === id
+          ? {
+              ...pedido,
+              status: estado,
+              updated_at: fecha,
+            }
+          : pedido
+      )
+    );
+  }
+
+  const pedidosFiltrados =
+    filtro === "todos"
+      ? pedidos
+      : pedidos.filter(
+          (pedido) =>
+            pedido.status === filtro
+        );
+
+  if (cargando) {
+    return (
+      <div className="py-24 text-center">
+        <p className="text-sm text-[#81798e]">
+          Cargando pedidos...
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <section>
-      <div className="mb-8">
-        <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-          Administración
-        </p>
-
-        <h1 className="text-3xl font-black">
-          Pedidos y ventas
-        </h1>
-
-        <p className="mt-2 text-sm text-[#777777]">
-          Aquí podrás revisar y gestionar
-          los pedidos de tus clientes.
-        </p>
-      </div>
-
-      <div className={`${tarjeta} p-8 text-center`}>
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#21182a] text-3xl text-[#b98bdd]">
-          ▤
-        </div>
-
-        <h2 className="text-xl font-bold">
-          Pedidos y ventas
-        </h2>
-
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#777777]">
-          Esta sección está preparada para
-          mostrar y gestionar los pedidos
-          realizados en GMISH.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-/* =========================================================
-   ESTADÍSTICAS
-   ========================================================= */
-
-function EstadisticasAdmin() {
-  return (
-    <section>
-      <div className="mb-8">
-        <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-          Administración
-        </p>
-
-        <h1 className="text-3xl font-black">
-          Estadísticas
-        </h1>
-
-        <p className="mt-2 text-sm text-[#777777]">
-          Aquí podrás revisar el rendimiento
-          de GMISH.
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className={`${tarjeta} p-6`}>
-          <p className="text-sm text-[#777777]">
+    <section className="w-full">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="text-center">
+          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
             Ventas
-          </p>
+          </span>
 
-          <p className="mt-2 text-3xl font-black">
-            S/ 0.00
+          <h1 className="mt-6 text-3xl font-black text-white">
+            Pedidos y ventas
+          </h1>
+
+          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+            Consulta pedidos y actualiza su estado.
           </p>
         </div>
 
-        <div className={`${tarjeta} p-6`}>
-          <p className="text-sm text-[#777777]">
-            Pedidos
-          </p>
-
-          <p className="mt-2 text-3xl font-black">
-            0
-          </p>
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
+          {[
+            ["todos", "Todos"],
+            ["pendiente", "Pendientes"],
+            ["enviado", "Enviados"],
+            ["entregado", "Entregados"],
+            ["cancelado", "Cancelados"],
+          ].map(([valor, nombre]) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setFiltro(valor)}
+              className={`rounded-full px-5 py-2.5 text-xs font-bold transition ${
+                filtro === valor
+                  ? "bg-[#7c3aed] text-white shadow-[0_5px_20px_rgba(124,58,237,0.2)]"
+                  : "border border-[#342c45] bg-[#17151f] text-[#91889d] hover:border-[#7c3aed] hover:text-[#b993ff]"
+              }`}
+            >
+              {nombre}
+            </button>
+          ))}
         </div>
 
-        <div className={`${tarjeta} p-6`}>
-          <p className="text-sm text-[#777777]">
-            Productos vendidos
-          </p>
+        {error && (
+          <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+            {error}
+          </div>
+        )}
 
-          <p className="mt-2 text-3xl font-black">
-            0
-          </p>
+        <div className="mt-10 space-y-6">
+          {pedidosFiltrados.length === 0 ? (
+            <div className={`${tarjeta} p-12 text-center`}>
+              <p className="text-sm font-semibold text-[#aaa1b3]">
+                No hay pedidos en esta categoría.
+              </p>
+            </div>
+          ) : (
+            pedidosFiltrados.map((pedido) => (
+              <article
+                key={pedido.id}
+                className={`${tarjeta} p-6 sm:p-8`}
+              >
+                <div className="flex flex-col gap-7 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="text-center lg:text-left">
+                    <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                      <h2 className="text-base font-black text-white">
+                        Pedido{" "}
+                        {pedido.order_number ||
+                          `#${pedido.id}`}
+                      </h2>
+
+                      <span className="rounded-full bg-[#291d3b] px-3 py-1 text-xs font-bold capitalize text-[#b993ff]">
+                        {pedido.status ||
+                          "pendiente"}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 space-y-2 text-sm text-[#91889d]">
+                      <p>
+                        <strong className="text-[#cfc7d8]">
+                          Cliente:
+                        </strong>{" "}
+                        {pedido.customer_name ||
+                          "-"}
+                      </p>
+
+                      <p>
+                        <strong className="text-[#cfc7d8]">
+                          Fecha:
+                        </strong>{" "}
+                        {formatearFechaHora(
+                          pedido.created_at
+                        )}
+                      </p>
+
+                      <p>
+                        <strong className="text-[#cfc7d8]">
+                          Dirección:
+                        </strong>{" "}
+                        {pedido.delivery_address ||
+                          "-"}
+                      </p>
+
+                      <p>
+                        <strong className="text-[#cfc7d8]">
+                          Referencia:
+                        </strong>{" "}
+                        {pedido.delivery_reference ||
+                          "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-center lg:text-right">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-[#71687e]">
+                      Total
+                    </p>
+
+                    <p className="mt-2 text-2xl font-black text-[#a978ff]">
+                      {formatearPrecio(
+                        pedido.total
+                      )}
+                    </p>
+
+                    <select
+                      value={
+                        pedido.status ||
+                        "pendiente"
+                      }
+                      onChange={(event) =>
+                        cambiarEstado(
+                          pedido.id,
+                          event.target.value
+                        )
+                      }
+                      className="mt-5 rounded-xl border border-[#342c45] bg-[#121019] px-4 py-2.5 text-xs font-semibold text-[#ddd5e7] outline-none focus:border-[#8b5cf6]"
+                    >
+                      <option value="pendiente">
+                        Pendiente
+                      </option>
+
+                      <option value="enviado">
+                        Enviado
+                      </option>
+
+                      <option value="entregado">
+                        Entregado
+                      </option>
+
+                      <option value="cancelado">
+                        Cancelado
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                {pedido.order_items?.length >
+                  0 && (
+                  <div className="mt-7 border-t border-[#29233a] pt-6">
+                    <p className="mb-4 text-center text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                      Productos
+                    </p>
+
+                    <div className="space-y-3">
+                      {pedido.order_items.map(
+                        (item) => (
+                          <div
+                            key={item.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#121019] px-4 py-3.5 text-xs"
+                          >
+                            <span className="font-semibold text-[#cfc7d8]">
+                              {item.size || "-"}{" "}
+                              /{" "}
+                              {item.color || "-"}
+                            </span>
+
+                            <span className="text-[#81798e]">
+                              x{item.quantity}
+                            </span>
+
+                            <span className="font-bold text-[#ddd5e7]">
+                              {formatearPrecio(
+                                item.subtotal
+                              )}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+              </article>
+            ))
+          )}
         </div>
       </div>
     </section>
@@ -622,33 +1066,23 @@ function EstadisticasAdmin() {
 
 /* =========================================================
    PORTADAS
-   ========================================================= */
+========================================================= */
 
 function PortadasAdmin() {
-  const tipos = [
-    {
-      id: "portada_principal",
-      nombre: "Portada principal",
-      descripcion:
-        "La imagen principal que aparece en Inicio.",
-    },
-    {
-      id: "portada_hombre",
-      nombre: "Portada Hombre",
-      descripcion:
-        "Imagen utilizada en la sección Hombre.",
-    },
-    {
-      id: "portada_mujer",
-      nombre: "Portada Mujer",
-      descripcion:
-        "Imagen utilizada en la sección Mujer.",
-    },
-  ];
+  const [portadas, setPortadas] = useState({
+    principal: "",
+    hombre: "",
+    mujer: "",
+  });
+
+  const [archivos, setArchivos] = useState({
+    principal: null,
+    hombre: null,
+    mujer: null,
+  });
 
   const [cargando, setCargando] = useState(true);
-  const [subiendo, setSubiendo] = useState("");
-  const [imagenes, setImagenes] = useState({});
+  const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
 
@@ -658,324 +1092,588 @@ function PortadasAdmin() {
 
   async function cargarPortadas() {
     setCargando(true);
-    setError("");
 
-    const { data, error: errorConsulta } =
+    const { data, error: errorPortadas } =
       await supabase
         .from("store_settings")
-        .select("setting_key, setting_value")
+        .select(
+          "setting_key, setting_value"
+        )
         .in("setting_key", [
           "portada_principal",
           "portada_hombre",
           "portada_mujer",
         ]);
 
-    if (errorConsulta) {
+    if (errorPortadas) {
+      console.error(errorPortadas);
+
       setError(
         "No se pudieron cargar las portadas."
       );
+
       setCargando(false);
       return;
     }
 
-    const nuevasImagenes = {};
+    const nuevasPortadas = {
+      principal: "",
+      hombre: "",
+      mujer: "",
+    };
 
-    data?.forEach((item) => {
-      if (item.setting_key) {
-        nuevasImagenes[item.setting_key] =
+    (data || []).forEach((item) => {
+      if (
+        item.setting_key ===
+        "portada_principal"
+      ) {
+        nuevasPortadas.principal =
+          item.setting_value || "";
+      }
+
+      if (
+        item.setting_key === "portada_hombre"
+      ) {
+        nuevasPortadas.hombre =
+          item.setting_value || "";
+      }
+
+      if (
+        item.setting_key === "portada_mujer"
+      ) {
+        nuevasPortadas.mujer =
           item.setting_value || "";
       }
     });
 
-    setImagenes(nuevasImagenes);
+    setPortadas(nuevasPortadas);
     setCargando(false);
   }
 
-  async function cambiarPortada(
-    tipo,
-    archivo
-  ) {
-    if (!archivo) return;
+  function seleccionarArchivo(tipo, archivo) {
+    setArchivos((actuales) => ({
+      ...actuales,
+      [tipo]: archivo,
+    }));
 
-    setSubiendo(tipo);
+    setMensaje("");
+    setError("");
+  }
+
+  async function guardarPortada(tipo) {
+    const archivo = archivos[tipo];
+
+    if (!archivo) {
+      setError(
+        "Selecciona una imagen primero."
+      );
+      return;
+    }
+
+    setGuardando(true);
     setMensaje("");
     setError("");
 
-    const extension =
-      archivo.name
-        .split(".")
-        .pop()
-        ?.toLowerCase() || "jpg";
+    try {
+      const extension =
+        archivo.name
+          .split(".")
+          .pop()
+          ?.toLowerCase() || "jpg";
 
-    const nombreArchivo =
-      `${tipo}-${Date.now()}.${extension}`;
+      const nombreArchivo =
+        `${tipo}-${Date.now()}.${extension}`;
 
-    const ruta =
-      `portadas/${nombreArchivo}`;
+      const ruta =
+        `portadas/${nombreArchivo}`;
 
-    const { error: errorSubida } =
-      await supabase.storage
-        .from("product-images")
-        .upload(
-          ruta,
-          archivo,
-          {
-            upsert: false,
-            contentType:
-              archivo.type,
-          }
-        );
+      const { error: errorUpload } =
+        await supabase.storage
+          .from("product-images")
+          .upload(ruta, archivo, {
+            upsert: true,
+            contentType: archivo.type,
+          });
 
-    if (errorSubida) {
-      setError(
-        "No se pudo subir la nueva portada."
+      if (errorUpload) {
+        throw errorUpload;
+      }
+
+      const { data: urlData } =
+        supabase.storage
+          .from("product-images")
+          .getPublicUrl(ruta);
+
+      const url = urlData.publicUrl;
+
+      const settingKey =
+        `portada_${tipo}`;
+
+      const { error: errorGuardar } =
+        await supabase
+          .from("store_settings")
+          .upsert(
+            {
+              id:
+                tipo === "principal"
+                  ? 6
+                  : tipo === "hombre"
+                    ? 7
+                    : 5,
+              store_name: "GMISH",
+              setting_key: settingKey,
+              setting_value: url,
+              updated_at:
+                new Date().toISOString(),
+            },
+            {
+              onConflict: "id",
+            }
+          );
+
+      if (errorGuardar) {
+        throw errorGuardar;
+      }
+
+      setPortadas((actuales) => ({
+        ...actuales,
+        [tipo]: url,
+      }));
+
+      setArchivos((actuales) => ({
+        ...actuales,
+        [tipo]: null,
+      }));
+
+      setMensaje(
+        `Portada de ${tipo} actualizada correctamente.`
       );
-      setSubiendo("");
-      return;
-    }
+    } catch (err) {
+      console.error(err);
 
-    const { data: urlData } =
-      supabase.storage
-        .from("product-images")
-        .getPublicUrl(ruta);
-
-    const nuevaUrl =
-      urlData?.publicUrl;
-
-    if (!nuevaUrl) {
       setError(
-        "La imagen se subió, pero no se pudo obtener su URL."
+        err?.message ||
+          "No se pudo guardar la portada."
       );
-      setSubiendo("");
-      return;
+    } finally {
+      setGuardando(false);
     }
-
-    const { error: errorGuardar } =
-      await supabase
-        .from("store_settings")
-        .upsert(
-          {
-            setting_key: tipo,
-            setting_value: nuevaUrl,
-            updated_at:
-              new Date().toISOString(),
-          },
-          {
-            onConflict:
-              "setting_key",
-          }
-        );
-
-    if (errorGuardar) {
-      setError(
-        "La imagen se subió, pero no se pudo guardar."
-      );
-      setSubiendo("");
-      return;
-    }
-
-    setImagenes((actual) => ({
-      ...actual,
-      [tipo]: nuevaUrl,
-    }));
-
-    setMensaje(
-      "Portada actualizada correctamente."
-    );
-
-    setSubiendo("");
   }
 
   if (cargando) {
     return (
-      <section>
-        <div className="mb-8">
-          <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-            Administración
-          </p>
-
-          <h1 className="text-3xl font-black">
-            Portadas
-          </h1>
-        </div>
-
-        <div
-          className={`${tarjeta} p-8 text-center text-sm text-[#777777]`}
-        >
+      <div className="py-24 text-center">
+        <p className="text-sm text-[#81798e]">
           Cargando portadas...
-        </div>
-      </section>
+        </p>
+      </div>
     );
   }
 
+  const opciones = [
+    {
+      id: "principal",
+      titulo: "Portada principal",
+      descripcion:
+        "Imagen principal que aparece en Inicio.",
+    },
+    {
+      id: "hombre",
+      titulo: "Portada Hombre",
+      descripcion:
+        "Imagen utilizada para la sección Hombre.",
+    },
+    {
+      id: "mujer",
+      titulo: "Portada Mujer",
+      descripcion:
+        "Imagen utilizada para la sección Mujer.",
+    },
+  ];
+
   return (
-    <section>
-      <div className="mb-8">
-        <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-          Administración
-        </p>
+    <section className="w-full">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="text-center">
+          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
+            Imágenes
+          </span>
 
-        <h1 className="text-3xl font-black">
-          Portadas
-        </h1>
+          <h1 className="mt-6 text-3xl font-black text-white">
+            Portadas
+          </h1>
 
-        <p className="mt-2 text-sm text-[#777777]">
-          Administra por separado las imágenes
-          principales de GMISH.
-        </p>
-      </div>
-
-      {mensaje && (
-        <div className="mb-5 rounded-xl border border-green-900/60 bg-green-950/30 px-4 py-3 text-sm text-green-300">
-          {mensaje}
+          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+            Administra las imágenes principales de la tienda.
+          </p>
         </div>
-      )}
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-          {error}
-        </div>
-      )}
+        {mensaje && (
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+            {mensaje}
+          </div>
+        )}
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        {tipos.map((tipo) => {
-          const imagen =
-            imagenes[tipo.id];
+        {error && (
+          <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+            {error}
+          </div>
+        )}
 
-          return (
+        <div className="mt-10 grid gap-7 md:grid-cols-2">
+          {opciones.map((opcion) => (
             <div
-              key={tipo.id}
+              key={opcion.id}
               className={`${tarjeta} overflow-hidden`}
             >
-              <div className="p-6">
-                <h2 className="text-lg font-bold">
-                  {tipo.nombre}
+              <div className="aspect-[16/9] bg-[#121019]">
+                {portadas[opcion.id] ? (
+                  <img
+                    src={portadas[opcion.id]}
+                    alt={opcion.titulo}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-[#71687e]">
+                    Sin imagen
+                  </div>
+                )}
+              </div>
+
+              <div className="p-7 text-center">
+                <h2 className="text-base font-bold text-white">
+                  {opcion.titulo}
                 </h2>
 
-                <p className="mt-1 text-sm leading-6 text-[#777777]">
-                  {tipo.descripcion}
+                <p className="mt-3 text-xs leading-5 text-[#81798e]">
+                  {opcion.descripcion}
                 </p>
-              </div>
 
-              {imagen ? (
-                <div className="px-6">
-                  <div className="overflow-hidden rounded-2xl border border-[#303030]">
-                    <img
-                      src={imagen}
-                      alt={tipo.nombre}
-                      className="h-52 w-full object-cover"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="mx-6 flex h-52 items-center justify-center rounded-2xl border border-dashed border-[#383838] bg-[#0d0d0d] text-center text-sm text-[#666666]">
-                  No hay imagen
-                  seleccionada.
-                </div>
-              )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) =>
+                    seleccionarArchivo(
+                      opcion.id,
+                      event.target.files?.[0] ||
+                        null
+                    )
+                  }
+                  className="mt-6 w-full text-xs text-[#91889d]"
+                />
 
-              <div className="p-6">
-                <label
-                  className={`${botonPrincipal} inline-flex w-full cursor-pointer items-center justify-center`}
+                <button
+                  type="button"
+                  disabled={
+                    guardando ||
+                    !archivos[opcion.id]
+                  }
+                  onClick={() =>
+                    guardarPortada(opcion.id)
+                  }
+                  className={`${botonMorado} mt-5 w-full`}
                 >
-                  {subiendo === tipo.id
-                    ? "Subiendo..."
-                    : imagen
-                      ? "Cambiar imagen"
-                      : "Subir imagen"}
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={
-                      subiendo === tipo.id
-                    }
-                    onChange={(e) => {
-                      cambiarPortada(
-                        tipo.id,
-                        e.target.files?.[0]
-                      );
-
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                  Guardar portada
+                </button>
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
 /* =========================================================
+   ESTADÍSTICAS
+========================================================= */
+
+function EstadisticasAdmin() {
+  const [pedidos, setPedidos] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    cargarEstadisticas();
+  }, []);
+
+  async function cargarEstadisticas() {
+    setCargando(true);
+
+    const [
+      { data: pedidosData, error: pedidosError },
+      {
+        data: productosData,
+        error: productosError,
+      },
+    ] = await Promise.all([
+      supabase
+        .from("orders")
+        .select(
+          "id, status, total, created_at, discount"
+        ),
+
+      supabase
+        .from("products")
+        .select(
+          "id, name, sold_count, price, is_active, is_new, is_best_seller"
+        ),
+    ]);
+
+    if (pedidosError) {
+      console.error(pedidosError);
+    }
+
+    if (productosError) {
+      console.error(productosError);
+    }
+
+    setPedidos(pedidosData || []);
+    setProductos(productosData || []);
+    setCargando(false);
+  }
+
+  const pedidosValidos = pedidos.filter(
+    (pedido) =>
+      pedido.status !== "cancelado"
+  );
+
+  const pedidosEntregados = pedidos.filter(
+    (pedido) =>
+      pedido.status === "entregado"
+  );
+
+  const ventasEntregadas =
+    pedidosEntregados.reduce(
+      (total, pedido) =>
+        total + Number(pedido.total || 0),
+      0
+    );
+
+  const ventasGenerales =
+    pedidosValidos.reduce(
+      (total, pedido) =>
+        total + Number(pedido.total || 0),
+      0
+    );
+
+  const descuentos = pedidosValidos.reduce(
+    (total, pedido) =>
+      total + Number(pedido.discount || 0),
+    0
+  );
+
+  const productosVendidos = productos
+    .filter(
+      (producto) =>
+        Number(producto.sold_count || 0) > 0
+    )
+    .sort(
+      (a, b) =>
+        Number(b.sold_count || 0) -
+        Number(a.sold_count || 0)
+    )
+    .slice(0, 5);
+
+  if (cargando) {
+    return (
+      <div className="py-24 text-center">
+        <p className="text-sm text-[#81798e]">
+          Calculando estadísticas...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="w-full">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="text-center">
+          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
+            Análisis
+          </span>
+
+          <h1 className="mt-6 text-3xl font-black text-white">
+            Estadísticas
+          </h1>
+
+          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+            Resumen general del rendimiento de GMISH.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            titulo="Pedidos"
+            valor={pedidosValidos.length}
+          />
+
+          <StatCard
+            titulo="Entregados"
+            valor={pedidosEntregados.length}
+          />
+
+          <StatCard
+            titulo="Ventas entregadas"
+            valor={formatearPrecio(
+              ventasEntregadas
+            )}
+          />
+
+          <StatCard
+            titulo="Descuentos"
+            valor={formatearPrecio(
+              descuentos
+            )}
+          />
+        </div>
+
+        <div className="mt-8 grid gap-7 lg:grid-cols-2">
+          <div className={`${tarjeta} p-7`}>
+            <h2 className="text-center text-base font-black text-white lg:text-left">
+              Resumen de ventas
+            </h2>
+
+            <div className="mt-6 space-y-5">
+              <FilaEstadistica
+                nombre="Ventas no canceladas"
+                valor={formatearPrecio(
+                  ventasGenerales
+                )}
+              />
+
+              <FilaEstadistica
+                nombre="Ventas entregadas"
+                valor={formatearPrecio(
+                  ventasEntregadas
+                )}
+              />
+
+              <FilaEstadistica
+                nombre="Pedidos cancelados"
+                valor={
+                  pedidos.filter(
+                    (pedido) =>
+                      pedido.status ===
+                      "cancelado"
+                  ).length
+                }
+              />
+            </div>
+          </div>
+
+          <div className={`${tarjeta} p-7`}>
+            <h2 className="text-center text-base font-black text-white lg:text-left">
+              Productos más vendidos
+            </h2>
+
+            <div className="mt-6 space-y-3">
+              {productosVendidos.length ===
+              0 ? (
+                <p className="text-center text-sm text-[#81798e]">
+                  Todavía no hay productos vendidos.
+                </p>
+              ) : (
+                productosVendidos.map(
+                  (producto) => (
+                    <div
+                      key={producto.id}
+                      className="flex items-center justify-between gap-4 rounded-xl bg-[#121019] px-4 py-3.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-[#ddd5e7]">
+                          {producto.name}
+                        </p>
+
+                        <p className="mt-1 text-xs text-[#71687e]">
+                          {formatearPrecio(
+                            producto.price
+                          )}
+                        </p>
+                      </div>
+
+                      <span className="shrink-0 rounded-full bg-[#291d3b] px-3 py-1 text-xs font-bold text-[#b993ff]">
+                        {producto.sold_count ||
+                          0}{" "}
+                        vendidos
+                      </span>
+                    </div>
+                  )
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StatCard({ titulo, valor }) {
+  return (
+    <div
+      className={`${tarjeta} flex min-h-[145px] flex-col items-center justify-center p-6 text-center`}
+    >
+      <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+        {titulo}
+      </p>
+
+      <p className="mt-4 text-2xl font-black text-[#a978ff]">
+        {valor}
+      </p>
+    </div>
+  );
+}
+
+function FilaEstadistica({ nombre, valor }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-[#29233a] pb-4">
+      <span className="text-sm text-[#91889d]">
+        {nombre}
+      </span>
+
+      <span className="text-right text-sm font-black text-[#ddd5e7]">
+        {valor}
+      </span>
+    </div>
+  );
+}
+
+/* =========================================================
    CONFIGURACIÓN
-   ========================================================= */
+========================================================= */
 
 function ConfiguracionAdmin() {
-  const [cargando, setCargando] =
-    useState(true);
+  const [config, setConfig] = useState({
+    whatsapp_principal: "",
+    whatsapp_secundario: "",
+    address: "",
+    maps_url: "",
+    instagram_url: "",
+    tiktok_url: "",
+    facebook_url: "",
+  });
 
-  const [guardando, setGuardando] =
-    useState(false);
+  const [contenido, setContenido] = useState({
+    home_title: "",
+    home_text: "",
+    home_button: "",
+    home_featured: "",
+    hombre_text: "",
+    mujer_text: "",
+    ofertas_text: "",
+    promo_title: "",
+    campaign_name: "",
+    campaign_active: "false",
+    campaign_start: "",
+    campaign_end: "",
+    campaign_message: "",
+  });
 
-  const [mensaje, setMensaje] =
-    useState("");
-
-  const [error, setError] =
-    useState("");
-
-  const [formulario, setFormulario] =
-    useState({
-      store_name: "",
-      whatsapp: "",
-      address: "",
-      maps_url: "",
-      instagram_url: "",
-      tiktok_url: "",
-      facebook_url: "",
-
-      home_title:
-        "Nueva colección GMISH",
-
-      home_text:
-        "Descubre nuestras últimas prendas y novedades.",
-
-      home_button:
-        "Ver novedades",
-
-      home_featured:
-        "",
-
-      hombre_text:
-        "Descubre nuestra colección para hombre.",
-
-      mujer_text:
-        "Descubre nuestra colección para mujer.",
-
-      ofertas_text:
-        "Encuentra nuestras mejores ofertas.",
-
-      promo_title:
-        "Promociones GMISH",
-
-      campaign_name:
-        "",
-
-      campaign_active:
-        false,
-
-      campaign_start:
-        "",
-
-      campaign_end:
-        "",
-
-      campaign_message:
-        "",
-    });
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     cargarConfiguracion();
@@ -985,787 +1683,617 @@ function ConfiguracionAdmin() {
     setCargando(true);
     setError("");
 
-    const {
-      data: generales,
-      error: errorGeneral,
-    } = await supabase
-      .from("store_settings")
-      .select("*")
-      .is("setting_key", null)
-      .limit(1)
-      .maybeSingle();
+    const { data, error: errorConfig } =
+      await supabase
+        .from("store_settings")
+        .select("*")
+        .order("id", {
+          ascending: true,
+        });
 
-    if (errorGeneral) {
+    if (errorConfig) {
+      console.error(errorConfig);
+
       setError(
-        "No se pudieron cargar los datos de la tienda."
+        "No se pudo cargar la configuración."
       );
+
       setCargando(false);
       return;
     }
 
-    const {
-      data: contenidos,
-      error: errorContenido,
-    } = await supabase
-      .from("store_settings")
-      .select(
-        "setting_key, setting_value"
-      )
-      .not("setting_key", "is", null);
+    const filaGeneral =
+      (data || []).find(
+        (item) => item.setting_key === null
+      ) || data?.[0];
 
-    if (errorContenido) {
-      setError(
-        "No se pudo cargar el contenido de la tienda."
-      );
-      setCargando(false);
-      return;
-    }
+    setConfig({
+      whatsapp_principal:
+        filaGeneral?.whatsapp_principal ||
+        "",
+      whatsapp_secundario:
+        filaGeneral?.whatsapp_secundario ||
+        "",
+      address: filaGeneral?.address || "",
+      maps_url: filaGeneral?.maps_url || "",
+      instagram_url:
+        filaGeneral?.instagram_url || "",
+      tiktok_url:
+        filaGeneral?.tiktok_url || "",
+      facebook_url:
+        filaGeneral?.facebook_url || "",
+    });
 
-    const valores = {};
+    const nuevoContenido = {
+      home_title: "",
+      home_text: "",
+      home_button: "",
+      home_featured: "",
+      hombre_text: "",
+      mujer_text: "",
+      ofertas_text: "",
+      promo_title: "",
+      campaign_name: "",
+      campaign_active: "false",
+      campaign_start: "",
+      campaign_end: "",
+      campaign_message: "",
+    };
 
-    contenidos?.forEach((item) => {
-      if (item.setting_key) {
-        valores[item.setting_key] =
-          item.setting_value ?? "";
+    (data || []).forEach((item) => {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          nuevoContenido,
+          item.setting_key
+        )
+      ) {
+        nuevoContenido[item.setting_key] =
+          item.setting_value || "";
       }
     });
 
-    setFormulario({
-      store_name:
-        generales?.store_name ?? "",
-
-      whatsapp:
-        generales?.whatsapp ?? "",
-
-      address:
-        generales?.address ?? "",
-
-      maps_url:
-        generales?.maps_url ?? "",
-
-      instagram_url:
-        generales?.instagram_url ?? "",
-
-      tiktok_url:
-        generales?.tiktok_url ?? "",
-
-      facebook_url:
-        generales?.facebook_url ?? "",
-
-      home_title:
-        valores.home_title ??
-        "Nueva colección GMISH",
-
-      home_text:
-        valores.home_text ??
-        "Descubre nuestras últimas prendas y novedades.",
-
-      home_button:
-        valores.home_button ??
-        "Ver novedades",
-
-      home_featured:
-        valores.home_featured ?? "",
-
-      hombre_text:
-        valores.hombre_text ??
-        "Descubre nuestra colección para hombre.",
-
-      mujer_text:
-        valores.mujer_text ??
-        "Descubre nuestra colección para mujer.",
-
-      ofertas_text:
-        valores.ofertas_text ??
-        "Encuentra nuestras mejores ofertas.",
-
-      promo_title:
-        valores.promo_title ??
-        "Promociones GMISH",
-
-      campaign_name:
-        valores.campaign_name ?? "",
-
-      campaign_active:
-        valores.campaign_active ===
-        "true",
-
-      campaign_start:
-        valores.campaign_start ?? "",
-
-      campaign_end:
-        valores.campaign_end ?? "",
-
-      campaign_message:
-        valores.campaign_message ?? "",
-    });
-
+    setContenido(nuevoContenido);
     setCargando(false);
   }
 
-  function cambiarCampo(
-    campoNombre,
-    valor
-  ) {
-    setFormulario((actual) => ({
+  function cambiarConfig(campo, valor) {
+    setConfig((actual) => ({
       ...actual,
-      [campoNombre]: valor,
+      [campo]: valor,
     }));
   }
 
-  async function guardarConfiguracion() {
+  function cambiarContenido(campo, valor) {
+    setContenido((actual) => ({
+      ...actual,
+      [campo]: valor,
+    }));
+  }
+
+  async function guardarConfiguracion(event) {
+    event.preventDefault();
+
     setGuardando(true);
     setMensaje("");
     setError("");
 
-    const ahora =
-      new Date().toISOString();
-
-    const datosGenerales = {
-      store_name:
-        formulario.store_name,
-      whatsapp:
-        formulario.whatsapp,
-      address:
-        formulario.address,
-      maps_url:
-        formulario.maps_url,
-      instagram_url:
-        formulario.instagram_url,
-      tiktok_url:
-        formulario.tiktok_url,
-      facebook_url:
-        formulario.facebook_url,
-      updated_at: ahora,
-    };
-
-    const {
-      data: existente,
-      error: errorConsulta,
-    } = await supabase
-      .from("store_settings")
-      .select("id")
-      .is("setting_key", null)
-      .limit(1)
-      .maybeSingle();
-
-    if (errorConsulta) {
-      setError(
-        "No se pudo comprobar la configuración actual."
-      );
-      setGuardando(false);
-      return;
-    }
-
-    let errorGeneral = null;
-
-    if (existente?.id) {
-      const { error } =
+    try {
+      const { error: errorGeneral } =
         await supabase
           .from("store_settings")
-          .update(datosGenerales)
-          .eq("id", existente.id);
+          .update({
+            store_name: "GMISH",
+            address: config.address,
+            maps_url: config.maps_url,
+            instagram_url:
+              config.instagram_url,
+            tiktok_url:
+              config.tiktok_url,
+            facebook_url:
+              config.facebook_url,
+            whatsapp_principal:
+              config.whatsapp_principal,
+            whatsapp_secundario:
+              config.whatsapp_secundario,
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq("id", 1);
 
-      errorGeneral = error;
-    } else {
-      const { error } =
-        await supabase
+      if (errorGeneral) {
+        throw errorGeneral;
+      }
+
+      const claves = Object.keys(contenido);
+
+      for (const clave of claves) {
+        const {
+          error: errorContenido,
+        } = await supabase
           .from("store_settings")
-          .insert(datosGenerales);
+          .upsert(
+            {
+              store_name: "GMISH",
+              setting_key: clave,
+              setting_value:
+                contenido[clave] ?? "",
+              updated_at:
+                new Date().toISOString(),
+            },
+            {
+              onConflict: "setting_key",
+            }
+          );
 
-      errorGeneral = error;
-    }
+        if (errorContenido) {
+          throw errorContenido;
+        }
+      }
 
-    if (errorGeneral) {
-      setError(
-        "No se pudieron guardar los datos generales."
+      setMensaje(
+        "Configuración guardada correctamente."
       );
-      setGuardando(false);
-      return;
-    }
+    } catch (err) {
+      console.error(err);
 
-    const contenidos = [
-      {
-        setting_key: "home_title",
-        setting_value:
-          formulario.home_title,
-      },
-      {
-        setting_key: "home_text",
-        setting_value:
-          formulario.home_text,
-      },
-      {
-        setting_key: "home_button",
-        setting_value:
-          formulario.home_button,
-      },
-      {
-        setting_key: "home_featured",
-        setting_value:
-          formulario.home_featured,
-      },
-      {
-        setting_key: "hombre_text",
-        setting_value:
-          formulario.hombre_text,
-      },
-      {
-        setting_key: "mujer_text",
-        setting_value:
-          formulario.mujer_text,
-      },
-      {
-        setting_key: "ofertas_text",
-        setting_value:
-          formulario.ofertas_text,
-      },
-      {
-        setting_key: "promo_title",
-        setting_value:
-          formulario.promo_title,
-      },
-      {
-        setting_key: "campaign_name",
-        setting_value:
-          formulario.campaign_name,
-      },
-      {
-        setting_key: "campaign_active",
-        setting_value:
-          String(
-            formulario.campaign_active
-          ),
-      },
-      {
-        setting_key: "campaign_start",
-        setting_value:
-          formulario.campaign_start,
-      },
-      {
-        setting_key: "campaign_end",
-        setting_value:
-          formulario.campaign_end,
-      },
-      {
-        setting_key: "campaign_message",
-        setting_value:
-          formulario.campaign_message,
-      },
-    ].map((item) => ({
-      ...item,
-      updated_at: ahora,
-    }));
-
-    const {
-      error: errorContenido,
-    } = await supabase
-      .from("store_settings")
-      .upsert(contenidos, {
-        onConflict:
-          "setting_key",
-      });
-
-    if (errorContenido) {
       setError(
-        "Los datos generales se guardaron, pero no se pudo guardar todo el contenido."
+        err?.message ||
+          "No se pudo guardar la configuración."
       );
+    } finally {
       setGuardando(false);
-      return;
     }
-
-    setMensaje(
-      "Configuración guardada correctamente."
-    );
-
-    setGuardando(false);
   }
 
   if (cargando) {
     return (
-      <section>
-        <div className="mb-8">
-          <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-            Administración
-          </p>
-
-          <h1 className="text-3xl font-black">
-            Configuración
-          </h1>
-        </div>
-
-        <div
-          className={`${tarjeta} p-8 text-center text-sm text-[#777777]`}
-        >
+      <div className="py-24 text-center">
+        <p className="text-sm text-[#81798e]">
           Cargando configuración...
-        </div>
-      </section>
+        </p>
+      </div>
     );
   }
 
   return (
-    <section>
-      <div className="mb-8">
-        <p className="mb-2 text-sm font-medium text-[#8d6ba8]">
-          Administración
-        </p>
+    <section className="w-full">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="text-center">
+          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
+            Sistema
+          </span>
 
-        <h1 className="text-3xl font-black">
-          Configuración
-        </h1>
+          <h1 className="mt-6 text-3xl font-black text-white">
+            Configuración
+          </h1>
 
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#777777]">
-          Administra desde aquí la información,
-          contenido, redes sociales y campañas
-          de GMISH.
-        </p>
-      </div>
-
-      {mensaje && (
-        <div className="mb-5 rounded-xl border border-green-900/60 bg-green-950/30 px-4 py-3 text-sm text-green-300">
-          {mensaje}
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-          {error}
-        </div>
-      )}
-
-      <div className="space-y-5">
-        {/* DATOS DE LA TIENDA */}
-
-        <div className={`${tarjeta} p-6`}>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold">
-              🏪 Datos de la tienda
-            </h2>
-
-            <p className="mt-1 text-sm text-[#777777]">
-              Información general de GMISH.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <CampoConfiguracion
-              label="Nombre de la tienda"
-              value={
-                formulario.store_name
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "store_name",
-                  valor
-                )
-              }
-              placeholder="GMISH"
-            />
-
-            <CampoConfiguracion
-              label="WhatsApp"
-              value={
-                formulario.whatsapp
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "whatsapp",
-                  valor
-                )
-              }
-              placeholder="51999999999"
-            />
-
-            <CampoConfiguracion
-              label="Dirección"
-              value={
-                formulario.address
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "address",
-                  valor
-                )
-              }
-              placeholder="Dirección de la tienda"
-            />
-
-            <CampoConfiguracion
-              label="Google Maps"
-              value={
-                formulario.maps_url
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "maps_url",
-                  valor
-                )
-              }
-              placeholder="https://maps.google.com/..."
-            />
-          </div>
+          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+            Administra los datos generales y el contenido de la tienda.
+          </p>
         </div>
 
-        {/* CONTENIDO DEL INICIO */}
-
-        <div className={`${tarjeta} p-6`}>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold">
-              🎨 Contenido del inicio
-            </h2>
-
-            <p className="mt-1 text-sm text-[#777777]">
-              Cambia los textos que aparecen
-              en la página principal sin tocar
-              el código.
-            </p>
+        {mensaje && (
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+            {mensaje}
           </div>
+        )}
 
-          <div className="space-y-4">
-            <CampoConfiguracion
-              label="Título principal"
-              value={
-                formulario.home_title
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "home_title",
-                  valor
-                )
-              }
-              placeholder="Nueva colección GMISH"
-            />
-
-            <CampoGrande
-              label="Texto principal"
-              value={
-                formulario.home_text
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "home_text",
-                  valor
-                )
-              }
-              placeholder="Descubre nuestras últimas prendas..."
-            />
-
-            <CampoConfiguracion
-              label="Texto del botón"
-              value={
-                formulario.home_button
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "home_button",
-                  valor
-                )
-              }
-              placeholder="Ver novedades"
-            />
-
-            <CampoGrande
-              label="Mensaje destacado"
-              value={
-                formulario.home_featured
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "home_featured",
-                  valor
-                )
-              }
-              placeholder="Escribe un mensaje especial para mostrar en Inicio."
-            />
+        {error && (
+          <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+            {error}
           </div>
-        </div>
+        )}
 
-        {/* TEXTOS DE CATEGORÍAS */}
+        <form
+          onSubmit={guardarConfiguracion}
+          className="mt-10 space-y-8"
+        >
+          {/* CONTACTO */}
 
-        <div className={`${tarjeta} p-6`}>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold">
-              🛍️ Textos de las categorías
-            </h2>
+          <div className={`${tarjeta} p-7 sm:p-9`}>
+            <div className="text-center">
+              <h2 className="text-lg font-black text-white">
+                Contacto
+              </h2>
 
-            <p className="mt-1 text-sm text-[#777777]">
-              Personaliza los mensajes de cada
-              sección de la tienda.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <CampoGrande
-              label="Texto de Hombre"
-              value={
-                formulario.hombre_text
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "hombre_text",
-                  valor
-                )
-              }
-              placeholder="Descubre nuestra colección para hombre."
-            />
-
-            <CampoGrande
-              label="Texto de Mujer"
-              value={
-                formulario.mujer_text
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "mujer_text",
-                  valor
-                )
-              }
-              placeholder="Descubre nuestra colección para mujer."
-            />
-
-            <CampoGrande
-              label="Texto de Ofertas"
-              value={
-                formulario.ofertas_text
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "ofertas_text",
-                  valor
-                )
-              }
-              placeholder="Encuentra nuestras mejores ofertas."
-            />
-
-            <CampoConfiguracion
-              label="Título de promociones"
-              value={
-                formulario.promo_title
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "promo_title",
-                  valor
-                )
-              }
-              placeholder="Promociones GMISH"
-            />
-          </div>
-        </div>
-
-        {/* CAMPAÑA */}
-
-        <div className={`${tarjeta} p-6`}>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold">
-              🎉 Campaña especial
-            </h2>
-
-            <p className="mt-1 text-sm leading-6 text-[#777777]">
-              Puedes preparar una campaña,
-              como un aniversario, y activarla
-              cuando quieras.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <CampoConfiguracion
-              label="Nombre de la campaña"
-              value={
-                formulario.campaign_name
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "campaign_name",
-                  valor
-                )
-              }
-              placeholder="Aniversario GMISH"
-            />
-
-            <CampoGrande
-              label="Mensaje de la campaña"
-              value={
-                formulario.campaign_message
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "campaign_message",
-                  valor
-                )
-              }
-              placeholder="Celebramos contigo con promociones especiales."
-            />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#cccccc]">
-                  Fecha de inicio
-                </label>
-
-                <input
-                  type="date"
-                  value={
-                    formulario.campaign_start
-                  }
-                  onChange={(e) =>
-                    cambiarCampo(
-                      "campaign_start",
-                      e.target.value
-                    )
-                  }
-                  className={campo}
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#cccccc]">
-                  Fecha de finalización
-                </label>
-
-                <input
-                  type="date"
-                  value={
-                    formulario.campaign_end
-                  }
-                  onChange={(e) =>
-                    cambiarCampo(
-                      "campaign_end",
-                      e.target.value
-                    )
-                  }
-                  className={campo}
-                />
-              </div>
+              <p className="mt-2 text-xs text-[#81798e]">
+                Datos utilizados por la tienda.
+              </p>
             </div>
 
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#383838] bg-[#0d0d0d] px-4 py-4">
-              <input
-                type="checkbox"
-                checked={
-                  formulario.campaign_active
+            <div className="mt-7 grid gap-6 md:grid-cols-2">
+              <CampoConfiguracion
+                etiqueta="WhatsApp principal"
+                valor={
+                  config.whatsapp_principal
                 }
-                onChange={(e) =>
-                  cambiarCampo(
-                    "campaign_active",
-                    e.target.checked
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "whatsapp_principal",
+                    valor
                   )
                 }
-                className="h-5 w-5 accent-[#76509a]"
+                placeholder="519xxxxxxxx"
+              />
+
+              <CampoConfiguracion
+                etiqueta="WhatsApp secundario"
+                valor={
+                  config.whatsapp_secundario
+                }
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "whatsapp_secundario",
+                    valor
+                  )
+                }
+                placeholder="519xxxxxxxx"
+              />
+
+              <CampoConfiguracion
+                etiqueta="Dirección"
+                valor={config.address}
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "address",
+                    valor
+                  )
+                }
+                placeholder="Dirección del local"
+              />
+
+              <CampoConfiguracion
+                etiqueta="Google Maps"
+                valor={config.maps_url}
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "maps_url",
+                    valor
+                  )
+                }
+                placeholder="Enlace de Google Maps"
+              />
+            </div>
+          </div>
+
+          {/* REDES */}
+
+          <div className={`${tarjeta} p-7 sm:p-9`}>
+            <div className="text-center">
+              <h2 className="text-lg font-black text-white">
+                Redes sociales
+              </h2>
+
+              <p className="mt-2 text-xs text-[#81798e]">
+                Enlaces oficiales de GMISH.
+              </p>
+            </div>
+
+            <div className="mt-7 grid gap-6 md:grid-cols-3">
+              <CampoConfiguracion
+                etiqueta="Instagram"
+                valor={
+                  config.instagram_url
+                }
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "instagram_url",
+                    valor
+                  )
+                }
+                placeholder="https://instagram.com/..."
+              />
+
+              <CampoConfiguracion
+                etiqueta="TikTok"
+                valor={config.tiktok_url}
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "tiktok_url",
+                    valor
+                  )
+                }
+                placeholder="https://tiktok.com/..."
+              />
+
+              <CampoConfiguracion
+                etiqueta="Facebook"
+                valor={
+                  config.facebook_url
+                }
+                onChange={(valor) =>
+                  cambiarConfig(
+                    "facebook_url",
+                    valor
+                  )
+                }
+                placeholder="https://facebook.com/..."
+              />
+            </div>
+          </div>
+
+          {/* INICIO */}
+
+          <div className={`${tarjeta} p-7 sm:p-9`}>
+            <div className="text-center">
+              <h2 className="text-lg font-black text-white">
+                Página de inicio
+              </h2>
+
+              <p className="mt-2 text-xs text-[#81798e]">
+                Textos de la página principal.
+              </p>
+            </div>
+
+            <div className="mt-7 space-y-6">
+              <CampoConfiguracion
+                etiqueta="Título"
+                valor={contenido.home_title}
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "home_title",
+                    valor
+                  )
+                }
+                placeholder="Nueva colección GMISH"
+              />
+
+              <CampoGrande
+                etiqueta="Descripción"
+                valor={contenido.home_text}
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "home_text",
+                    valor
+                  )
+                }
+                placeholder="Texto de la página principal"
+              />
+
+              <CampoConfiguracion
+                etiqueta="Texto del botón"
+                valor={
+                  contenido.home_button
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "home_button",
+                    valor
+                  )
+                }
+                placeholder="Ver novedades"
+              />
+
+              <CampoConfiguracion
+                etiqueta="Productos destacados"
+                valor={
+                  contenido.home_featured
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "home_featured",
+                    valor
+                  )
+                }
+                placeholder="Opcional"
+              />
+            </div>
+          </div>
+
+          {/* CATEGORÍAS */}
+
+          <div className={`${tarjeta} p-7 sm:p-9`}>
+            <div className="text-center">
+              <h2 className="text-lg font-black text-white">
+                Categorías
+              </h2>
+
+              <p className="mt-2 text-xs text-[#81798e]">
+                Textos mostrados en las categorías.
+              </p>
+            </div>
+
+            <div className="mt-7 space-y-6">
+              <CampoGrande
+                etiqueta="Texto Hombre"
+                valor={
+                  contenido.hombre_text
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "hombre_text",
+                    valor
+                  )
+                }
+                placeholder="Descripción de Hombre"
+              />
+
+              <CampoGrande
+                etiqueta="Texto Mujer"
+                valor={
+                  contenido.mujer_text
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "mujer_text",
+                    valor
+                  )
+                }
+                placeholder="Descripción de Mujer"
+              />
+
+              <CampoGrande
+                etiqueta="Texto Ofertas"
+                valor={
+                  contenido.ofertas_text
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "ofertas_text",
+                    valor
+                  )
+                }
+                placeholder="Descripción de Ofertas"
+              />
+            </div>
+          </div>
+
+          {/* PROMOCIONES */}
+
+          <div className={`${tarjeta} p-7 sm:p-9`}>
+            <div className="text-center">
+              <h2 className="text-lg font-black text-white">
+                Promociones y campañas
+              </h2>
+
+              <p className="mt-2 text-xs text-[#81798e]">
+                Preparado para campañas futuras.
+              </p>
+            </div>
+
+            <div className="mt-7 space-y-6">
+              <CampoConfiguracion
+                etiqueta="Título de promociones"
+                valor={
+                  contenido.promo_title
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "promo_title",
+                    valor
+                  )
+                }
+                placeholder="Promociones GMISH"
+              />
+
+              <CampoConfiguracion
+                etiqueta="Nombre de campaña"
+                valor={
+                  contenido.campaign_name
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "campaign_name",
+                    valor
+                  )
+                }
+                placeholder="Nombre de campaña"
               />
 
               <div>
-                <p className="text-sm font-semibold text-white">
-                  Activar campaña
-                </p>
+                <label className={etiqueta}>
+                  Campaña activa
+                </label>
 
-                <p className="mt-1 text-xs text-[#777777]">
-                  La campaña podrá utilizarse
-                  en la tienda pública.
-                </p>
+                <select
+                  value={
+                    contenido.campaign_active
+                  }
+                  onChange={(event) =>
+                    cambiarContenido(
+                      "campaign_active",
+                      event.target.value
+                    )
+                  }
+                  className={campo}
+                >
+                  <option value="false">
+                    No
+                  </option>
+
+                  <option value="true">
+                    Sí
+                  </option>
+                </select>
               </div>
-            </label>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <CampoConfiguracion
+                  etiqueta="Inicio"
+                  tipo="datetime-local"
+                  valor={
+                    contenido.campaign_start
+                  }
+                  onChange={(valor) =>
+                    cambiarContenido(
+                      "campaign_start",
+                      valor
+                    )
+                  }
+                />
+
+                <CampoConfiguracion
+                  etiqueta="Fin"
+                  tipo="datetime-local"
+                  valor={
+                    contenido.campaign_end
+                  }
+                  onChange={(valor) =>
+                    cambiarContenido(
+                      "campaign_end",
+                      valor
+                    )
+                  }
+                />
+              </div>
+
+              <CampoGrande
+                etiqueta="Mensaje de campaña"
+                valor={
+                  contenido.campaign_message
+                }
+                onChange={(valor) =>
+                  cambiarContenido(
+                    "campaign_message",
+                    valor
+                  )
+                }
+                placeholder="Mensaje que verá el cliente"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* REDES SOCIALES */}
+          {/* BOTÓN GUARDAR */}
 
-        <div className={`${tarjeta} p-6`}>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold">
-              🔗 Redes sociales
-            </h2>
-
-            <p className="mt-1 text-sm text-[#777777]">
-              Enlaces oficiales de GMISH.
-            </p>
+          <div className="flex justify-center pb-6 pt-2">
+            <button
+              type="submit"
+              disabled={guardando}
+              className={`${botonMorado} min-w-60 px-8 py-3.5`}
+            >
+              {guardando
+                ? "Guardando..."
+                : "Guardar configuración"}
+            </button>
           </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <CampoConfiguracion
-              label="Instagram"
-              value={
-                formulario.instagram_url
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "instagram_url",
-                  valor
-                )
-              }
-              placeholder="https://instagram.com/..."
-            />
-
-            <CampoConfiguracion
-              label="TikTok"
-              value={
-                formulario.tiktok_url
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "tiktok_url",
-                  valor
-                )
-              }
-              placeholder="https://tiktok.com/@..."
-            />
-
-            <CampoConfiguracion
-              label="Facebook"
-              value={
-                formulario.facebook_url
-              }
-              onChange={(valor) =>
-                cambiarCampo(
-                  "facebook_url",
-                  valor
-                )
-              }
-              placeholder="https://facebook.com/..."
-            />
-          </div>
-        </div>
-
-        {/* GUARDAR */}
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={guardarConfiguracion}
-            disabled={guardando}
-            className="w-full rounded-xl bg-[#76509a] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#8660aa] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-          >
-            {guardando
-              ? "Guardando cambios..."
-              : "Guardar toda la configuración"}
-          </button>
-        </div>
+        </form>
       </div>
     </section>
   );
 }
 
 /* =========================================================
-   COMPONENTES PEQUEÑOS DE CONFIGURACIÓN
-   ========================================================= */
+   CAMPOS
+========================================================= */
 
 function CampoConfiguracion({
-  label,
-  value,
+  etiqueta,
+  valor,
   onChange,
   placeholder,
+  tipo = "text",
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-[#cccccc]">
-        {label}
+      <label className={etiqueta}>
+        {etiqueta}
       </label>
 
       <input
-        type="text"
-        value={value}
-        onChange={(e) =>
-          onChange(e.target.value)
+        type={tipo}
+        value={valor || ""}
+        onChange={(event) =>
+          onChange(event.target.value)
         }
         placeholder={placeholder}
         className={campo}
@@ -1775,21 +2303,21 @@ function CampoConfiguracion({
 }
 
 function CampoGrande({
-  label,
-  value,
+  etiqueta,
+  valor,
   onChange,
   placeholder,
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-[#cccccc]">
-        {label}
+      <label className={etiqueta}>
+        {etiqueta}
       </label>
 
       <textarea
-        value={value}
-        onChange={(e) =>
-          onChange(e.target.value)
+        value={valor || ""}
+        onChange={(event) =>
+          onChange(event.target.value)
         }
         placeholder={placeholder}
         rows={4}
@@ -1798,3 +2326,5 @@ function CampoGrande({
     </div>
   );
 }
+
+export default Admin;

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useCart } from "../CartContext";
 import { supabase } from "../lib/supabase";
-import store from "../data/store";
 
 function Cart() {
   const {
@@ -20,10 +19,8 @@ function Cart() {
 
   const [cliente, setCliente] = useState({
     nombre: "",
-    telefono: "",
-    zona: "",
     direccion: "",
-    notas: "",
+    referencia: "",
   });
 
   const total = cart.reduce(
@@ -48,20 +45,172 @@ function Cart() {
     if (cart.length === 0) return;
 
     setErrorPedido("");
-
-    if (!cliente.nombre.trim()) {
-      setErrorPedido("Escribe tu nombre.");
-      return;
-    }
-
-    if (!cliente.telefono.trim()) {
-      setErrorPedido("Escribe tu número de WhatsApp.");
-      return;
-    }
-
     setGuardandoPedido(true);
 
     try {
+      /*
+       * ---------------------------------------------------------
+       * 1. OBTENER LOS PRODUCTOS Y SABER QUIÉN ES EL PROPIETARIO
+       * ---------------------------------------------------------
+       */
+
+      const productIds = [
+        ...new Set(
+          cart.map((product) => product.productId || product.id)
+        ),
+      ];
+
+      const { data: productosDB, error: errorProductos } =
+        await supabase
+          .from("products")
+          .select("id, owner_role")
+          .in("id", productIds);
+
+      if (errorProductos) {
+        throw new Error(
+          errorProductos.message ||
+            "No se pudieron verificar los productos."
+        );
+      }
+
+      const propietarios = {};
+
+      (productosDB || []).forEach((producto) => {
+        propietarios[producto.id] =
+          producto.owner_role || "principal";
+      });
+
+      /*
+       * ---------------------------------------------------------
+       * 2. SEPARAR CARRITO EN PRINCIPAL Y SECUNDARIO
+       * ---------------------------------------------------------
+       */
+
+      const productosPrincipal = [];
+      const productosSecundario = [];
+
+      cart.forEach((product) => {
+        const productId =
+          product.productId || product.id;
+
+        const ownerRole =
+          product.owner_role ||
+          product.ownerRole ||
+          propietarios[productId] ||
+          "principal";
+
+        if (ownerRole === "secundario") {
+          productosSecundario.push(product);
+        } else {
+          productosPrincipal.push(product);
+        }
+      });
+
+      const tienePrincipal =
+        productosPrincipal.length > 0;
+
+      const tieneSecundario =
+        productosSecundario.length > 0;
+
+      /*
+       * ---------------------------------------------------------
+       * 3. SI HAY PRODUCTOS DEL PRINCIPAL,
+       *    PEDIMOS NOMBRE, DIRECCIÓN Y REFERENCIA
+       * ---------------------------------------------------------
+       */
+
+      if (tienePrincipal) {
+        if (!cliente.nombre.trim()) {
+          setErrorPedido("Escribe tu nombre.");
+          setGuardandoPedido(false);
+          return;
+        }
+
+        if (!cliente.direccion.trim()) {
+          setErrorPedido(
+            "Escribe tu dirección de entrega."
+          );
+          setGuardandoPedido(false);
+          return;
+        }
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 4. OBTENER LOS WHATSAPP CONFIGURADOS
+       * ---------------------------------------------------------
+       */
+
+      const { data: configuracion, error: errorConfiguracion } =
+        await supabase
+          .from("store_settings")
+          .select(
+            "whatsapp_principal, whatsapp_secundario"
+          )
+          .limit(1)
+          .maybeSingle();
+
+      if (errorConfiguracion) {
+        throw new Error(
+          errorConfiguracion.message ||
+            "No se pudo obtener la configuración de WhatsApp."
+        );
+      }
+
+      const whatsappPrincipal =
+        configuracion?.whatsapp_principal || "";
+
+      const whatsappSecundario =
+        configuracion?.whatsapp_secundario || "";
+
+      if (
+        tienePrincipal &&
+        !whatsappPrincipal
+      ) {
+        throw new Error(
+          "El WhatsApp principal todavía no está configurado."
+        );
+      }
+
+      if (
+        tieneSecundario &&
+        !whatsappSecundario
+      ) {
+        throw new Error(
+          "El WhatsApp secundario todavía no está configurado."
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 5. CALCULAR SUBTOTALES
+       * ---------------------------------------------------------
+       */
+
+      const subtotalPrincipal =
+        productosPrincipal.reduce(
+          (sum, product) =>
+            sum +
+            Number(product.price) *
+              product.quantity,
+          0
+        );
+
+      const subtotalSecundario =
+        productosSecundario.reduce(
+          (sum, product) =>
+            sum +
+            Number(product.price) *
+              product.quantity,
+          0
+        );
+
+      /*
+       * ---------------------------------------------------------
+       * 6. CREAR PEDIDO EN SUPABASE
+       * ---------------------------------------------------------
+       */
+
       const numeroPedido = `GM-${Date.now()
         .toString()
         .slice(-8)}`;
@@ -70,14 +219,31 @@ function Cart() {
         await supabase
           .from("orders")
           .insert({
-            customer_name: cliente.nombre.trim(),
-            customer_phone: cliente.telefono.trim(),
+            customer_name: tienePrincipal
+              ? cliente.nombre.trim()
+              : null,
+
+            customer_phone: null,
+
             status: "pendiente",
+
             total: total,
+
             order_number: numeroPedido,
-            delivery_zone: cliente.zona.trim() || null,
-            delivery_address: cliente.direccion.trim() || null,
-            notes: cliente.notas.trim() || null,
+
+            delivery_zone: null,
+
+            delivery_address: tienePrincipal
+              ? cliente.direccion.trim()
+              : null,
+
+            notes: null,
+
+            delivery_reference:
+              tienePrincipal &&
+              cliente.referencia.trim()
+                ? cliente.referencia.trim()
+                : null,
           })
           .select()
           .single();
@@ -94,24 +260,41 @@ function Cart() {
         );
       }
 
+      /*
+       * ---------------------------------------------------------
+       * 7. GUARDAR PRODUCTOS DEL PEDIDO
+       * ---------------------------------------------------------
+       */
+
       const items = cart.map((product) => ({
         order_id: pedido.id,
-        product_id: product.productId || product.id,
+
+        product_id:
+          product.productId || product.id,
+
         quantity: product.quantity,
+
         unit_price: Number(product.price),
-        size: product.selectedSize || null,
-        color: product.selectedColor || null,
+
+        size:
+          product.selectedSize || null,
+
+        color:
+          product.selectedColor || null,
+
         subtotal:
-          Number(product.price) * product.quantity,
+          Number(product.price) *
+          product.quantity,
       }));
 
-      const { error: errorItems } = await supabase
-        .from("order_items")
-        .insert(items);
+      const { error: errorItems } =
+        await supabase
+          .from("order_items")
+          .insert(items);
 
       if (errorItems) {
         console.error(
-          "Error guardando productos del pedido:",
+          "Error guardando productos:",
           errorItems
         );
 
@@ -126,62 +309,115 @@ function Cart() {
         );
       }
 
-      const orderLines = cart.map(
-        (product) =>
-          `• ${product.name} | Talla: ${
-            product.selectedSize || "No seleccionada"
-          } | Color: ${
-            product.selectedColor || "No seleccionado"
-          } | Cantidad: ${
-            product.quantity
-          } | Subtotal: S/${(
-            Number(product.price) * product.quantity
-          ).toFixed(2)}`
-      );
+      /*
+       * ---------------------------------------------------------
+       * 8. CREAR LÍNEAS DE WHATSAPP
+       * ---------------------------------------------------------
+       */
 
-      const message = [
-        "Hola, quiero realizar este pedido en GMISH:",
-        "",
-        `Número de pedido: ${numeroPedido}`,
-        "",
-        `Cliente: ${cliente.nombre}`,
-        `WhatsApp: ${cliente.telefono}`,
-        cliente.zona
-          ? `Zona: ${cliente.zona}`
-          : "",
-        cliente.direccion
-          ? `Dirección: ${cliente.direccion}`
-          : "",
-        "",
-        ...orderLines,
-        "",
-        `Total: S/${total.toFixed(2)}`,
-        cliente.notas
-          ? `\nNotas: ${cliente.notas}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      function crearLineas(productos) {
+        return productos.map((product) => {
+          const talla =
+            product.selectedSize ||
+            "Sin talla";
 
-      const url = `https://wa.me/${
-        store.whatsapp
-      }?text=${encodeURIComponent(message)}`;
+          const color =
+            product.selectedColor ||
+            "Sin color";
 
-      window.open(
-        url,
-        "_blank",
-        "noopener,noreferrer"
-      );
+          const cantidad =
+            Number(product.quantity) > 1
+              ? ` · ${product.quantity}`
+              : "";
+
+          return `• ${talla} / ${color}${cantidad}`;
+        });
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 9. CREAR MENSAJE PRINCIPAL
+       * ---------------------------------------------------------
+       */
+
+      function crearMensaje(productos, subtotal) {
+        const lineas = crearLineas(productos);
+
+        return [
+          "Hola, me interesa este pedido:",
+          "",
+          ...lineas,
+          "",
+          `Subtotal: S/${subtotal.toFixed(2)}`,
+        ].join("\n");
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 10. ABRIR WHATSAPP PRINCIPAL
+       * ---------------------------------------------------------
+       */
+
+      if (tienePrincipal) {
+        const mensajePrincipal =
+          crearMensaje(
+            productosPrincipal,
+            subtotalPrincipal
+          );
+
+        const urlPrincipal =
+          `https://wa.me/${whatsappPrincipal}` +
+          `?text=${encodeURIComponent(
+            mensajePrincipal
+          )}`;
+
+        window.open(
+          urlPrincipal,
+          "_blank",
+          "noopener,noreferrer"
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 11. ABRIR WHATSAPP SECUNDARIO
+       * ---------------------------------------------------------
+       */
+
+      if (tieneSecundario) {
+        const mensajeSecundario =
+          crearMensaje(
+            productosSecundario,
+            subtotalSecundario
+          );
+
+        const urlSecundario =
+          `https://wa.me/${whatsappSecundario}` +
+          `?text=${encodeURIComponent(
+            mensajeSecundario
+          )}`;
+
+        window.open(
+          urlSecundario,
+          "_blank",
+          "noopener,noreferrer"
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 12. LIMPIAR CARRITO
+       * ---------------------------------------------------------
+       */
 
       clearCart();
+
       setMostrarDatos(false);
 
       setCliente({
         nombre: "",
-        telefono: "",
-        zona: "",
         direccion: "",
-        notas: "",
+        referencia: "",
       });
     } catch (error) {
       console.error(error);
@@ -400,8 +636,15 @@ function Cart() {
                   {!mostrarDatos ? (
                     <>
                       <p className="mt-2 text-xs leading-5 text-[#898274]">
-                        Primero necesitamos unos datos
-                        para registrar tu pedido.
+                        {cart.some(
+                          (product) =>
+                            product.owner_role ===
+                              "principal" ||
+                            product.ownerRole ===
+                              "principal"
+                        )
+                          ? "Completa tus datos para registrar el pedido."
+                          : "Continúa para enviar tu pedido por WhatsApp."}
                       </p>
 
                       <button
@@ -417,100 +660,72 @@ function Cart() {
                     </>
                   ) : (
                     <div className="mt-5 space-y-3">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                          Nombre
-                        </label>
+                      {cart.some(
+                        (product) =>
+                          product.owner_role ===
+                            "principal" ||
+                          product.ownerRole ===
+                            "principal"
+                      ) && (
+                        <>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                              Nombre
+                            </label>
 
-                        <input
-                          type="text"
-                          value={cliente.nombre}
-                          onChange={(event) =>
-                            actualizarCliente(
-                              "nombre",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Tu nombre"
-                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                        />
-                      </div>
+                            <input
+                              type="text"
+                              value={cliente.nombre}
+                              onChange={(event) =>
+                                actualizarCliente(
+                                  "nombre",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="Tu nombre"
+                              className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                          WhatsApp
-                        </label>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                              Dirección de entrega
+                            </label>
 
-                        <input
-                          type="tel"
-                          value={cliente.telefono}
-                          onChange={(event) =>
-                            actualizarCliente(
-                              "telefono",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Tu número"
-                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                        />
-                      </div>
+                            <input
+                              type="text"
+                              value={cliente.direccion}
+                              onChange={(event) =>
+                                actualizarCliente(
+                                  "direccion",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="Dirección de entrega"
+                              className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                          Zona
-                        </label>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                              Referencia
+                            </label>
 
-                        <input
-                          type="text"
-                          value={cliente.zona}
-                          onChange={(event) =>
-                            actualizarCliente(
-                              "zona",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Ej. La Merced"
-                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                          Dirección
-                        </label>
-
-                        <input
-                          type="text"
-                          value={cliente.direccion}
-                          onChange={(event) =>
-                            actualizarCliente(
-                              "direccion",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Dirección de entrega"
-                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                          Nota
-                        </label>
-
-                        <textarea
-                          value={cliente.notas}
-                          onChange={(event) =>
-                            actualizarCliente(
-                              "notas",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Alguna indicación adicional"
-                          rows={2}
-                          className="w-full resize-none rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                        />
-                      </div>
+                            <input
+                              type="text"
+                              value={cliente.referencia}
+                              onChange={(event) =>
+                                actualizarCliente(
+                                  "referencia",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="Referencia de ubicación"
+                              className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                            />
+                          </div>
+                        </>
+                      )}
 
                       {errorPedido && (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">

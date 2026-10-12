@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import "./App.css";
 import { supabase } from "./lib/supabase";
@@ -16,8 +15,9 @@ function Tienda() {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [errorProductos, setErrorProductos] = useState("");
+
   const [portadas, setPortadas] = useState({
-    inicio: "",
+    principal: "",
     hombre: "",
     mujer: "",
   });
@@ -121,7 +121,6 @@ function Tienda() {
     };
   }, []);
 
-  
   // Cargar las portadas guardadas en Supabase.
   useEffect(() => {
     let cancelado = false;
@@ -130,7 +129,11 @@ function Tienda() {
       const { data, error } = await supabase
         .from("store_settings")
         .select("setting_key, setting_value")
-        .in("setting_key", ["inicio", "hombre", "mujer"]);
+        .in("setting_key", [
+          "portada_principal",
+          "portada_hombre",
+          "portada_mujer",
+        ]);
 
       if (cancelado) return;
 
@@ -140,17 +143,29 @@ function Tienda() {
       }
 
       const portadasGuardadas = {
-        inicio: "",
+        principal: "",
         hombre: "",
         mujer: "",
       };
 
       (data || []).forEach((fila) => {
-        if (fila.setting_key in portadasGuardadas) {
-          portadasGuardadas[fila.setting_key] =
+        if (fila.setting_key === "portada_principal") {
+          portadasGuardadas.principal =
+            fila.setting_value || "";
+        }
+
+        if (fila.setting_key === "portada_hombre") {
+          portadasGuardadas.hombre =
+            fila.setting_value || "";
+        }
+
+        if (fila.setting_key === "portada_mujer") {
+          portadasGuardadas.mujer =
             fila.setting_value || "";
         }
       });
+
+      console.log("Portadas cargadas:", portadasGuardadas);
 
       setPortadas(portadasGuardadas);
     }
@@ -232,7 +247,9 @@ function Tienda() {
 
       if (categoriaProducto !== categoria) return;
 
-      const nombre = String(producto.subcategory || "").trim();
+      const nombre = String(
+        producto.subcategory || ""
+      ).trim();
 
       if (!nombre) return;
 
@@ -244,23 +261,33 @@ function Tienda() {
     });
 
     return [...subcategoriasUnicas.entries()]
-      .sort((a, b) => a[1].localeCompare(b[1], "es"))
-      .map(([value, label]) => ({ value, label }));
+      .sort((a, b) =>
+        a[1].localeCompare(b[1], "es")
+      )
+      .map(([value, label]) => ({
+        value,
+        label,
+      }));
   }
 
   // Navegar entre páginas y conservar el historial.
-  function navegar(destino, siguientesSubcategorias) {
+  function navegar(
+    destino,
+    siguientesSubcategorias
+  ) {
     const estadoActual = window.history.state;
 
     window.history.replaceState(
       {
-        ...(estadoActual && typeof estadoActual === "object"
+        ...(estadoActual &&
+        typeof estadoActual === "object"
           ? estadoActual
           : {}),
         gmishPage: pagina,
         gmishScrollY: window.scrollY,
         gmishSearch: busqueda,
-        gmishSubcategories: subcategoriasSeleccionadas,
+        gmishSubcategories:
+          subcategoriasSeleccionadas,
         gmishProductModal: false,
       },
       "",
@@ -273,7 +300,8 @@ function Tienda() {
         gmishScrollY: 0,
         gmishSearch: busqueda,
         gmishSubcategories:
-          siguientesSubcategorias || subcategoriasSeleccionadas,
+          siguientesSubcategorias ||
+          subcategoriasSeleccionadas,
         gmishProductModal: false,
       },
       "",
@@ -284,28 +312,44 @@ function Tienda() {
     setPanelAbierto(null);
     setCategoriaMenuAbierta(null);
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   function irA(destino) {
-    navegar(destino, subcategoriasSeleccionadas);
+    navegar(
+      destino,
+      subcategoriasSeleccionadas
+    );
   }
 
   // Elegir una subcategoría desde el menú.
-  function irASubcategoria(categoria, subcategoria) {
+  function irASubcategoria(
+    categoria,
+    subcategoria
+  ) {
     const nuevasSubcategorias = {
       ...subcategoriasSeleccionadas,
       [categoria]: subcategoria,
     };
 
-    navegar(categoria, nuevasSubcategorias);
-    setSubcategoriasSeleccionadas(nuevasSubcategorias);
+    navegar(
+      categoria,
+      nuevasSubcategorias
+    );
+
+    setSubcategoriasSeleccionadas(
+      nuevasSubcategorias
+    );
   }
 
   // Abrir una subcategoría desde "Ver todos".
-  // Guarda la vista general para que la flecha de regresar
-  // vuelva a las filas de categorías de Hombre o Mujer.
-  function seleccionarSubcategoria(categoria, subcategoria) {
+  function seleccionarSubcategoria(
+    categoria,
+    subcategoria
+  ) {
     const nuevasSubcategorias = {
       ...subcategoriasSeleccionadas,
       [categoria]: subcategoria,
@@ -313,36 +357,39 @@ function Tienda() {
 
     const estadoActual = window.history.state;
 
-    // La entrada actual conserva la vista general de categorías.
     window.history.replaceState(
       {
-        ...(estadoActual && typeof estadoActual === "object"
+        ...(estadoActual &&
+        typeof estadoActual === "object"
           ? estadoActual
           : {}),
         gmishPage: pagina,
         gmishScrollY: window.scrollY,
         gmishSearch: busqueda,
-        gmishSubcategories: subcategoriasSeleccionadas,
+        gmishSubcategories:
+          subcategoriasSeleccionadas,
         gmishProductModal: false,
       },
       "",
       window.location.href
     );
 
-    // Se crea una entrada para mostrar únicamente la subcategoría.
     window.history.pushState(
       {
         gmishPage: pagina,
         gmishScrollY: 0,
         gmishSearch: busqueda,
-        gmishSubcategories: nuevasSubcategorias,
+        gmishSubcategories:
+          nuevasSubcategorias,
         gmishProductModal: false,
       },
       "",
       window.location.href
     );
 
-    setSubcategoriasSeleccionadas(nuevasSubcategorias);
+    setSubcategoriasSeleccionadas(
+      nuevasSubcategorias
+    );
 
     window.scrollTo({
       top: 0,
@@ -352,7 +399,8 @@ function Tienda() {
 
   function alternarPanel(nombre) {
     setPanelAbierto((actual) => {
-      const siguiente = actual === nombre ? null : nombre;
+      const siguiente =
+        actual === nombre ? null : nombre;
 
       if (siguiente !== "menu") {
         setCategoriaMenuAbierta(null);
@@ -364,7 +412,10 @@ function Tienda() {
 
   function buscar(evento) {
     evento.preventDefault();
-    navegar("buscar", subcategoriasSeleccionadas);
+    navegar(
+      "buscar",
+      subcategoriasSeleccionadas
+    );
   }
 
   function volverATienda() {
@@ -378,7 +429,8 @@ function Tienda() {
         gmishPage: "inicio",
         gmishScrollY: 0,
         gmishSearch: "",
-        gmishSubcategories: subcategoriasIniciales,
+        gmishSubcategories:
+          subcategoriasIniciales,
         gmishProductModal: false,
       },
       "",
@@ -388,11 +440,16 @@ function Tienda() {
     setEsAdmin(false);
     setPagina("inicio");
     setBusqueda("");
-    setSubcategoriasSeleccionadas(subcategoriasIniciales);
+    setSubcategoriasSeleccionadas(
+      subcategoriasIniciales
+    );
     setPanelAbierto(null);
     setCategoriaMenuAbierta(null);
 
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({
+      top: 0,
+      behavior: "instant",
+    });
   }
 
   if (esAdmin) {
@@ -411,8 +468,11 @@ function Tienda() {
     );
   }
 
-  const subcategoriasHombre = obtenerSubcategorias("hombre");
-  const subcategoriasMujer = obtenerSubcategorias("mujer");
+  const subcategoriasHombre =
+    obtenerSubcategorias("hombre");
+
+  const subcategoriasMujer =
+    obtenerSubcategorias("mujer");
 
   return (
     <div className="hero">
@@ -422,11 +482,22 @@ function Tienda() {
             type="button"
             className="icon-link"
             aria-label="Abrir buscador"
-            aria-expanded={panelAbierto === "buscador"}
-            onClick={() => alternarPanel("buscador")}
+            aria-expanded={
+              panelAbierto === "buscador"
+            }
+            onClick={() =>
+              alternarPanel("buscador")
+            }
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="10.8" cy="10.8" r="6.8" />
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                cx="10.8"
+                cy="10.8"
+                r="6.8"
+              />
               <path d="m16 16 5 5" />
             </svg>
           </button>
@@ -442,10 +513,21 @@ function Tienda() {
               openCart();
             }}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.9a2 2 0 0 0 1.9-1.5L22 8H6" />
-              <circle cx="10" cy="20" r="1" />
-              <circle cx="18" cy="20" r="1" />
+              <circle
+                cx="10"
+                cy="20"
+                r="1"
+              />
+              <circle
+                cx="18"
+                cy="20"
+                r="1"
+              />
             </svg>
 
             {cantidadCarrito > 0 && (
@@ -469,8 +551,12 @@ function Tienda() {
           type="button"
           className="menu-icon"
           aria-label="Abrir menú"
-          aria-expanded={panelAbierto === "menu"}
-          onClick={() => alternarPanel("menu")}
+          aria-expanded={
+            panelAbierto === "menu"
+          }
+          onClick={() =>
+            alternarPanel("menu")
+          }
         >
           <span />
           <span />
@@ -480,8 +566,16 @@ function Tienda() {
 
       {/* MENÚ PRINCIPAL */}
       {panelAbierto === "menu" && (
-        <nav className="menu-desplegable" aria-label="Menú principal">
-          <button type="button" onClick={() => irA("inicio")}>
+        <nav
+          className="menu-desplegable"
+          aria-label="Menú principal"
+        >
+          <button
+            type="button"
+            onClick={() =>
+              irA("inicio")
+            }
+          >
             Inicio
           </button>
 
@@ -490,114 +584,176 @@ function Tienda() {
           <button
             type="button"
             className="menu-boton-categoria"
-            aria-expanded={categoriaMenuAbierta === "hombre"}
+            aria-expanded={
+              categoriaMenuAbierta ===
+              "hombre"
+            }
             onClick={() =>
-              setCategoriaMenuAbierta((actual) =>
-                actual === "hombre" ? null : "hombre"
+              setCategoriaMenuAbierta(
+                (actual) =>
+                  actual === "hombre"
+                    ? null
+                    : "hombre"
               )
             }
           >
             <span>Hombre</span>
           </button>
 
-          {categoriaMenuAbierta === "hombre" && (
+          {categoriaMenuAbierta ===
+            "hombre" && (
             <div className="menu-subcategorias">
               <button
                 type="button"
                 className={
-                  subcategoriasSeleccionadas.hombre === "todos"
+                  subcategoriasSeleccionadas
+                    .hombre === "todos"
                     ? "activo"
                     : ""
                 }
-                onClick={() => irASubcategoria("hombre", "todos")}
+                onClick={() =>
+                  irASubcategoria(
+                    "hombre",
+                    "todos"
+                  )
+                }
               >
                 Todo
               </button>
 
-              {subcategoriasHombre.map((subcategoria) => (
-                <button
-                  type="button"
-                  key={subcategoria.value}
-                  className={
-                    subcategoriasSeleccionadas.hombre ===
-                    subcategoria.value
-                      ? "activo"
-                      : ""
-                  }
-                  onClick={() =>
-                    irASubcategoria("hombre", subcategoria.value)
-                  }
-                >
-                  {subcategoria.label}
-                </button>
-              ))}
+              {subcategoriasHombre.map(
+                (subcategoria) => (
+                  <button
+                    type="button"
+                    key={
+                      subcategoria.value
+                    }
+                    className={
+                      subcategoriasSeleccionadas
+                        .hombre ===
+                      subcategoria.value
+                        ? "activo"
+                        : ""
+                    }
+                    onClick={() =>
+                      irASubcategoria(
+                        "hombre",
+                        subcategoria.value
+                      )
+                    }
+                  >
+                    {subcategoria.label}
+                  </button>
+                )
+              )}
             </div>
           )}
 
           <button
             type="button"
             className="menu-boton-categoria"
-            aria-expanded={categoriaMenuAbierta === "mujer"}
+            aria-expanded={
+              categoriaMenuAbierta ===
+              "mujer"
+            }
             onClick={() =>
-              setCategoriaMenuAbierta((actual) =>
-                actual === "mujer" ? null : "mujer"
+              setCategoriaMenuAbierta(
+                (actual) =>
+                  actual === "mujer"
+                    ? null
+                    : "mujer"
               )
             }
           >
             <span>Mujer</span>
           </button>
 
-          {categoriaMenuAbierta === "mujer" && (
+          {categoriaMenuAbierta ===
+            "mujer" && (
             <div className="menu-subcategorias">
               <button
                 type="button"
                 className={
-                  subcategoriasSeleccionadas.mujer === "todos"
+                  subcategoriasSeleccionadas
+                    .mujer === "todos"
                     ? "activo"
                     : ""
                 }
-                onClick={() => irASubcategoria("mujer", "todos")}
+                onClick={() =>
+                  irASubcategoria(
+                    "mujer",
+                    "todos"
+                  )
+                }
               >
                 Todo
               </button>
 
-              {subcategoriasMujer.map((subcategoria) => (
-                <button
-                  type="button"
-                  key={subcategoria.value}
-                  className={
-                    subcategoriasSeleccionadas.mujer ===
-                    subcategoria.value
-                      ? "activo"
-                      : ""
-                  }
-                  onClick={() =>
-                    irASubcategoria("mujer", subcategoria.value)
-                  }
-                >
-                  {subcategoria.label}
-                </button>
-              ))}
+              {subcategoriasMujer.map(
+                (subcategoria) => (
+                  <button
+                    type="button"
+                    key={
+                      subcategoria.value
+                    }
+                    className={
+                      subcategoriasSeleccionadas
+                        .mujer ===
+                      subcategoria.value
+                        ? "activo"
+                        : ""
+                    }
+                    onClick={() =>
+                      irASubcategoria(
+                        "mujer",
+                        subcategoria.value
+                      )
+                    }
+                  >
+                    {subcategoria.label}
+                  </button>
+                )
+              )}
             </div>
           )}
 
           <hr className="menu-separador" />
 
-          <button type="button" onClick={() => irA("ofertas")}>
+          <button
+            type="button"
+            onClick={() =>
+              irA("ofertas")
+            }
+          >
             Ofertas
           </button>
 
-          <button type="button" onClick={() => irA("nuevos")}>
+          <button
+            type="button"
+            onClick={() =>
+              irA("nuevos")
+            }
+          >
             New In
           </button>
 
           <hr className="menu-separador" />
 
-          <button type="button" onClick={() => irA("visitanos")}>
+          <button
+            type="button"
+            onClick={() =>
+              irA("visitanos")
+            }
+          >
             Visítanos
           </button>
 
-          <button type="button" onClick={() => irA("contacto")}>
+          <button
+            type="button"
+            onClick={() =>
+              irA("contacto")
+            }
+          >
             Contáctanos
           </button>
         </nav>
@@ -605,35 +761,53 @@ function Tienda() {
 
       {/* BUSCADOR */}
       {panelAbierto === "buscador" && (
-        <form className="buscador-panel" onSubmit={buscar}>
+        <form
+          className="buscador-panel"
+          onSubmit={buscar}
+        >
           <input
             type="search"
             placeholder="¿Qué estás buscando?"
             aria-label="Buscar productos"
             value={busqueda}
-            onChange={(evento) => setBusqueda(evento.target.value)}
+            onChange={(evento) =>
+              setBusqueda(
+                evento.target.value
+              )
+            }
             autoFocus
           />
 
-          <button type="submit">Buscar</button>
+          <button type="submit">
+            Buscar
+          </button>
         </form>
       )}
 
       <main className="contenido-tienda">
         {pagina === "inicio" && (
-          
           <section
             className="hero-content"
             style={{
-              "--portada-inicio": portadas.inicio
-                ? `url("${portadas.inicio}")`
-                : "url('/gmish-bg.jpg')",
+              "--portada-inicio":
+                portadas.principal
+                  ? `url("${portadas.principal}")`
+                  : "url('/gmish-bg.jpg')",
             }}
           >
             <div className="portada-texto">
-              <p className="portada-etiqueta">G’MISH COLLECTION</p>
-              <h1 className="brand-name">G’MISH</h1>
-              <h2 className="main-heading">ESTILO QUE NOS UNE</h2>
+              <p className="portada-etiqueta">
+                G’MISH COLLECTION
+              </p>
+
+              <h1 className="brand-name">
+                G’MISH
+              </h1>
+
+              <h2 className="main-heading">
+                ESTILO QUE NOS UNE
+              </h2>
+
               <p className="sub-heading">
                 OUTFITS QUE SE ADAPTAN A TU ESTILO
               </p>
@@ -641,14 +815,18 @@ function Tienda() {
               <div className="buttons-wrapper">
                 <button
                   className="btn"
-                  onClick={() => irA("coleccion")}
+                  onClick={() =>
+                    irA("coleccion")
+                  }
                 >
                   VER COLECCIÓN
                 </button>
 
                 <button
                   className="btn"
-                  onClick={() => irA("visitanos")}
+                  onClick={() =>
+                    irA("visitanos")
+                  }
                 >
                   VISÍTANOS
                 </button>
@@ -659,8 +837,13 @@ function Tienda() {
 
         {pagina === "coleccion" && (
           <section className="seccion-interior pagina-coleccion">
-            <p className="seccion-etiqueta">G’MISH COLLECTION</p>
-            <h1>Encuentra tu estilo</h1>
+            <p className="seccion-etiqueta">
+              G’MISH COLLECTION
+            </p>
+
+            <h1>
+              Encuentra tu estilo
+            </h1>
 
             <p className="intro-coleccion">
               Explora nuestra selección para cada estilo.
@@ -669,14 +852,19 @@ function Tienda() {
             <div className="coleccion-categorias">
               <button
                 className="categoria-boton"
-                onClick={() => irA("hombre")}
+                onClick={() =>
+                  irA("hombre")
+                }
               >
                 <img
-                  
-                  src={portadas.hombre || "/hombre.jpg"}
+                  src={
+                    portadas.hombre ||
+                    "/hombre.jpg"
+                  }
                   alt="Colección de hombre"
                   onError={(evento) => {
-                    evento.currentTarget.style.display = "none";
+                    evento.currentTarget.style.display =
+                      "none";
                   }}
                 />
 
@@ -686,7 +874,11 @@ function Tienda() {
                   <span className="categoria-subtitulo">
                     DESCUBRE
                   </span>
-                  <span className="categoria-nombre">Hombre</span>
+
+                  <span className="categoria-nombre">
+                    Hombre
+                  </span>
+
                   <span className="categoria-enlace">
                     EXPLORAR ↗
                   </span>
@@ -695,13 +887,19 @@ function Tienda() {
 
               <button
                 className="categoria-boton"
-                onClick={() => irA("mujer")}
+                onClick={() =>
+                  irA("mujer")
+                }
               >
-                <img                  
-                  src={portadas.mujer || "/mujer.jpg"}
+                <img
+                  src={
+                    portadas.mujer ||
+                    "/mujer.jpg"
+                  }
                   alt="Colección de mujer"
                   onError={(evento) => {
-                    evento.currentTarget.style.display = "none";
+                    evento.currentTarget.style.display =
+                      "none";
                   }}
                 />
 
@@ -711,7 +909,11 @@ function Tienda() {
                   <span className="categoria-subtitulo">
                     DESCUBRE
                   </span>
-                  <span className="categoria-nombre">Mujer</span>
+
+                  <span className="categoria-nombre">
+                    Mujer
+                  </span>
+
                   <span className="categoria-enlace">
                     EXPLORAR ↗
                   </span>
@@ -721,12 +923,17 @@ function Tienda() {
           </section>
         )}
 
-        {(pagina === "hombre" || pagina === "mujer") && (
+        {(pagina === "hombre" ||
+          pagina === "mujer") && (
           <section className="seccion-interior">
-            <p className="seccion-etiqueta">G’MISH COLLECTION</p>
+            <p className="seccion-etiqueta">
+              G’MISH COLLECTION
+            </p>
 
             <h1>
-              {pagina === "hombre" ? "Hombre" : "Mujer"}
+              {pagina === "hombre"
+                ? "Hombre"
+                : "Mujer"}
             </h1>
 
             <p className="intro-coleccion">
@@ -734,18 +941,29 @@ function Tienda() {
             </p>
 
             {cargando ? (
-              <p>Cargando prendas...</p>
+              <p>
+                Cargando prendas...
+              </p>
             ) : errorProductos ? (
-              <p role="alert">{errorProductos}</p>
+              <p role="alert">
+                {errorProductos}
+              </p>
             ) : (
               <CategorySection
                 category={pagina}
                 products={productos}
                 selectedSubcategory={
-                  subcategoriasSeleccionadas[pagina]
+                  subcategoriasSeleccionadas[
+                    pagina
+                  ]
                 }
-                onSelectSubcategory={(subcategoria) =>
-                  seleccionarSubcategoria(pagina, subcategoria)
+                onSelectSubcategory={(
+                  subcategoria
+                ) =>
+                  seleccionarSubcategoria(
+                    pagina,
+                    subcategoria
+                  )
                 }
               />
             )}
@@ -754,7 +972,10 @@ function Tienda() {
 
         {pagina === "ofertas" && (
           <section className="seccion-interior">
-            <p className="seccion-etiqueta">OPORTUNIDADES GMISH</p>
+            <p className="seccion-etiqueta">
+              OPORTUNIDADES GMISH
+            </p>
+
             <h1>Ofertas</h1>
 
             <p className="intro-coleccion">
@@ -762,9 +983,13 @@ function Tienda() {
             </p>
 
             {cargando ? (
-              <p>Cargando ofertas...</p>
+              <p>
+                Cargando ofertas...
+              </p>
             ) : errorProductos ? (
-              <p role="alert">{errorProductos}</p>
+              <p role="alert">
+                {errorProductos}
+              </p>
             ) : (
               <FeaturedProducts
                 category="ofertas"
@@ -779,7 +1004,10 @@ function Tienda() {
 
         {pagina === "nuevos" && (
           <section className="seccion-interior">
-            <p className="seccion-etiqueta">LATEST ARRIVALS</p>
+            <p className="seccion-etiqueta">
+              LATEST ARRIVALS
+            </p>
+
             <h1>New In</h1>
 
             <p className="intro-coleccion">
@@ -787,9 +1015,13 @@ function Tienda() {
             </p>
 
             {cargando ? (
-              <p>Cargando novedades...</p>
+              <p>
+                Cargando novedades...
+              </p>
             ) : errorProductos ? (
-              <p role="alert">{errorProductos}</p>
+              <p role="alert">
+                {errorProductos}
+              </p>
             ) : (
               <FeaturedProducts
                 category="todos"
@@ -804,8 +1036,13 @@ function Tienda() {
 
         {pagina === "buscar" && (
           <section className="seccion-interior">
-            <p className="seccion-etiqueta">G’MISH COLLECTION</p>
-            <h1>Resultados de búsqueda</h1>
+            <p className="seccion-etiqueta">
+              G’MISH COLLECTION
+            </p>
+
+            <h1>
+              Resultados de búsqueda
+            </h1>
 
             <p className="texto-busqueda">
               {busqueda.trim()
@@ -814,9 +1051,13 @@ function Tienda() {
             </p>
 
             {cargando ? (
-              <p>Buscando prendas...</p>
+              <p>
+                Buscando prendas...
+              </p>
             ) : errorProductos ? (
-              <p role="alert">{errorProductos}</p>
+              <p role="alert">
+                {errorProductos}
+              </p>
             ) : (
               <FeaturedProducts
                 category="todos"
@@ -829,7 +1070,9 @@ function Tienda() {
 
             <button
               className="boton-interior"
-              onClick={() => irA("coleccion")}
+              onClick={() =>
+                irA("coleccion")
+              }
             >
               VER CATEGORÍAS
             </button>
@@ -838,8 +1081,13 @@ function Tienda() {
 
         {pagina === "visitanos" && (
           <section className="seccion-interior pagina-vacia">
-            <p className="seccion-etiqueta">ESTAMOS PARA TI</p>
-            <h1>Visítanos</h1>
+            <p className="seccion-etiqueta">
+              ESTAMOS PARA TI
+            </p>
+
+            <h1>
+              Visítanos
+            </h1>
 
             <p>
               Próximamente encontrarás aquí nuestra dirección y horarios.
@@ -847,7 +1095,9 @@ function Tienda() {
 
             <button
               className="boton-interior"
-              onClick={() => irA("inicio")}
+              onClick={() =>
+                irA("inicio")
+              }
             >
               VOLVER AL INICIO
             </button>
@@ -856,8 +1106,13 @@ function Tienda() {
 
         {pagina === "contacto" && (
           <section className="seccion-interior pagina-vacia">
-            <p className="seccion-etiqueta">ESTAMOS PARA TI</p>
-            <h1>Contáctanos</h1>
+            <p className="seccion-etiqueta">
+              ESTAMOS PARA TI
+            </p>
+
+            <h1>
+              Contáctanos
+            </h1>
 
             <p>
               Pronto añadiremos aquí nuestros datos de contacto.
@@ -865,7 +1120,9 @@ function Tienda() {
 
             <button
               className="boton-interior"
-              onClick={() => irA("inicio")}
+              onClick={() =>
+                irA("inicio")
+              }
             >
               VOLVER AL INICIO
             </button>
@@ -874,8 +1131,14 @@ function Tienda() {
       </main>
 
       <footer className="footer">
-        <span className="footer-logo">G’MISH</span>
-        <p>Tu estilo, nuestra inspiración.</p>
+        <span className="footer-logo">
+          G’MISH
+        </span>
+
+        <p>
+          Tu estilo, nuestra inspiración.
+        </p>
+
         <span>
           © 2026 G’MISH. Todos los derechos reservados.
         </span>

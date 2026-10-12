@@ -1,19 +1,26 @@
-
 import { useEffect, useRef, useState } from "react"
 import { supabase } from "../lib/supabase"
 
 const SIZES = ["S", "M", "L", "XL"]
 
 const inputClass =
-  "w-full rounded-xl border border-[#303030] bg-[#0d0d0d] px-4 py-3 text-sm text-gray-100 outline-none transition focus:border-[#76509a] focus:ring-2 focus:ring-[#261535]"
+  "w-full rounded-xl border border-[#303030] bg-[#0d0d0d] px-4 py-3 text-sm text-gray-100 outline-none transition focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20"
 
-function ProductButton({ children, onClick, className = "", disabled = false }) {
+const cardClass =
+  "rounded-2xl border border-[#2c2735] bg-[#141218] shadow-[0_12px_35px_rgba(0,0,0,0.22)]"
+
+function ProductButton({
+  children,
+  onClick,
+  className = "",
+  disabled = false,
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded-xl bg-purple-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-purple-800 disabled:opacity-50 ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center rounded-xl bg-[#7c3aed] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8b5cf6] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -272,12 +279,16 @@ export default function ProductsAdmin() {
       const uploadedImages = []
 
       for (const file of files) {
-        const extension = file.name.split(".").pop()?.toLowerCase() || "png"
+        const extension =
+          file.name.split(".").pop()?.toLowerCase() || "png"
+
         const safeName = generateSlug(name || "producto")
+
         const uniqueName =
           `${safeName}-${Date.now()}-${Math.random()
             .toString(36)
             .substring(2, 8)}.${extension}`
+
         const filePath = `products/${uniqueName}`
 
         const { error: uploadError } = await supabase.storage
@@ -319,7 +330,10 @@ export default function ProductsAdmin() {
       alert(`No se pudieron subir las imágenes: ${error.message}`)
     } finally {
       setUploadingImage(null)
-      if (event.target) event.target.value = ""
+
+      if (event.target) {
+        event.target.value = ""
+      }
     }
   }
 
@@ -357,7 +371,9 @@ export default function ProductsAdmin() {
           ? [variant.color_image_url]
           : []
 
-        const allImages = images.length ? [...new Set(images)] : fallbackImages
+        const allImages = images.length
+          ? [...new Set(images)]
+          : fallbackImages
 
         groupedColors[colorName] = {
           name: colorName,
@@ -391,13 +407,19 @@ export default function ProductsAdmin() {
     setDescription(product.description || "")
     setIsNew(Boolean(product.is_new))
     setIsBestSeller(Boolean(product.is_best_seller))
+
     setColors(
       Object.values(groupedColors).length
         ? Object.values(groupedColors)
         : [createEmptyColor()]
     )
 
-    navigate("editor", null, false, product.category || "hombre")
+    navigate(
+      "editor",
+      null,
+      false,
+      product.category || "hombre"
+    )
   }
 
   const validateForm = () => {
@@ -483,6 +505,7 @@ export default function ProductsAdmin() {
       if (!colorData) continue
 
       const images = [...new Set(colorData.images || [])]
+
       if (!images.length) continue
 
       const rows = images.map((imageUrl, index) => ({
@@ -522,18 +545,23 @@ export default function ProductsAdmin() {
 
     if (productError) throw productError
 
-    const { data: insertedVariants, error: variantsError } = await supabase
-      .from("product_variants")
-      .insert(
-        variants.map((variant) => ({
-          ...variant,
-          product_id: product.id,
-        }))
-      )
-      .select()
+    const { data: insertedVariants, error: variantsError } =
+      await supabase
+        .from("product_variants")
+        .insert(
+          variants.map((variant) => ({
+            ...variant,
+            product_id: product.id,
+          }))
+        )
+        .select()
 
     if (variantsError) {
-      await supabase.from("products").delete().eq("id", product.id)
+      await supabase
+        .from("products")
+        .delete()
+        .eq("id", product.id)
+
       throw variantsError
     }
 
@@ -560,14 +588,17 @@ export default function ProductsAdmin() {
 
     if (productError) throw productError
 
-    const { data: existingVariants, error: readError } = await supabase
-      .from("product_variants")
-      .select("id")
-      .eq("product_id", editingId)
+    const { data: existingVariants, error: readError } =
+      await supabase
+        .from("product_variants")
+        .select("id")
+        .eq("product_id", editingId)
 
     if (readError) throw readError
 
-    const variantIds = (existingVariants || []).map((variant) => variant.id)
+    const variantIds = (existingVariants || []).map(
+      (variant) => variant.id
+    )
 
     if (variantIds.length) {
       const { error } = await supabase
@@ -585,15 +616,16 @@ export default function ProductsAdmin() {
 
     if (deleteError) throw deleteError
 
-    const { data: insertedVariants, error: insertError } = await supabase
-      .from("product_variants")
-      .insert(
-        variants.map((variant) => ({
-          ...variant,
-          product_id: editingId,
-        }))
-      )
-      .select()
+    const { data: insertedVariants, error: insertError } =
+      await supabase
+        .from("product_variants")
+        .insert(
+          variants.map((variant) => ({
+            ...variant,
+            product_id: editingId,
+          }))
+        )
+        .select()
 
     if (insertError) throw insertError
 
@@ -602,6 +634,7 @@ export default function ProductsAdmin() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+
     if (!validateForm()) return
 
     setSaving(true)
@@ -646,13 +679,19 @@ export default function ProductsAdmin() {
 
     setProducts((current) =>
       current.map((item) =>
-        item.id === product.id ? { ...item, is_active: newStatus } : item
+        item.id === product.id
+          ? { ...item, is_active: newStatus }
+          : item
       )
     )
   }
 
   const deleteProduct = async (product) => {
-    if (!window.confirm(`¿Eliminar definitivamente "${product.name}"?`)) {
+    if (
+      !window.confirm(
+        `¿Eliminar definitivamente "${product.name}"?`
+      )
+    ) {
       return
     }
 
@@ -675,7 +714,9 @@ export default function ProductsAdmin() {
     for (const variant of product.product_variants || []) {
       const images = (variant.product_variant_images || [])
         .slice()
-        .sort((a, b) => (a.position || 0) - (b.position || 0))
+        .sort(
+          (a, b) => (a.position || 0) - (b.position || 0)
+        )
 
       if (images[0]?.image_url) return images[0].image_url
       if (variant.color_image_url) return variant.color_image_url
@@ -694,10 +735,15 @@ export default function ProductsAdmin() {
       const key = label.toLowerCase()
 
       if (!groups[key]) {
-        groups[key] = { key, label, products: [] }
+        groups[key] = {
+          key,
+          label,
+          products: [],
+        }
       }
 
       groups[key].products.push(product)
+
       return groups
     }, {})
   ).sort((a, b) => a.label.localeCompare(b.label, "es"))
@@ -707,13 +753,17 @@ export default function ProductsAdmin() {
   )
 
   const categoryCount = (categoryId) =>
-    products.filter((product) => product.category === categoryId).length
+    products.filter(
+      (product) => product.category === categoryId
+    ).length
 
   const ProductCard = ({ product }) => {
     const image = getProductImage(product)
 
     return (
-      <article className="w-full min-w-0 overflow-hidden rounded-xl border border-[#303030] bg-[#141414]">
+      <article
+        className={`${cardClass} w-full min-w-0 overflow-hidden`}
+      >
         <button
           type="button"
           onClick={() => startEditing(product)}
@@ -728,21 +778,23 @@ export default function ProductsAdmin() {
               className="h-full w-full object-contain transition duration-300 hover:scale-105"
             />
           ) : (
-            <div className="flex h-full items-center justify-center px-2 text-center text-xs text-gray-500">
+            <div className="flex h-full items-center justify-center px-3 text-center text-xs text-gray-500">
               Sin fotografía
             </div>
           )}
         </button>
 
-        <div className="flex flex-col gap-1 p-2 text-center">
-          <h2 className="line-clamp-2 min-h-8 break-words text-xs font-semibold">
+        <div className="flex flex-col gap-3 p-4 text-center">
+          <h2 className="line-clamp-2 min-h-9 break-words text-xs font-semibold">
             {product.name}
           </h2>
 
           <button
             type="button"
-            onClick={() => toggleProductVisibility(product)}
-            className="w-full rounded-lg border border-[#76509a] px-2 py-2 text-xs font-semibold text-purple-200 transition hover:bg-[#261535]"
+            onClick={() =>
+              toggleProductVisibility(product)
+            }
+            className="w-full rounded-lg border border-[#76509a] px-3 py-2.5 text-xs font-semibold text-purple-200 transition hover:bg-[#261535]"
           >
             {product.is_active ? "Ocultar" : "Mostrar"}
           </button>
@@ -750,7 +802,7 @@ export default function ProductsAdmin() {
           <button
             type="button"
             onClick={() => deleteProduct(product)}
-            className="w-full rounded-lg border border-red-900 px-2 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-950"
+            className="w-full rounded-lg border border-red-900 px-3 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-950"
           >
             Eliminar
           </button>
@@ -761,28 +813,33 @@ export default function ProductsAdmin() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-[#0b0b0b] text-gray-400">
+      <div className="flex min-h-[65vh] w-full items-center justify-center bg-[#0b0b0b] px-6 text-gray-400">
         Cargando productos...
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0b0b] px-4 py-8 text-gray-100 sm:px-7">
-      <div className="mx-auto flex w-full max-w-[1500px] flex-col items-center gap-8">
+    <div className="min-h-screen w-full bg-[#0b0b0b] px-4 py-10 text-gray-100 sm:px-8 sm:py-14">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-12">
         {view === "list" && (
           <>
-            <header className="w-full text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">
+            <header className="mx-auto w-full max-w-3xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-purple-300">
                 GMISH COLLECTION
               </p>
-              <h1 className="mt-3 text-3xl font-bold">Productos</h1>
-              <p className="mt-2 text-sm text-gray-400">
-                Selecciona una categoría para administrar tus prendas.
+
+              <h1 className="mt-4 text-3xl font-bold sm:text-4xl">
+                Productos
+              </h1>
+
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-gray-400">
+                Selecciona una categoría para administrar tus
+                prendas.
               </p>
             </header>
 
-            <div className="grid w-full max-w-2xl grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-8 sm:grid-cols-2">
               {[
                 { id: "hombre", label: "HOMBRE" },
                 { id: "mujer", label: "MUJER" },
@@ -790,15 +847,24 @@ export default function ProductsAdmin() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => navigate("category", null, false, item.id)}
-                  className="flex min-h-44 flex-col items-center justify-center gap-4 rounded-2xl border border-[#303030] bg-[#141414] p-6 text-center transition hover:border-purple-500 hover:bg-[#19131f]"
+                  onClick={() =>
+                    navigate(
+                      "category",
+                      null,
+                      false,
+                      item.id
+                    )
+                  }
+                  className={`${cardClass} flex min-h-52 w-full flex-col items-center justify-center gap-6 p-8 text-center transition hover:border-purple-500 hover:bg-[#19131f]`}
                 >
-                  <span className="text-lg font-bold tracking-widest">
+                  <span className="text-lg font-bold tracking-[0.2em]">
                     {item.label}
                   </span>
-                  <span className="rounded-full bg-[#261535] px-4 py-2 text-sm text-purple-200">
+
+                  <span className="rounded-full border border-[#76509a] bg-[#261535] px-5 py-2.5 text-sm text-purple-200">
                     {categoryCount(item.id)} productos
                   </span>
+
                   <span className="text-xs text-gray-400">
                     Administrar prendas →
                   </span>
@@ -809,40 +875,55 @@ export default function ProductsAdmin() {
         )}
 
         {view === "category" && (
-          <div className="flex w-full flex-col items-center gap-7">
-            <header className="w-full text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">
+          <div className="flex w-full flex-col items-center gap-12">
+            <header className="mx-auto w-full max-w-3xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-purple-300">
                 GMISH COLLECTION
               </p>
-              <h1 className="mt-3 text-2xl font-bold">
-                {filterCategory === "hombre" ? "HOMBRE" : "MUJER"}
+
+              <h1 className="mt-4 text-3xl font-bold sm:text-4xl">
+                {filterCategory === "hombre"
+                  ? "HOMBRE"
+                  : "MUJER"}
               </h1>
-              <p className="mt-2 text-sm text-gray-400">
+
+              <p className="mt-4 text-sm text-gray-400">
                 {visibleProducts.length} productos registrados
               </p>
             </header>
 
-            <ProductButton onClick={startNewProduct}>
-              + Agregar producto
-            </ProductButton>
+            <div className="flex w-full justify-center">
+              <ProductButton onClick={startNewProduct}>
+                + Agregar producto
+              </ProductButton>
+            </div>
 
             {!visibleProducts.length ? (
-              <div className="flex w-full max-w-xl flex-col items-center gap-4 rounded-2xl border border-dashed border-[#454545] px-5 py-12 text-center">
+              <div
+                className={`${cardClass} mx-auto flex w-full max-w-2xl flex-col items-center gap-6 border-dashed px-8 py-16 text-center`}
+              >
                 <p className="text-gray-400">
                   Todavía no hay productos en esta categoría.
                 </p>
+
                 <ProductButton onClick={startNewProduct}>
                   + Registrar primera prenda
                 </ProductButton>
               </div>
             ) : (
-              <div className="w-full space-y-10">
+              <div className="mx-auto flex w-full max-w-6xl flex-col gap-14">
                 {groupedSubcategories.map((group) => (
-                  <section key={group.key} className="w-full min-w-0">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                  <section
+                    key={group.key}
+                    className="mx-auto w-full"
+                  >
+                    <div className="mb-7 flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:text-left">
                       <div>
-                        <h2 className="text-lg font-bold">{group.label}</h2>
-                        <p className="mt-1 text-xs text-gray-400">
+                        <h2 className="text-xl font-bold">
+                          {group.label}
+                        </h2>
+
+                        <p className="mt-2 text-xs text-gray-400">
                           {group.products.length}{" "}
                           {group.products.length === 1
                             ? "producto"
@@ -852,18 +933,23 @@ export default function ProductsAdmin() {
 
                       <button
                         type="button"
-                        onClick={() => navigate("subcategory", group.key)}
-                        className="shrink-0 rounded-lg border border-[#76509a] px-4 py-2 text-xs font-semibold text-purple-200 transition hover:bg-[#261535]"
+                        onClick={() =>
+                          navigate(
+                            "subcategory",
+                            group.key
+                          )
+                        }
+                        className="shrink-0 rounded-lg border border-[#76509a] px-5 py-2.5 text-xs font-semibold text-purple-200 transition hover:bg-[#261535]"
                       >
                         Ver más →
                       </button>
                     </div>
 
-                    <div className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-4">
+                    <div className="flex w-full snap-x snap-mandatory gap-6 overflow-x-auto px-1 pb-6">
                       {group.products.map((product) => (
                         <div
                           key={product.id}
-                          className="w-[155px] min-w-[155px] snap-start sm:w-[175px] sm:min-w-[175px]"
+                          className="w-[170px] min-w-[170px] snap-start sm:w-[190px] sm:min-w-[190px]"
                         >
                           <ProductCard product={product} />
                         </div>
@@ -877,31 +963,45 @@ export default function ProductsAdmin() {
         )}
 
         {view === "subcategory" && (
-          <div className="flex w-full flex-col items-center gap-7">
-            <header className="w-full text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">
-                {filterCategory === "hombre" ? "HOMBRE" : "MUJER"}
+          <div className="flex w-full flex-col items-center gap-12">
+            <header className="mx-auto w-full max-w-3xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-purple-300">
+                {filterCategory === "hombre"
+                  ? "HOMBRE"
+                  : "MUJER"}
               </p>
-              <h1 className="mt-3 text-2xl font-bold">
-                {selectedGroup?.label || selectedSubcategory}
+
+              <h1 className="mt-4 text-3xl font-bold sm:text-4xl">
+                {selectedGroup?.label ||
+                  selectedSubcategory}
               </h1>
-              <p className="mt-2 text-sm text-gray-400">
-                {selectedGroup?.products.length || 0} productos registrados
+
+              <p className="mt-4 text-sm text-gray-400">
+                {selectedGroup?.products.length || 0}{" "}
+                productos registrados
               </p>
             </header>
 
-            <ProductButton onClick={startNewProduct}>
-              + Agregar producto
-            </ProductButton>
+            <div className="flex w-full justify-center">
+              <ProductButton onClick={startNewProduct}>
+                + Agregar producto
+              </ProductButton>
+            </div>
 
-            {!selectedGroup || !selectedGroup.products.length ? (
-              <p className="py-12 text-center text-gray-400">
+            {!selectedGroup ||
+            !selectedGroup.products.length ? (
+              <div className="mx-auto py-16 text-center text-gray-400">
                 No hay productos en esta subcategoría.
-              </p>
+              </div>
             ) : (
-              <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              <div className="mx-auto grid w-full max-w-6xl grid-cols-2 justify-items-center gap-x-6 gap-y-10 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {selectedGroup.products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <div
+                    key={product.id}
+                    className="w-full max-w-[190px]"
+                  >
+                    <ProductCard product={product} />
+                  </div>
                 ))}
               </div>
             )}
@@ -909,181 +1009,244 @@ export default function ProductsAdmin() {
         )}
 
         {view === "editor" && (
-          <div className="flex w-full flex-col items-center gap-6">
-            <header className="w-full text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">
+          <div className="flex w-full flex-col items-center gap-12">
+            <header className="mx-auto w-full max-w-3xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-purple-300">
                 GMISH COLLECTION
               </p>
-              <h1 className="mt-3 text-2xl font-bold">
-                {editingId ? "Editar producto" : "Agregar producto"}
+
+              <h1 className="mt-4 text-3xl font-bold sm:text-4xl">
+                {editingId
+                  ? "Editar producto"
+                  : "Agregar producto"}
               </h1>
             </header>
 
             <form
               onSubmit={handleSubmit}
-              className="mx-auto flex w-full max-w-4xl flex-col gap-6"
+              className="mx-auto flex w-full max-w-5xl flex-col gap-10"
             >
-              <section className="rounded-2xl border border-[#303030] bg-[#141414] p-5 sm:p-7">
-                <h2 className="mb-6 text-center text-lg font-bold">
-                  Información general
-                </h2>
+              <section
+                className={`${cardClass} w-full p-7 sm:p-10`}
+              >
+                <div className="mx-auto w-full max-w-4xl">
+                  <h2 className="mb-8 text-center text-xl font-bold">
+                    Información general
+                  </h2>
 
-                <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Nombre del producto *
-                    </label>
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Ej. Polo Oversize"
-                      className={inputClass}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Categoría *
-                    </label>
-                    <select
-                      value={category}
-                      onChange={(e) => {
-                        setCategory(e.target.value)
-                        setFilterCategory(e.target.value)
-                      }}
-                      className={inputClass}
-                    >
-                      <option value="hombre">Hombre</option>
-                      <option value="mujer">Mujer</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Subcategoría *
-                    </label>
-                    <input
-                      value={subcategory}
-                      onChange={(e) => setSubcategory(e.target.value)}
-                      placeholder="Ej. Polos, pantalones, tops"
-                      className={inputClass}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-x-8 gap-y-8 sm:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Precio (S/) *
+                      <label className="mb-3 block text-sm font-medium">
+                        Nombre del producto *
                       </label>
+
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
+                        value={name}
+                        onChange={(e) =>
+                          setName(e.target.value)
+                        }
+                        placeholder="Ej. Polo Oversize"
                         className={inputClass}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Precio anterior
+                      <label className="mb-3 block text-sm font-medium">
+                        Categoría *
                       </label>
+
+                      <select
+                        value={category}
+                        onChange={(e) => {
+                          setCategory(e.target.value)
+                          setFilterCategory(e.target.value)
+                        }}
+                        className={inputClass}
+                      >
+                        <option value="hombre">
+                          Hombre
+                        </option>
+
+                        <option value="mujer">
+                          Mujer
+                        </option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-sm font-medium">
+                        Subcategoría *
+                      </label>
+
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={oldPrice}
-                        onChange={(e) => setOldPrice(e.target.value)}
+                        value={subcategory}
+                        onChange={(e) =>
+                          setSubcategory(e.target.value)
+                        }
+                        placeholder="Ej. Polos, pantalones, tops"
+                        className={inputClass}
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-3 block text-sm font-medium">
+                          Precio (S/) *
+                        </label>
+
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={price}
+                          onChange={(e) =>
+                            setPrice(e.target.value)
+                          }
+                          className={inputClass}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-3 block text-sm font-medium">
+                          Precio anterior
+                        </label>
+
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={oldPrice}
+                          onChange={(e) =>
+                            setOldPrice(e.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-5 rounded-2xl border border-[#303030] bg-[#0d0d0d] px-6 py-6 sm:col-span-2">
+                      <label className="flex cursor-pointer items-center gap-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={isNew}
+                          onChange={(e) =>
+                            setIsNew(e.target.checked)
+                          }
+                          className="h-4 w-4 accent-purple-700"
+                        />
+
+                        Mostrar como nuevo
+                      </label>
+
+                      <label className="flex cursor-pointer items-center gap-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={isBestSeller}
+                          onChange={(e) =>
+                            setIsBestSeller(
+                              e.target.checked
+                            )
+                          }
+                          className="h-4 w-4 accent-purple-700"
+                        />
+
+                        Mostrar como más vendido
+                      </label>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="mb-3 block text-sm font-medium">
+                        Descripción
+                      </label>
+
+                      <textarea
+                        rows={5}
+                        value={description}
+                        onChange={(e) =>
+                          setDescription(e.target.value)
+                        }
+                        placeholder="Detalles de la prenda..."
                         className={inputClass}
                       />
                     </div>
                   </div>
-
-                  {/* OPCIONES DE DESTACADO, ENCIMA DE LA DESCRIPCIÓN */}
-                  <div className="sm:col-span-2 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 rounded-xl border border-[#303030] bg-[#0d0d0d] px-4 py-4">
-                    <label className="flex cursor-pointer items-center gap-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={isNew}
-                        onChange={(e) => setIsNew(e.target.checked)}
-                        className="h-4 w-4 accent-purple-700"
-                      />
-                      Mostrar como nuevo
-                    </label>
-
-                    <label className="flex cursor-pointer items-center gap-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={isBestSeller}
-                        onChange={(e) => setIsBestSeller(e.target.checked)}
-                        className="h-4 w-4 accent-purple-700"
-                      />
-                      Mostrar como más vendido
-                    </label>
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="mb-2 block text-sm font-medium">
-                      Descripción
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Detalles de la prenda..."
-                      className={inputClass}
-                    />
-                  </div>
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-[#303030] bg-[#141414] p-5 sm:p-7">
-                <div className="mb-6 flex flex-col items-center gap-4 text-center">
-                  <h2 className="text-lg font-bold">Colores, fotos y stock</h2>
+              <section
+                className={`${cardClass} w-full p-7 sm:p-10`}
+              >
+                <div className="mb-10 flex flex-col items-center gap-6 text-center">
+                  <div>
+                    <h2 className="text-xl font-bold">
+                      Colores, fotos y stock
+                    </h2>
+
+                    <p className="mt-2 text-sm text-gray-400">
+                      Configura cada color, sus fotografías y
+                      las tallas disponibles.
+                    </p>
+                  </div>
+
                   <ProductButton onClick={addColor}>
                     + Agregar color
                   </ProductButton>
                 </div>
 
                 {!colors.length && (
-                  <div className="rounded-xl border border-dashed border-[#454545] p-8 text-center text-sm text-gray-400">
+                  <div className="rounded-xl border border-dashed border-[#454545] p-10 text-center text-sm text-gray-400">
                     Sin colores.
                   </div>
                 )}
 
-                <div className="flex flex-col gap-6">
+                <div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
                   {colors.map((color, colorIndex) => (
                     <div
                       key={colorIndex}
-                      className="rounded-2xl border border-[#303030] bg-[#0d0d0d] p-4 sm:p-6"
+                      className="rounded-2xl border border-[#303030] bg-[#0d0d0d] p-6 sm:p-8"
                     >
-                      <div className="mb-6 flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between">
-                        <h3 className="font-bold">
-                          Color {colorIndex + 1}
-                          {color.name ? ` · ${color.name}` : ""}
-                        </h3>
+                      <div className="mb-8 flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:text-left">
+                        <div>
+                          <p className="text-xs uppercase tracking-widest text-purple-300">
+                            Variante
+                          </p>
+
+                          <h3 className="mt-2 font-bold">
+                            Color {colorIndex + 1}
+                            {color.name
+                              ? ` · ${color.name}`
+                              : ""}
+                          </h3>
+                        </div>
+
                         <button
                           type="button"
-                          onClick={() => removeColor(colorIndex)}
-                          className="rounded-lg border border-red-900 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-950"
+                          onClick={() =>
+                            removeColor(colorIndex)
+                          }
+                          className="rounded-lg border border-red-900 px-5 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-950"
                         >
                           Eliminar color
                         </button>
                       </div>
 
-                      <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-2">
+                      <div className="grid gap-x-8 gap-y-8 sm:grid-cols-2">
                         <div>
-                          <label className="mb-2 block text-sm font-medium">
+                          <label className="mb-3 block text-sm font-medium">
                             Nombre del color *
                           </label>
+
                           <input
                             value={color.name}
                             onChange={(e) =>
-                              updateColor(colorIndex, "name", e.target.value)
+                              updateColor(
+                                colorIndex,
+                                "name",
+                                e.target.value
+                              )
                             }
                             placeholder="Ej. Negro"
                             className={inputClass}
@@ -1092,18 +1255,24 @@ export default function ProductsAdmin() {
                         </div>
 
                         <div>
-                          <label className="mb-2 block text-sm font-medium">
+                          <label className="mb-3 block text-sm font-medium">
                             Color de referencia
                           </label>
-                          <div className="flex items-center gap-3 rounded-xl border border-[#303030] bg-[#141414] p-2">
+
+                          <div className="flex min-h-12 items-center gap-4 rounded-xl border border-[#303030] bg-[#141414] p-2">
                             <input
                               type="color"
                               value={color.hex}
                               onChange={(e) =>
-                                updateColor(colorIndex, "hex", e.target.value)
+                                updateColor(
+                                  colorIndex,
+                                  "hex",
+                                  e.target.value
+                                )
                               }
                               className="h-10 w-12 cursor-pointer border-0 bg-transparent"
                             />
+
                             <span className="text-sm text-gray-400">
                               {color.hex}
                             </span>
@@ -1113,23 +1282,43 @@ export default function ProductsAdmin() {
 
                       <input
                         ref={(element) => {
-                          fileInputRefs.current[colorIndex] = element
+                          fileInputRefs.current[colorIndex] =
+                            element
                         }}
                         type="file"
                         accept="image/*"
                         multiple
                         className="hidden"
-                        onChange={(e) => uploadColorImages(colorIndex, e)}
+                        onChange={(e) =>
+                          uploadColorImages(
+                            colorIndex,
+                            e
+                          )
+                        }
                       />
 
-                      <div className="mt-7 border-t border-[#303030] pt-6">
-                        <div className="mb-5 flex flex-col items-center gap-4 text-center">
-                          <h4 className="font-semibold">Fotografías</h4>
+                      <div className="mt-10 border-t border-[#303030] pt-8">
+                        <div className="mb-7 flex flex-col items-center gap-5 text-center">
+                          <div>
+                            <h4 className="font-semibold">
+                              Fotografías
+                            </h4>
+
+                            <p className="mt-2 text-xs text-gray-500">
+                              La primera fotografía será la
+                              principal.
+                            </p>
+                          </div>
+
                           <ProductButton
                             onClick={() =>
-                              fileInputRefs.current[colorIndex]?.click()
+                              fileInputRefs.current[
+                                colorIndex
+                              ]?.click()
                             }
-                            disabled={uploadingImage === colorIndex}
+                            disabled={
+                              uploadingImage === colorIndex
+                            }
                           >
                             {uploadingImage === colorIndex
                               ? "Subiendo..."
@@ -1138,127 +1327,174 @@ export default function ProductsAdmin() {
                         </div>
 
                         {!color.images?.length ? (
-                          <div className="rounded-xl border border-dashed border-[#454545] bg-[#141414] p-6 text-center text-sm text-gray-400">
+                          <div className="rounded-xl border border-dashed border-[#454545] bg-[#141414] p-10 text-center text-sm text-gray-400">
                             Sin fotografías.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                            {color.images.map((imageUrl, imageIndex) => (
-                              <div
-                                key={`${imageUrl}-${imageIndex}`}
-                                className="w-full max-w-[220px] overflow-hidden rounded-xl border border-[#303030] bg-[#141414]"
-                              >
-                                <div className="relative aspect-[3/4] bg-[#0d0d0d]">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`${color.name || "Prenda"} foto ${imageIndex + 1}`}
-                                    className="h-full w-full object-contain"
-                                  />
-                                  <span className="absolute left-2 top-2 rounded-full bg-[#0b0b0b]/95 px-2 py-1 text-xs font-semibold">
-                                    {imageIndex === 0
-                                      ? "Principal"
-                                      : `Foto ${imageIndex + 1}`}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      removeColorImage(colorIndex, imageIndex)
-                                    }
-                                    aria-label="Quitar foto"
-                                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white hover:bg-red-700"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
+                          <div className="grid grid-cols-1 justify-items-center gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+                            {color.images.map(
+                              (
+                                imageUrl,
+                                imageIndex
+                              ) => (
+                                <div
+                                  key={`${imageUrl}-${imageIndex}`}
+                                  className="w-full max-w-[220px] overflow-hidden rounded-xl border border-[#303030] bg-[#141414]"
+                                >
+                                  <div className="relative aspect-[3/4] bg-[#0d0d0d]">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`${
+                                        color.name ||
+                                        "Prenda"
+                                      } foto ${
+                                        imageIndex + 1
+                                      }`}
+                                      className="h-full w-full object-contain"
+                                    />
 
-                                {imageIndex > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const images = [...color.images]
-                                      const [selected] = images.splice(
-                                        imageIndex,
-                                        1
-                                      )
-                                      images.unshift(selected)
+                                    <span className="absolute left-2 top-2 rounded-full bg-[#0b0b0b]/95 px-2 py-1 text-xs font-semibold">
+                                      {imageIndex === 0
+                                        ? "Principal"
+                                        : `Foto ${
+                                            imageIndex + 1
+                                          }`}
+                                    </span>
 
-                                      setColors((current) =>
-                                        current.map((item, index) =>
-                                          index === colorIndex
-                                            ? {
-                                                ...item,
-                                                images,
-                                                imageUrl: images[0] || "",
-                                              }
-                                            : item
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeColorImage(
+                                          colorIndex,
+                                          imageIndex
                                         )
-                                      )
-                                    }}
-                                    className="w-full border-t border-[#303030] px-2 py-3 text-xs font-semibold text-purple-300 hover:bg-[#261535]"
-                                  >
-                                    Usar como principal
-                                  </button>
-                                )}
-                              </div>
-                            ))}
+                                      }
+                                      aria-label="Quitar foto"
+                                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white transition hover:bg-red-700"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+
+                                  {imageIndex > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const images = [
+                                          ...color.images,
+                                        ]
+
+                                        const [selected] =
+                                          images.splice(
+                                            imageIndex,
+                                            1
+                                          )
+
+                                        images.unshift(
+                                          selected
+                                        )
+
+                                        setColors(
+                                          (current) =>
+                                            current.map(
+                                              (
+                                                item,
+                                                index
+                                              ) =>
+                                                index ===
+                                                colorIndex
+                                                  ? {
+                                                      ...item,
+                                                      images,
+                                                      imageUrl:
+                                                        images[0] ||
+                                                        "",
+                                                    }
+                                                  : item
+                                            )
+                                        )
+                                      }}
+                                      className="w-full border-t border-[#303030] px-3 py-3 text-xs font-semibold text-purple-300 transition hover:bg-[#261535]"
+                                    >
+                                      Usar como principal
+                                    </button>
+                                  )}
+                                </div>
+                              )
+                            )}
                           </div>
                         )}
                       </div>
 
-                      <div className="mt-7 border-t border-[#303030] pt-6">
-                        <h4 className="mb-5 text-center font-semibold">
-                          Tallas y stock
-                        </h4>
+                      <div className="mt-10 border-t border-[#303030] pt-8">
+                        <div className="mb-7 text-center">
+                          <h4 className="font-semibold">
+                            Tallas y stock
+                          </h4>
 
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                          {color.sizes.map((sizeItem, sizeIndex) => (
-                            <div
-                              key={sizeItem.size}
-                              className={`rounded-xl border p-4 ${
-                                sizeItem.enabled
-                                  ? "border-[#76509a] bg-[#141414]"
-                                  : "border-[#303030] bg-[#1b1b1b]"
-                              }`}
-                            >
-                              <label className="flex cursor-pointer items-center justify-center gap-2 font-semibold">
+                          <p className="mt-2 text-xs text-gray-500">
+                            Activa solamente las tallas que
+                            tengas disponibles.
+                          </p>
+                        </div>
+
+                        <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+                          {color.sizes.map(
+                            (sizeItem, sizeIndex) => (
+                              <div
+                                key={sizeItem.size}
+                                className={`rounded-xl border p-5 ${
+                                  sizeItem.enabled
+                                    ? "border-[#76509a] bg-[#17121f]"
+                                    : "border-[#303030] bg-[#141414]"
+                                }`}
+                              >
+                                <label className="flex cursor-pointer items-center justify-center gap-3 font-semibold">
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      sizeItem.enabled
+                                    }
+                                    onChange={(e) =>
+                                      updateColorSize(
+                                        colorIndex,
+                                        sizeIndex,
+                                        "enabled",
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="h-4 w-4 accent-purple-700"
+                                  />
+
+                                  Talla {sizeItem.size}
+                                </label>
+
+                                <label className="mb-3 mt-5 block text-center text-xs text-gray-400">
+                                  Unidades disponibles
+                                </label>
+
                                 <input
-                                  type="checkbox"
-                                  checked={sizeItem.enabled}
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={sizeItem.stock}
                                   onChange={(e) =>
                                     updateColorSize(
                                       colorIndex,
                                       sizeIndex,
-                                      "enabled",
-                                      e.target.checked
+                                      "stock",
+                                      e.target.value
                                     )
                                   }
-                                  className="h-4 w-4 accent-purple-700"
+                                  disabled={
+                                    !sizeItem.enabled
+                                  }
+                                  placeholder="Cantidad"
+                                  className={`${inputClass} text-center disabled:opacity-40`}
                                 />
-                                Talla {sizeItem.size}
-                              </label>
-
-                              <label className="mb-2 mt-4 block text-center text-xs text-gray-400">
-                                Unidades disponibles
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={sizeItem.stock}
-                                onChange={(e) =>
-                                  updateColorSize(
-                                    colorIndex,
-                                    sizeIndex,
-                                    "stock",
-                                    e.target.value
-                                  )
-                                }
-                                disabled={!sizeItem.enabled}
-                                placeholder="Cantidad"
-                                className={`${inputClass} text-center disabled:opacity-40`}
-                              />
-                            </div>
-                          ))}
+                              </div>
+                            )
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1266,11 +1502,13 @@ export default function ProductsAdmin() {
                 </div>
               </section>
 
-              <div className="sticky bottom-0 z-10 flex w-full items-center justify-center border-t border-[#303030] bg-[#0b0b0b] py-5">
+              <div className="flex w-full justify-center border-t border-[#303030] pt-8">
                 <button
                   type="submit"
-                  disabled={saving || uploadingImage !== null}
-                  className="inline-flex w-full max-w-sm items-center justify-center rounded-xl bg-purple-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-purple-800 disabled:opacity-50"
+                  disabled={
+                    saving || uploadingImage !== null
+                  }
+                  className="inline-flex min-h-12 w-full max-w-md items-center justify-center rounded-xl bg-[#7c3aed] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8b5cf6] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving
                     ? "Guardando..."

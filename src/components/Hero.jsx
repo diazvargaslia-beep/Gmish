@@ -4,19 +4,31 @@ import { supabase } from "../lib/supabase";
 function Hero() {
   const [imagen, setImagen] = useState("");
   const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     cargarPortada();
   }, []);
 
   async function cargarPortada() {
+    console.log("Buscando portada_principal...");
+
     const { data, error } = await supabase
       .from("store_settings")
       .select("setting_value")
       .eq("setting_key", "portada_principal")
       .maybeSingle();
 
-    if (!error && data?.setting_value) {
+    console.log("Datos recibidos:", data);
+    console.log("Error:", error);
+
+    if (error) {
+      setError(error.message);
+      setCargando(false);
+      return;
+    }
+
+    if (data?.setting_value) {
       setImagen(data.setting_value);
     }
 
@@ -58,9 +70,15 @@ function Hero() {
             <span className="text-sm font-medium text-[#E7E1D2]">
               Cargando imagen...
             </span>
+          ) : error ? (
+            <div className="p-6 text-center text-sm text-red-400">
+              Error al cargar la portada:
+              <br />
+              {error}
+            </div>
           ) : (
             <span className="text-sm font-medium text-[#E7E1D2]">
-              Imagen principal
+              No hay portada configurada
             </span>
           )}
         </div>
