@@ -496,11 +496,11 @@ function Admin() {
   ===================================================== */
 
   return (
-    <div className="min-h-screen bg-[#0f0d15] text-[#eee9f5]">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#0f0d15] text-[#eee9f5]">
       {/* HEADER */}
 
-      <header className="sticky top-0 z-50 border-b border-[#29233a] bg-[#121019]/95 shadow-[0_8px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-        <div className="mx-auto flex h-20 w-full max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
+      <header className="sticky top-0 z-50 w-full border-b border-[#29233a] bg-[#121019]/95 shadow-[0_8px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+        <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-6 px-5 sm:px-8 lg:px-10">
           {/* IZQUIERDA */}
 
           <div className="flex min-w-0 items-center gap-4">
@@ -614,45 +614,63 @@ function Admin() {
         </>
       )}
 
-      {/* CONTENIDO */}
+      {/* CONTENIDO PRINCIPAL */}
 
-      <main className="mx-auto w-full max-w-5xl px-5 py-12 sm:px-8 sm:py-14">
-        {seccion === "inicio" && (
-          <InicioAdmin
-            rol={rol}
-            conectado={conectado}
-            cambiarSeccion={cambiarSeccion}
-            seccionesVisibles={seccionesVisibles}
-          />
-        )}
-
-        {seccion === "productos" && (
-          <div className="mx-auto w-full max-w-5xl">
-            <ProductsAdmin rol={rol} />
-          </div>
-        )}
-
-        {seccion === "pedidos" &&
-          rol === "principal" && <PedidosAdmin />}
-
-        {seccion === "portadas" &&
-          rol === "principal" && <PortadasAdmin />}
-
-        {seccion === "estadisticas" &&
-          rol === "principal" && (
-            <EstadisticasAdmin />
+      <main className="flex w-full justify-center px-5 py-14 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
+        <div className="flex w-full max-w-7xl flex-col items-center gap-16">
+          {seccion === "inicio" && (
+            <div className="flex w-full justify-center">
+              <InicioAdmin
+                rol={rol}
+                conectado={conectado}
+                cambiarSeccion={cambiarSeccion}
+                seccionesVisibles={seccionesVisibles}
+              />
+            </div>
           )}
 
-        {seccion === "configuracion" &&
-          rol === "principal" && (
-            <ConfiguracionAdmin />
+          {seccion === "productos" && (
+            <div className="flex w-full justify-center">
+              <div className="w-full max-w-6xl">
+                <ProductsAdmin rol={rol} />
+              </div>
+            </div>
           )}
+
+          {seccion === "pedidos" &&
+            rol === "principal" && (
+              <div className="flex w-full justify-center">
+                <PedidosAdmin />
+              </div>
+            )}
+
+          {seccion === "portadas" &&
+            rol === "principal" && (
+              <div className="flex w-full justify-center">
+                <PortadasAdmin />
+              </div>
+            )}
+
+          {seccion === "estadisticas" &&
+            rol === "principal" && (
+              <div className="flex w-full justify-center">
+                <EstadisticasAdmin />
+              </div>
+            )}
+
+          {seccion === "configuracion" &&
+            rol === "principal" && (
+              <div className="flex w-full justify-center">
+                <ConfiguracionAdmin />
+              </div>
+            )}
+        </div>
       </main>
 
       {/* FOOTER */}
 
-      <footer className="mx-auto mt-6 w-full max-w-5xl border-t border-[#29233a] px-5 py-10 sm:px-8">
-        <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row">
+      <footer className="w-full border-t border-[#29233a]">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-5 px-5 py-10 text-center sm:px-8 md:flex-row md:text-left lg:px-10">
           <p className="text-xs font-semibold text-[#696170]">
             © {new Date().getFullYear()} GMISH
           </p>
@@ -681,38 +699,40 @@ function InicioAdmin({
   );
 
   return (
-    <section className="w-full">
-      <div className="mx-auto w-full max-w-4xl text-center">
-        <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
-          Panel GMISH
-        </span>
-
-        <h1 className="mt-6 text-3xl font-black tracking-tight text-white sm:text-4xl">
-          Bienvenida al administrador
-        </h1>
-
-        <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-[#91889d]">
-          Gestiona productos, pedidos, portadas,
-          estadísticas y configuración desde un solo lugar.
-        </p>
-
-        <div className="mt-6 flex justify-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#342c45] bg-[#17151f] px-4 py-2.5 text-xs font-semibold text-[#91889d]">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                conectado
-                  ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                  : "bg-red-500"
-              }`}
-            />
-
-            {conectado
-              ? "Supabase conectado"
-              : "Revisar conexión"}
+    <section className="flex w-full justify-center">
+      <div className="flex w-full max-w-6xl flex-col items-center">
+        <div className="w-full max-w-4xl text-center">
+          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
+            Panel GMISH
           </span>
+
+          <h1 className="mt-7 text-3xl font-black tracking-tight text-white sm:text-4xl">
+            Bienvenida al administrador
+          </h1>
+
+          <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#91889d]">
+            Gestiona productos, pedidos, portadas,
+            estadísticas y configuración desde un solo lugar.
+          </p>
+
+          <div className="mt-7 flex justify-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#342c45] bg-[#17151f] px-4 py-2.5 text-xs font-semibold text-[#91889d]">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  conectado
+                    ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                    : "bg-red-500"
+                }`}
+              />
+
+              {conectado
+                ? "Supabase conectado"
+                : "Revisar conexión"}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid w-full grid-cols-1 justify-items-center gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
           {tarjetas.map((item) => (
             <button
               key={item.id}
@@ -720,24 +740,24 @@ function InicioAdmin({
               onClick={() =>
                 cambiarSeccion(item.id)
               }
-              className={`${tarjeta} group flex min-h-[190px] flex-col items-center justify-center p-7 text-center transition duration-200 hover:-translate-y-1 hover:border-[#6d4ca0] hover:shadow-[0_18px_50px_rgba(124,58,237,0.14)]`}
+              className={`${tarjeta} group flex min-h-[210px] w-full max-w-[360px] flex-col items-center justify-center p-8 text-center transition duration-200 hover:-translate-y-1 hover:border-[#6d4ca0] hover:shadow-[0_18px_50px_rgba(124,58,237,0.14)]`}
             >
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#241b32] text-xl text-[#a978ff] transition group-hover:bg-[#7c3aed] group-hover:text-white">
                 {item.icono}
               </div>
 
-              <h2 className="mt-5 text-base font-bold text-white">
+              <h2 className="mt-6 text-base font-bold text-white">
                 {item.nombre}
               </h2>
 
-              <p className="mt-2 text-xs leading-5 text-[#81798e]">
+              <p className="mt-3 text-xs leading-5 text-[#81798e]">
                 Administrar esta sección.
               </p>
             </button>
           ))}
         </div>
 
-        <div className="mx-auto mt-10 max-w-md rounded-2xl border border-[#342c45] bg-[#17151f] p-6 text-center">
+        <div className="mx-auto mt-14 w-full max-w-md rounded-2xl border border-[#342c45] bg-[#17151f] p-7 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-[#766d80]">
             Cuenta actual
           </p>
@@ -859,7 +879,7 @@ function PedidosAdmin() {
 
   if (cargando) {
     return (
-      <div className="py-24 text-center">
+      <div className="flex w-full justify-center py-24 text-center">
         <p className="text-sm text-[#81798e]">
           Cargando pedidos...
         </p>
@@ -868,23 +888,23 @@ function PedidosAdmin() {
   }
 
   return (
-    <section className="w-full">
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="text-center">
+    <section className="flex w-full justify-center">
+      <div className="flex w-full max-w-5xl flex-col items-center">
+        <div className="w-full text-center">
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
             Ventas
           </span>
 
-          <h1 className="mt-6 text-3xl font-black text-white">
+          <h1 className="mt-7 text-3xl font-black text-white">
             Pedidos y ventas
           </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
             Consulta pedidos y actualiza su estado.
           </p>
         </div>
 
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
+        <div className="mt-12 flex w-full flex-wrap justify-center gap-4">
           {[
             ["todos", "Todos"],
             ["pendiente", "Pendientes"],
@@ -908,14 +928,14 @@ function PedidosAdmin() {
         </div>
 
         {error && (
-          <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+          <div className="mx-auto mt-10 w-full max-w-2xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
             {error}
           </div>
         )}
 
-        <div className="mt-10 space-y-6">
+        <div className="mt-12 w-full space-y-8">
           {pedidosFiltrados.length === 0 ? (
-            <div className={`${tarjeta} p-12 text-center`}>
+            <div className={`${tarjeta} p-14 text-center`}>
               <p className="text-sm font-semibold text-[#aaa1b3]">
                 No hay pedidos en esta categoría.
               </p>
@@ -924,9 +944,9 @@ function PedidosAdmin() {
             pedidosFiltrados.map((pedido) => (
               <article
                 key={pedido.id}
-                className={`${tarjeta} p-6 sm:p-8`}
+                className={`${tarjeta} p-7 sm:p-9`}
               >
-                <div className="flex flex-col gap-7 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
                   <div className="text-center lg:text-left">
                     <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
                       <h2 className="text-base font-black text-white">
@@ -941,7 +961,7 @@ function PedidosAdmin() {
                       </span>
                     </div>
 
-                    <div className="mt-5 space-y-2 text-sm text-[#91889d]">
+                    <div className="mt-6 space-y-3 text-sm text-[#91889d]">
                       <p>
                         <strong className="text-[#cfc7d8]">
                           Cliente:
@@ -999,7 +1019,7 @@ function PedidosAdmin() {
                           event.target.value
                         )
                       }
-                      className="mt-5 rounded-xl border border-[#342c45] bg-[#121019] px-4 py-2.5 text-xs font-semibold text-[#ddd5e7] outline-none focus:border-[#8b5cf6]"
+                      className="mt-6 rounded-xl border border-[#342c45] bg-[#121019] px-4 py-2.5 text-xs font-semibold text-[#ddd5e7] outline-none focus:border-[#8b5cf6]"
                     >
                       <option value="pendiente">
                         Pendiente
@@ -1022,17 +1042,17 @@ function PedidosAdmin() {
 
                 {pedido.order_items?.length >
                   0 && (
-                  <div className="mt-7 border-t border-[#29233a] pt-6">
-                    <p className="mb-4 text-center text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                  <div className="mt-8 border-t border-[#29233a] pt-7">
+                    <p className="mb-5 text-center text-xs font-bold uppercase tracking-widest text-[#71687e]">
                       Productos
                     </p>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {pedido.order_items.map(
                         (item) => (
                           <div
                             key={item.id}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#121019] px-4 py-3.5 text-xs"
+                            className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[#121019] px-5 py-4 text-xs"
                           >
                             <span className="font-semibold text-[#cfc7d8]">
                               {item.size || "-"}{" "}
@@ -1262,7 +1282,7 @@ function PortadasAdmin() {
 
   if (cargando) {
     return (
-      <div className="py-24 text-center">
+      <div className="flex w-full justify-center py-24 text-center">
         <p className="text-sm text-[#81798e]">
           Cargando portadas...
         </p>
@@ -1292,39 +1312,39 @@ function PortadasAdmin() {
   ];
 
   return (
-    <section className="w-full">
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="text-center">
+    <section className="flex w-full justify-center">
+      <div className="flex w-full max-w-5xl flex-col items-center">
+        <div className="w-full text-center">
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
             Imágenes
           </span>
 
-          <h1 className="mt-6 text-3xl font-black text-white">
+          <h1 className="mt-7 text-3xl font-black text-white">
             Portadas
           </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
             Administra las imágenes principales de la tienda.
           </p>
         </div>
 
         {mensaje && (
-          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+          <div className="mx-auto mt-10 w-full max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
             {mensaje}
           </div>
         )}
 
         {error && (
-          <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+          <div className="mx-auto mt-7 w-full max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
             {error}
           </div>
         )}
 
-        <div className="mt-10 grid gap-7 md:grid-cols-2">
+        <div className="mt-12 grid w-full justify-items-center gap-x-8 gap-y-10 md:grid-cols-2">
           {opciones.map((opcion) => (
             <div
               key={opcion.id}
-              className={`${tarjeta} overflow-hidden`}
+              className={`${tarjeta} w-full max-w-[500px] overflow-hidden`}
             >
               <div className="aspect-[16/9] bg-[#121019]">
                 {portadas[opcion.id] ? (
@@ -1340,7 +1360,7 @@ function PortadasAdmin() {
                 )}
               </div>
 
-              <div className="p-7 text-center">
+              <div className="p-8 text-center">
                 <h2 className="text-base font-bold text-white">
                   {opcion.titulo}
                 </h2>
@@ -1359,7 +1379,7 @@ function PortadasAdmin() {
                         null
                     )
                   }
-                  className="mt-6 w-full text-xs text-[#91889d]"
+                  className="mt-7 w-full text-xs text-[#91889d]"
                 />
 
                 <button
@@ -1371,7 +1391,7 @@ function PortadasAdmin() {
                   onClick={() =>
                     guardarPortada(opcion.id)
                   }
-                  className={`${botonMorado} mt-5 w-full`}
+                  className={`${botonMorado} mt-6 w-full`}
                 >
                   Guardar portada
                 </button>
@@ -1477,7 +1497,7 @@ function EstadisticasAdmin() {
 
   if (cargando) {
     return (
-      <div className="py-24 text-center">
+      <div className="flex w-full justify-center py-24 text-center">
         <p className="text-sm text-[#81798e]">
           Calculando estadísticas...
         </p>
@@ -1486,23 +1506,23 @@ function EstadisticasAdmin() {
   }
 
   return (
-    <section className="w-full">
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="text-center">
+    <section className="flex w-full justify-center">
+      <div className="flex w-full max-w-5xl flex-col items-center">
+        <div className="w-full text-center">
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
             Análisis
           </span>
 
-          <h1 className="mt-6 text-3xl font-black text-white">
+          <h1 className="mt-7 text-3xl font-black text-white">
             Estadísticas
           </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
             Resumen general del rendimiento de GMISH.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid w-full justify-items-center gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             titulo="Pedidos"
             valor={pedidosValidos.length}
@@ -1528,13 +1548,13 @@ function EstadisticasAdmin() {
           />
         </div>
 
-        <div className="mt-8 grid gap-7 lg:grid-cols-2">
-          <div className={`${tarjeta} p-7`}>
+        <div className="mt-10 grid w-full justify-items-center gap-x-8 gap-y-10 lg:grid-cols-2">
+          <div className={`${tarjeta} w-full p-8`}>
             <h2 className="text-center text-base font-black text-white lg:text-left">
               Resumen de ventas
             </h2>
 
-            <div className="mt-6 space-y-5">
+            <div className="mt-7 space-y-6">
               <FilaEstadistica
                 nombre="Ventas no canceladas"
                 valor={formatearPrecio(
@@ -1562,12 +1582,12 @@ function EstadisticasAdmin() {
             </div>
           </div>
 
-          <div className={`${tarjeta} p-7`}>
+          <div className={`${tarjeta} w-full p-8`}>
             <h2 className="text-center text-base font-black text-white lg:text-left">
               Productos más vendidos
             </h2>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-7 space-y-4">
               {productosVendidos.length ===
               0 ? (
                 <p className="text-center text-sm text-[#81798e]">
@@ -1578,7 +1598,7 @@ function EstadisticasAdmin() {
                   (producto) => (
                     <div
                       key={producto.id}
-                      className="flex items-center justify-between gap-4 rounded-xl bg-[#121019] px-4 py-3.5"
+                      className="flex items-center justify-between gap-4 rounded-xl bg-[#121019] px-5 py-4"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-[#ddd5e7]">
@@ -1612,7 +1632,7 @@ function EstadisticasAdmin() {
 function StatCard({ titulo, valor }) {
   return (
     <div
-      className={`${tarjeta} flex min-h-[145px] flex-col items-center justify-center p-6 text-center`}
+      className={`${tarjeta} flex min-h-[150px] w-full flex-col items-center justify-center p-7 text-center`}
     >
       <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
         {titulo}
@@ -1627,7 +1647,7 @@ function StatCard({ titulo, valor }) {
 
 function FilaEstadistica({ nombre, valor }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#29233a] pb-4">
+    <div className="flex items-center justify-between gap-5 border-b border-[#29233a] pb-5">
       <span className="text-sm text-[#91889d]">
         {nombre}
       </span>
@@ -1847,7 +1867,7 @@ function ConfiguracionAdmin() {
 
   if (cargando) {
     return (
-      <div className="py-24 text-center">
+      <div className="flex w-full justify-center py-24 text-center">
         <p className="text-sm text-[#81798e]">
           Cargando configuración...
         </p>
@@ -1856,41 +1876,41 @@ function ConfiguracionAdmin() {
   }
 
   return (
-    <section className="w-full">
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="text-center">
+    <section className="flex w-full justify-center">
+      <div className="flex w-full max-w-5xl flex-col items-center">
+        <div className="w-full text-center">
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
             Sistema
           </span>
 
-          <h1 className="mt-6 text-3xl font-black text-white">
+          <h1 className="mt-7 text-3xl font-black text-white">
             Configuración
           </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-sm text-[#91889d]">
+          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
             Administra los datos generales y el contenido de la tienda.
           </p>
         </div>
 
         {mensaje && (
-          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+          <div className="mx-auto mt-10 w-full max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
             {mensaje}
           </div>
         )}
 
         {error && (
-          <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+          <div className="mx-auto mt-7 w-full max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
             {error}
           </div>
         )}
 
         <form
           onSubmit={guardarConfiguracion}
-          className="mt-10 space-y-8"
+          className="mt-12 w-full space-y-10"
         >
           {/* CONTACTO */}
 
-          <div className={`${tarjeta} p-7 sm:p-9`}>
+          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
             <div className="text-center">
               <h2 className="text-lg font-black text-white">
                 Contacto
@@ -1901,7 +1921,7 @@ function ConfiguracionAdmin() {
               </p>
             </div>
 
-            <div className="mt-7 grid gap-6 md:grid-cols-2">
+            <div className="mt-8 grid gap-x-8 gap-y-7 md:grid-cols-2">
               <CampoConfiguracion
                 etiqueta="WhatsApp principal"
                 valor={
@@ -1958,7 +1978,7 @@ function ConfiguracionAdmin() {
 
           {/* REDES */}
 
-          <div className={`${tarjeta} p-7 sm:p-9`}>
+          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
             <div className="text-center">
               <h2 className="text-lg font-black text-white">
                 Redes sociales
@@ -1969,7 +1989,7 @@ function ConfiguracionAdmin() {
               </p>
             </div>
 
-            <div className="mt-7 grid gap-6 md:grid-cols-3">
+            <div className="mt-8 grid gap-x-8 gap-y-7 md:grid-cols-3">
               <CampoConfiguracion
                 etiqueta="Instagram"
                 valor={
@@ -2014,7 +2034,7 @@ function ConfiguracionAdmin() {
 
           {/* INICIO */}
 
-          <div className={`${tarjeta} p-7 sm:p-9`}>
+          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
             <div className="text-center">
               <h2 className="text-lg font-black text-white">
                 Página de inicio
@@ -2025,7 +2045,7 @@ function ConfiguracionAdmin() {
               </p>
             </div>
 
-            <div className="mt-7 space-y-6">
+            <div className="mt-8 space-y-7">
               <CampoConfiguracion
                 etiqueta="Título"
                 valor={contenido.home_title}
@@ -2082,7 +2102,7 @@ function ConfiguracionAdmin() {
 
           {/* CATEGORÍAS */}
 
-          <div className={`${tarjeta} p-7 sm:p-9`}>
+          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
             <div className="text-center">
               <h2 className="text-lg font-black text-white">
                 Categorías
@@ -2093,7 +2113,7 @@ function ConfiguracionAdmin() {
               </p>
             </div>
 
-            <div className="mt-7 space-y-6">
+            <div className="mt-8 space-y-7">
               <CampoGrande
                 etiqueta="Texto Hombre"
                 valor={
@@ -2140,7 +2160,7 @@ function ConfiguracionAdmin() {
 
           {/* PROMOCIONES */}
 
-          <div className={`${tarjeta} p-7 sm:p-9`}>
+          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
             <div className="text-center">
               <h2 className="text-lg font-black text-white">
                 Promociones y campañas
@@ -2151,7 +2171,7 @@ function ConfiguracionAdmin() {
               </p>
             </div>
 
-            <div className="mt-7 space-y-6">
+            <div className="mt-8 space-y-7">
               <CampoConfiguracion
                 etiqueta="Título de promociones"
                 valor={
@@ -2207,7 +2227,7 @@ function ConfiguracionAdmin() {
                 </select>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
                 <CampoConfiguracion
                   etiqueta="Inicio"
                   tipo="datetime-local"
@@ -2255,7 +2275,7 @@ function ConfiguracionAdmin() {
 
           {/* BOTÓN GUARDAR */}
 
-          <div className="flex justify-center pb-6 pt-2">
+          <div className="flex justify-center pb-8 pt-2">
             <button
               type="submit"
               disabled={guardando}
@@ -2284,7 +2304,7 @@ function CampoConfiguracion({
   tipo = "text",
 }) {
   return (
-    <div>
+    <div className="w-full">
       <label className={etiqueta}>
         {etiqueta}
       </label>
@@ -2309,7 +2329,7 @@ function CampoGrande({
   placeholder,
 }) {
   return (
-    <div>
+    <div className="w-full">
       <label className={etiqueta}>
         {etiqueta}
       </label>
