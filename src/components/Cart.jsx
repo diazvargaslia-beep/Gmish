@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useCart } from "../CartContext";
+import { supabase } from "../lib/supabase";
 import store from "../data/store";
 
 function Cart() {
@@ -12,6 +14,18 @@ function Cart() {
     closeCart,
   } = useCart();
 
+  const [mostrarDatos, setMostrarDatos] = useState(false);
+  const [guardandoPedido, setGuardandoPedido] = useState(false);
+  const [errorPedido, setErrorPedido] = useState("");
+
+  const [cliente, setCliente] = useState({
+    nombre: "",
+    telefono: "",
+    zona: "",
+    direccion: "",
+    notas: "",
+  });
+
   const total = cart.reduce(
     (sum, product) =>
       sum + Number(product.price) * product.quantity,
@@ -23,30 +37,163 @@ function Cart() {
     0
   );
 
-  const sendToWhatsApp = () => {
+  function actualizarCliente(campo, valor) {
+    setCliente((actual) => ({
+      ...actual,
+      [campo]: valor,
+    }));
+  }
+
+  async function enviarPedido() {
     if (cart.length === 0) return;
 
-    const orderLines = cart.map(
-      (product) =>
-        `• ${product.name} | Talla: ${product.selectedSize} | Color: ${product.selectedColor} | Cantidad: ${product.quantity} | Subtotal: S/${(
-          Number(product.price) * product.quantity
-        ).toFixed(2)}`
-    );
+    setErrorPedido("");
 
-    const message = [
-      "Hola, quiero realizar este pedido en GMISH:",
-      "",
-      ...orderLines,
-      "",
-      `Total: S/${total.toFixed(2)}`,
-    ].join("\n");
+    if (!cliente.nombre.trim()) {
+      setErrorPedido("Escribe tu nombre.");
+      return;
+    }
 
-    const url = `https://wa.me/${store.whatsapp}?text=${encodeURIComponent(
-      message
-    )}`;
+    if (!cliente.telefono.trim()) {
+      setErrorPedido("Escribe tu número de WhatsApp.");
+      return;
+    }
 
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
+    setGuardandoPedido(true);
+
+    try {
+      const numeroPedido = `GM-${Date.now()
+        .toString()
+        .slice(-8)}`;
+
+      const { data: pedido, error: errorPedidoSupabase } =
+        await supabase
+          .from("orders")
+          .insert({
+            customer_name: cliente.nombre.trim(),
+            customer_phone: cliente.telefono.trim(),
+            status: "pendiente",
+            total: total,
+            order_number: numeroPedido,
+            delivery_zone: cliente.zona.trim() || null,
+            delivery_address: cliente.direccion.trim() || null,
+            notes: cliente.notas.trim() || null,
+          })
+          .select()
+          .single();
+
+      if (errorPedidoSupabase) {
+        console.error(
+          "Error creando pedido:",
+          errorPedidoSupabase
+        );
+
+        throw new Error(
+          errorPedidoSupabase.message ||
+            "No se pudo guardar el pedido."
+        );
+      }
+
+      const items = cart.map((product) => ({
+        order_id: pedido.id,
+        product_id: product.productId || product.id,
+        quantity: product.quantity,
+        unit_price: Number(product.price),
+        size: product.selectedSize || null,
+        color: product.selectedColor || null,
+        subtotal:
+          Number(product.price) * product.quantity,
+      }));
+
+      const { error: errorItems } = await supabase
+        .from("order_items")
+        .insert(items);
+
+      if (errorItems) {
+        console.error(
+          "Error guardando productos del pedido:",
+          errorItems
+        );
+
+        await supabase
+          .from("orders")
+          .delete()
+          .eq("id", pedido.id);
+
+        throw new Error(
+          errorItems.message ||
+            "No se pudieron guardar los productos."
+        );
+      }
+
+      const orderLines = cart.map(
+        (product) =>
+          `• ${product.name} | Talla: ${
+            product.selectedSize || "No seleccionada"
+          } | Color: ${
+            product.selectedColor || "No seleccionado"
+          } | Cantidad: ${
+            product.quantity
+          } | Subtotal: S/${(
+            Number(product.price) * product.quantity
+          ).toFixed(2)}`
+      );
+
+      const message = [
+        "Hola, quiero realizar este pedido en GMISH:",
+        "",
+        `Número de pedido: ${numeroPedido}`,
+        "",
+        `Cliente: ${cliente.nombre}`,
+        `WhatsApp: ${cliente.telefono}`,
+        cliente.zona
+          ? `Zona: ${cliente.zona}`
+          : "",
+        cliente.direccion
+          ? `Dirección: ${cliente.direccion}`
+          : "",
+        "",
+        ...orderLines,
+        "",
+        `Total: S/${total.toFixed(2)}`,
+        cliente.notas
+          ? `\nNotas: ${cliente.notas}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const url = `https://wa.me/${
+        store.whatsapp
+      }?text=${encodeURIComponent(message)}`;
+
+      window.open(
+        url,
+        "_blank",
+        "noopener,noreferrer"
+      );
+
+      clearCart();
+      setMostrarDatos(false);
+
+      setCliente({
+        nombre: "",
+        telefono: "",
+        zona: "",
+        direccion: "",
+        notas: "",
+      });
+    } catch (error) {
+      console.error(error);
+
+      setErrorPedido(
+        error.message ||
+          "No se pudo registrar el pedido. Inténtalo nuevamente."
+      );
+    } finally {
+      setGuardandoPedido(false);
+    }
+  }
 
   return (
     <>
@@ -60,7 +207,9 @@ function Cart() {
             aria-modal="true"
             aria-label="Tu carrito de compras"
             className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#e9e3d9] bg-[#fffefa] text-[#292821] shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
           >
             <div className="flex items-center justify-between border-b border-[#e9e3d9] px-6 py-5">
               <div>
@@ -70,6 +219,7 @@ function Cart() {
 
                 <h2 className="mt-1 text-2xl font-semibold tracking-tight">
                   Tu carrito
+
                   <span className="ml-2 text-sm font-normal text-[#898274]">
                     ({totalItems})
                   </span>
@@ -97,7 +247,8 @@ function Cart() {
                 </h3>
 
                 <p className="mt-2 max-w-xs text-sm leading-6 text-[#827b70]">
-                  Descubre nuestra colección y encuentra algo que vaya contigo.
+                  Descubre nuestra colección y
+                  encuentra algo que vaya contigo.
                 </p>
 
                 <button
@@ -137,7 +288,9 @@ function Cart() {
 
                             <button
                               type="button"
-                              onClick={() => removeFromCart(index)}
+                              onClick={() =>
+                                removeFromCart(index)
+                              }
                               aria-label={`Eliminar ${product.name}`}
                               className="text-xs text-[#8b8376] underline underline-offset-4 transition hover:text-red-600"
                             >
@@ -146,7 +299,9 @@ function Cart() {
                           </div>
 
                           <p className="mt-2 text-xs text-[#777064]">
-                            Talla: {product.selectedSize || "No seleccionada"}
+                            Talla:{" "}
+                            {product.selectedSize ||
+                              "No seleccionada"}
                           </p>
 
                           <div className="mt-1 flex items-center gap-2 text-xs text-[#777064]">
@@ -163,14 +318,16 @@ function Cart() {
                             )}
 
                             <span>
-                              {product.selectedColor || "No seleccionado"}
+                              {product.selectedColor ||
+                                "No seleccionado"}
                             </span>
                           </div>
 
                           <p className="mt-3 font-semibold text-[#292821]">
                             S/{" "}
                             {(
-                              Number(product.price) * product.quantity
+                              Number(product.price) *
+                              product.quantity
                             ).toFixed(2)}
                           </p>
                         </div>
@@ -180,7 +337,9 @@ function Cart() {
                         <div className="flex items-center overflow-hidden rounded-full border border-[#e4ded3]">
                           <button
                             type="button"
-                            onClick={() => decreaseQuantity(index)}
+                            onClick={() =>
+                              decreaseQuantity(index)
+                            }
                             aria-label="Disminuir cantidad"
                             className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-[#f2eee6]"
                           >
@@ -193,7 +352,9 @@ function Cart() {
 
                           <button
                             type="button"
-                            onClick={() => increaseQuantity(index)}
+                            onClick={() =>
+                              increaseQuantity(index)
+                            }
                             aria-label="Aumentar cantidad"
                             disabled={
                               Number(
@@ -214,7 +375,11 @@ function Cart() {
                         </div>
 
                         <span className="text-xs text-[#827b70]">
-                          S/ {Number(product.price).toFixed(2)} c/u
+                          S/{" "}
+                          {Number(
+                            product.price
+                          ).toFixed(2)}{" "}
+                          c/u
                         </span>
                       </div>
                     </article>
@@ -232,22 +397,157 @@ function Cart() {
                     </span>
                   </div>
 
-                  <p className="mt-2 text-xs leading-5 text-[#898274]">
-                    Confirma tu pedido por WhatsApp para coordinar la compra.
-                  </p>
+                  {!mostrarDatos ? (
+                    <>
+                      <p className="mt-2 text-xs leading-5 text-[#898274]">
+                        Primero necesitamos unos datos
+                        para registrar tu pedido.
+                      </p>
 
-                  <button
-                    type="button"
-                    onClick={sendToWhatsApp}
-                    className="mt-5 w-full rounded-full bg-[#292821] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#454238] active:scale-[0.99]"
-                  >
-                    Continuar por WhatsApp ↗
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setErrorPedido("");
+                          setMostrarDatos(true);
+                        }}
+                        className="mt-5 w-full rounded-full bg-[#292821] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#454238] active:scale-[0.99]"
+                      >
+                        Continuar con el pedido ↗
+                      </button>
+                    </>
+                  ) : (
+                    <div className="mt-5 space-y-3">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                          Nombre
+                        </label>
+
+                        <input
+                          type="text"
+                          value={cliente.nombre}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "nombre",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Tu nombre"
+                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                          WhatsApp
+                        </label>
+
+                        <input
+                          type="tel"
+                          value={cliente.telefono}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "telefono",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Tu número"
+                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                          Zona
+                        </label>
+
+                        <input
+                          type="text"
+                          value={cliente.zona}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "zona",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Ej. La Merced"
+                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                          Dirección
+                        </label>
+
+                        <input
+                          type="text"
+                          value={cliente.direccion}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "direccion",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Dirección de entrega"
+                          className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
+                          Nota
+                        </label>
+
+                        <textarea
+                          value={cliente.notas}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "notas",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Alguna indicación adicional"
+                          rows={2}
+                          className="w-full resize-none rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
+                        />
+                      </div>
+
+                      {errorPedido && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">
+                          {errorPedido}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={enviarPedido}
+                        disabled={guardandoPedido}
+                        className="w-full rounded-full bg-[#292821] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#454238] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {guardandoPedido
+                          ? "Registrando pedido..."
+                          : "Confirmar y continuar por WhatsApp ↗"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMostrarDatos(false);
+                          setErrorPedido("");
+                        }}
+                        disabled={guardandoPedido}
+                        className="w-full py-2 text-xs text-[#827b70] underline underline-offset-4 transition hover:text-[#292821]"
+                      >
+                        Volver al carrito
+                      </button>
+                    </div>
+                  )}
 
                   <button
                     type="button"
                     onClick={clearCart}
-                    className="mt-3 w-full py-2 text-xs text-[#827b70] underline underline-offset-4 transition hover:text-red-600"
+                    disabled={guardandoPedido}
+                    className="mt-3 w-full py-2 text-xs text-[#827b70] underline underline-offset-4 transition hover:text-red-600 disabled:opacity-40"
                   >
                     Vaciar carrito
                   </button>

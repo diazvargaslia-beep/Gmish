@@ -1,4 +1,28 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+
 function Hero() {
+  const [imagen, setImagen] = useState("");
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    cargarPortada();
+  }, []);
+
+  async function cargarPortada() {
+    const { data, error } = await supabase
+      .from("store_settings")
+      .select("setting_value")
+      .eq("setting_key", "portada_principal")
+      .maybeSingle();
+
+    if (!error && data?.setting_value) {
+      setImagen(data.setting_value);
+    }
+
+    setCargando(false);
+  }
+
   return (
     <section className="mx-auto max-w-7xl px-6 py-20">
       <div className="grid items-center gap-12 md:grid-cols-2">
@@ -23,14 +47,26 @@ function Hero() {
           </a>
         </div>
 
-        <div className="flex aspect-[4/5] items-center justify-center rounded-2xl bg-[#1B1D1A]">
-          <span className="text-sm font-medium text-[#E7E1D2]">
-            Imagen principal
-          </span>
+        <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[#1B1D1A]">
+          {imagen ? (
+            <img
+              src={imagen}
+              alt="Nueva colección GMISH"
+              className="h-full w-full object-cover"
+            />
+          ) : cargando ? (
+            <span className="text-sm font-medium text-[#E7E1D2]">
+              Cargando imagen...
+            </span>
+          ) : (
+            <span className="text-sm font-medium text-[#E7E1D2]">
+              Imagen principal
+            </span>
+          )}
         </div>
       </div>
     </section>
-  )
+  );
 }
 
-export default Hero
+export default Hero;
