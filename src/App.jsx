@@ -452,20 +452,10 @@ function Tienda() {
     });
   }
 
+  // ADMIN
+  // Se quitó el botón "VOLVER A LA TIENDA" que aparecía encima del administrador.
   if (esAdmin) {
-    return (
-      <div className="admin-page">
-        <button
-          type="button"
-          className="boton-interior"
-          onClick={volverATienda}
-        >
-          VOLVER A LA TIENDA
-        </button>
-
-        <Admin />
-      </div>
-    );
+    return <Admin />;
   }
 
   const subcategoriasHombre =

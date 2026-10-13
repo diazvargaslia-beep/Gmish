@@ -3,7 +3,49 @@ import { supabase } from "../lib/supabase";
 import ProductsAdmin from "./ProductsAdmin";
 
 /* =========================================================
-   SECCIONES Y PERMISOS
+   UTILIDADES
+========================================================= */
+
+function formatearPrecio(valor) {
+  return `S/ ${Number(valor || 0).toFixed(2)}`;
+}
+
+function formatearFechaHora(fecha) {
+  if (!fecha) return "-";
+
+  return new Intl.DateTimeFormat("es-PE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(fecha));
+}
+
+function obtenerTipoVenta(pedido) {
+  return pedido?.sale_type === "fisica"
+    ? "fisica"
+    : "online";
+}
+
+/* =========================================================
+   ESTILOS
+========================================================= */
+
+const tarjeta =
+  "w-full rounded-2xl border border-[#29233a] bg-[#17151f] shadow-[0_12px_40px_rgba(0,0,0,0.25)]";
+
+const botonPrincipal =
+  "rounded-xl border border-[#332b46] bg-[#1b1824] px-[1.3125rem] py-[0.7875rem] text-sm font-semibold text-[#e8e3f0] transition hover:border-[#8b5cf6] hover:bg-[#211c2d] disabled:cursor-not-allowed disabled:opacity-40";
+
+const botonMorado =
+  "rounded-xl bg-[#7c3aed] px-[1.3125rem] py-[0.7875rem] text-sm font-bold text-white transition hover:bg-[#8b5cf6] disabled:cursor-not-allowed disabled:opacity-40";
+
+const campo =
+  "w-full rounded-xl border border-[#342c45] bg-[#121019] px-4 py-3 text-sm text-[#f4f0f8] outline-none transition placeholder:text-[#777080] focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20";
+
+const etiqueta =
+  "mb-2 block text-sm font-semibold text-[#d9d3e2]";
+
+/* =========================================================
+   SECCIONES
 ========================================================= */
 
 const secciones = [
@@ -46,842 +88,403 @@ const secciones = [
 ];
 
 /* =========================================================
-   ESTILOS
-========================================================= */
-
-const tarjeta =
-  "rounded-2xl border border-[#29233a] bg-[#17151f] shadow-[0_12px_40px_rgba(0,0,0,0.25)]";
-
-const botonPrincipal =
-  "rounded-xl border border-[#332b46] bg-[#1b1824] px-5 py-3 text-sm font-semibold text-[#e8e3f0] transition hover:border-[#8b5cf6] hover:bg-[#211c2d] disabled:cursor-not-allowed disabled:opacity-40";
-
-const botonMorado =
-  "rounded-xl bg-[#7c3aed] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#8b5cf6] disabled:cursor-not-allowed disabled:opacity-40";
-
-const campo =
-  "w-full rounded-xl border border-[#342c45] bg-[#121019] px-4 py-3 text-sm text-[#f4f0f8] outline-none transition placeholder:text-[#777080] focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20";
-
-const etiqueta =
-  "mb-2 block text-sm font-semibold text-[#d9d3e2]";
-
-/* =========================================================
-   UTILIDADES
-========================================================= */
-
-function obtenerSeccionDesdeUrl() {
-  const hash = window.location.hash.replace("#", "").trim();
-
-  const existe = secciones.some(
-    (item) => item.id === hash
-  );
-
-  return existe ? hash : "inicio";
-}
-
-function formatearPrecio(valor) {
-  const numero = Number(valor || 0);
-
-  return `S/ ${numero.toFixed(2)}`;
-}
-
-function formatearFechaHora(fecha) {
-  if (!fecha) return "-";
-
-  return new Date(fecha).toLocaleString("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/* =========================================================
-   COMPONENTE PRINCIPAL
-========================================================= */
-
-function Admin() {
-  const [sesion, setSesion] = useState(null);
-  const [rol, setRol] = useState(null);
-
-  const [cargando, setCargando] = useState(true);
-  const [cargandoRol, setCargandoRol] = useState(false);
-  const [conectado, setConectado] = useState(false);
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [error, setError] = useState("");
-
-  const [seccion, setSeccion] = useState(() =>
-    obtenerSeccionDesdeUrl()
-  );
-
-  const [menuAbierto, setMenuAbierto] = useState(false);
-
-  /* =====================================================
-     SECCIONES SEGÚN ROL
-  ===================================================== */
-
-  const seccionesVisibles = useMemo(() => {
-    if (!rol) return [];
-
-    return secciones.filter((item) =>
-      item.acceso.includes(rol)
-    );
-  }, [rol]);
-
-  /* =====================================================
-     SESIÓN
-  ===================================================== */
-
-  useEffect(() => {
-    let activo = true;
-
-    async function cargarSesion() {
-      setCargando(true);
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!activo) return;
-
-      setSesion(session);
-
-      if (session?.user) {
-        await cargarRolUsuario(session.user.id);
-        await comprobarConexion();
-      }
-
-      setCargando(false);
-    }
-
-    cargarSesion();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      async (_event, nuevaSesion) => {
-        if (!activo) return;
-
-        setSesion(nuevaSesion);
-
-        if (nuevaSesion?.user) {
-          await cargarRolUsuario(nuevaSesion.user.id);
-          await comprobarConexion();
-        } else {
-          setRol(null);
-          setConectado(false);
-        }
-      }
-    );
-
-    return () => {
-      activo = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  /* =====================================================
-     HISTORIAL DEL NAVEGADOR
-  ===================================================== */
-
-  useEffect(() => {
-    function sincronizarConUrl() {
-      const nuevaSeccion = obtenerSeccionDesdeUrl();
-
-      setSeccion(nuevaSeccion);
-      setMenuAbierto(false);
-    }
-
-    window.addEventListener(
-      "hashchange",
-      sincronizarConUrl
-    );
-
-    window.addEventListener(
-      "popstate",
-      sincronizarConUrl
-    );
-
-    return () => {
-      window.removeEventListener(
-        "hashchange",
-        sincronizarConUrl
-      );
-
-      window.removeEventListener(
-        "popstate",
-        sincronizarConUrl
-      );
-    };
-  }, []);
-
-  /* =====================================================
-     CARGAR ROL
-  ===================================================== */
-
-  async function cargarRolUsuario(userId) {
-    setCargandoRol(true);
-    setError("");
-
-    const { data, error: errorRol } = await supabase
-      .from("admin_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (errorRol) {
-      console.error(errorRol);
-
-      setRol(null);
-
-      setError(
-        "No se pudo comprobar el rol de administrador."
-      );
-
-      setCargandoRol(false);
-      return null;
-    }
-
-    if (!data?.role) {
-      setRol(null);
-
-      setError(
-        "Esta cuenta no tiene un rol de administrador asignado."
-      );
-
-      setCargandoRol(false);
-
-      await supabase.auth.signOut();
-
-      return null;
-    }
-
-    setRol(data.role);
-    setCargandoRol(false);
-
-    return data.role;
-  }
-
-  /* =====================================================
-     PROTEGER SECCIÓN
-  ===================================================== */
-
-  useEffect(() => {
-    if (!rol) return;
-
-    const permitida = seccionesVisibles.some(
-      (item) => item.id === seccion
-    );
-
-    if (!permitida) {
-      cambiarSeccion("inicio", true);
-    }
-  }, [rol, seccion, seccionesVisibles]);
-
-  /* =====================================================
-     CONEXIÓN
-  ===================================================== */
-
-  async function comprobarConexion() {
-    const { error: errorConexion } = await supabase
-      .from("products")
-      .select("id")
-      .limit(1);
-
-    setConectado(!errorConexion);
-  }
-
-  /* =====================================================
-     LOGIN
-  ===================================================== */
-
-  async function iniciarSesion(event) {
-    event.preventDefault();
-
-    setError("");
-
-    if (!email.trim() || !password) {
-      setError(
-        "Completa el correo y la contraseña."
-      );
-      return;
-    }
-
-    const { data, error: errorLogin } =
-      await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-    if (errorLogin) {
-      setError(errorLogin.message);
-      return;
-    }
-
-    if (data?.user) {
-      await cargarRolUsuario(data.user.id);
-      await comprobarConexion();
-    }
-  }
-
-  /* =====================================================
-     CERRAR SESIÓN
-  ===================================================== */
-
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
-
-    setSesion(null);
-    setRol(null);
-    setMenuAbierto(false);
-    setSeccion("inicio");
-
-    window.history.pushState(
-      {},
-      "",
-      `${window.location.pathname}${window.location.search}#inicio`
-    );
-  }
-
-  /* =====================================================
-     CAMBIAR SECCIÓN
-  ===================================================== */
-
-  function cambiarSeccion(id, reemplazar = false) {
-    const permitida = seccionesVisibles.some(
-      (item) => item.id === id
-    );
-
-    if (!permitida) {
-      id = "inicio";
-    }
-
-    setSeccion(id);
-    setMenuAbierto(false);
-
-    const nuevaUrl =
-      `${window.location.pathname}` +
-      `${window.location.search}#${id}`;
-
-    if (reemplazar) {
-      window.history.replaceState(
-        { seccion: id },
-        "",
-        nuevaUrl
-      );
-    } else {
-      window.history.pushState(
-        { seccion: id },
-        "",
-        nuevaUrl
-      );
-    }
-  }
-
-  /* =====================================================
-     LOADING
-  ===================================================== */
-
-  if (cargando || cargandoRol) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f0d15] px-6">
-        <div className="w-full max-w-sm text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#7c3aed] text-2xl font-black text-white shadow-[0_0_35px_rgba(124,58,237,0.35)]">
-            G
-          </div>
-
-          <p className="text-sm font-semibold text-[#eee9f5]">
-            Cargando GMISH...
-          </p>
-
-          <p className="mt-2 text-xs text-[#81798e]">
-            Preparando el panel administrativo
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  /* =====================================================
-     LOGIN
-  ===================================================== */
-
-  if (!sesion) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f0d15] px-5 py-12">
-        <div className="mx-auto w-full max-w-md">
-          <div
-            className={`${tarjeta} overflow-hidden`}
-          >
-            <div className="border-b border-[#29233a] px-8 py-10 text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#7c3aed] text-2xl font-black text-white shadow-[0_0_35px_rgba(124,58,237,0.35)]">
-                G
-              </div>
-
-              <h1 className="text-2xl font-black tracking-tight text-white">
-                GMISH
-              </h1>
-
-              <p className="mt-2 text-sm text-[#91889d]">
-                Panel administrativo
-              </p>
-            </div>
-
-            <form
-              onSubmit={iniciarSesion}
-              className="space-y-6 px-8 py-9"
-            >
-              <div>
-                <label className={etiqueta}>
-                  Correo electrónico
-                </label>
-
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
-                  }
-                  placeholder="correo@ejemplo.com"
-                  className={campo}
-                  autoComplete="email"
-                />
-              </div>
-
-              <div>
-                <label className={etiqueta}>
-                  Contraseña
-                </label>
-
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
-                  placeholder="••••••••"
-                  className={campo}
-                  autoComplete="current-password"
-                />
-              </div>
-
-              {error && (
-                <div className="rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm leading-5 text-red-300">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className={`${botonMorado} w-full py-3.5`}
-              >
-                Iniciar sesión
-              </button>
-            </form>
-          </div>
-
-          <p className="mt-6 text-center text-xs text-[#696170]">
-            GMISH · Panel privado
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  /* =====================================================
-     PANEL PRINCIPAL
-  ===================================================== */
-
-  return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#0f0d15] text-[#eee9f5]">
-      {/* HEADER */}
-
-      <header className="sticky top-0 z-50 w-full border-b border-[#29233a] bg-[#121019]/95 shadow-[0_8px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-        <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-6 px-5 sm:px-8 lg:px-10">
-          {/* IZQUIERDA */}
-
-          <div className="flex min-w-0 items-center gap-4">
-            <button
-              type="button"
-              onClick={() =>
-                setMenuAbierto(!menuAbierto)
-              }
-              className="flex h-11 w-11 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border border-[#342c45] bg-[#181520] transition hover:border-[#8b5cf6] hover:bg-[#211c2d]"
-              aria-label="Abrir menú"
-            >
-              <span className="h-0.5 w-5 rounded-full bg-[#ddd5e7]" />
-              <span className="h-0.5 w-5 rounded-full bg-[#ddd5e7]" />
-              <span className="h-0.5 w-5 rounded-full bg-[#ddd5e7]" />
-            </button>
-
-            <div className="min-w-0">
-              <p className="text-lg font-black tracking-[0.18em] text-white">
-                GMISH
-              </p>
-
-              <p className="hidden text-[10px] font-medium uppercase tracking-widest text-[#746b80] sm:block">
-                Panel administrativo
-              </p>
-            </div>
-          </div>
-
-          {/* CENTRO */}
-
-          <div className="hidden items-center gap-3 md:flex">
-            <div
-              className={`h-2.5 w-2.5 rounded-full ${
-                conectado
-                  ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]"
-                  : "bg-red-500"
-              }`}
-            />
-
-            <span className="text-xs font-semibold text-[#8e8599]">
-              {conectado
-                ? "Base de datos conectada"
-                : "Sin conexión"}
-            </span>
-          </div>
-
-          {/* DERECHA */}
-
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="hidden rounded-full border border-[#3b3150] bg-[#211a2e] px-3 py-1.5 text-xs font-bold capitalize text-[#b993ff] sm:block">
-              {rol}
-            </span>
-
-            <button
-              type="button"
-              onClick={cerrarSesion}
-              className="rounded-xl border border-[#342c45] px-4 py-2.5 text-xs font-bold text-[#9c94a5] transition hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-400"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* MENÚ */}
-
-      {menuAbierto && (
-        <>
-          <button
-            type="button"
-            aria-label="Cerrar menú"
-            onClick={() => setMenuAbierto(false)}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]"
-          />
-
-          <aside className="fixed left-1/2 top-24 z-50 w-[calc(100%-32px)] max-w-sm -translate-x-1/2 rounded-2xl border border-[#342c45] bg-[#17151f] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.55)]">
-            <div className="mb-3 px-3 py-3 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
-                Administración
-              </p>
-            </div>
-
-            <nav className="space-y-2">
-              {seccionesVisibles.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() =>
-                    cambiarSeccion(item.id)
-                  }
-                  className={`flex w-full items-center gap-4 rounded-xl px-4 py-4 text-left text-sm font-semibold transition ${
-                    seccion === item.id
-                      ? "bg-[#2a1d3e] text-[#b993ff]"
-                      : "text-[#bcb4c7] hover:bg-[#211c2d] hover:text-white"
-                  }`}
-                >
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base ${
-                      seccion === item.id
-                        ? "bg-[#7c3aed] text-white"
-                        : "bg-[#211c2d] text-[#8f849e]"
-                    }`}
-                  >
-                    {item.icono}
-                  </span>
-
-                  <span>{item.nombre}</span>
-                </button>
-              ))}
-            </nav>
-          </aside>
-        </>
-      )}
-
-      {/* CONTENIDO PRINCIPAL */}
-
-      <main className="flex w-full justify-center px-5 py-14 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
-        <div className="flex w-full max-w-7xl flex-col items-center gap-16">
-          {seccion === "inicio" && (
-            <div className="flex w-full justify-center">
-              <InicioAdmin
-                rol={rol}
-                conectado={conectado}
-                cambiarSeccion={cambiarSeccion}
-                seccionesVisibles={seccionesVisibles}
-              />
-            </div>
-          )}
-
-          {seccion === "productos" && (
-            <div className="flex w-full justify-center">
-              <div className="w-full max-w-6xl">
-                <ProductsAdmin rol={rol} />
-              </div>
-            </div>
-          )}
-
-          {seccion === "pedidos" &&
-            rol === "principal" && (
-              <div className="flex w-full justify-center">
-                <PedidosAdmin />
-              </div>
-            )}
-
-          {seccion === "portadas" &&
-            rol === "principal" && (
-              <div className="flex w-full justify-center">
-                <PortadasAdmin />
-              </div>
-            )}
-
-          {seccion === "estadisticas" &&
-            rol === "principal" && (
-              <div className="flex w-full justify-center">
-                <EstadisticasAdmin />
-              </div>
-            )}
-
-          {seccion === "configuracion" &&
-            rol === "principal" && (
-              <div className="flex w-full justify-center">
-                <ConfiguracionAdmin />
-              </div>
-            )}
-        </div>
-      </main>
-
-      {/* FOOTER */}
-
-      <footer className="w-full border-t border-[#29233a]">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-5 px-5 py-10 text-center sm:px-8 md:flex-row md:text-left lg:px-10">
-          <p className="text-xs font-semibold text-[#696170]">
-            © {new Date().getFullYear()} GMISH
-          </p>
-
-          <p className="text-xs text-[#514a5a]">
-            Panel administrativo
-          </p>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-/* =========================================================
    INICIO
 ========================================================= */
 
-function InicioAdmin({
-  rol,
-  conectado,
-  cambiarSeccion,
-  seccionesVisibles,
-}) {
-  const tarjetas = seccionesVisibles.filter(
-    (item) => item.id !== "inicio"
+function InicioAdmin({ rol, onSeleccionar }) {
+  /*
+    IMPORTANTE:
+    Inicio NO se muestra dentro de Inicio.
+    Porque estamos en Inicio. La humanidad puede descansar.
+  */
+
+  const disponibles = secciones.filter(
+    (seccion) =>
+      seccion.id !== "inicio" &&
+      seccion.acceso.includes(rol)
   );
 
   return (
     <section className="flex w-full justify-center">
-      <div className="flex w-full max-w-6xl flex-col items-center">
-        <div className="w-full max-w-4xl text-center">
+      <div className="w-full max-w-6xl">
+
+        <div className="mx-auto max-w-4xl text-center">
+
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
-            Panel GMISH
+            GMISH
           </span>
 
-          <h1 className="mt-7 text-3xl font-black tracking-tight text-white sm:text-4xl">
-            Bienvenida al administrador
+          <h1 className="mt-7 text-3xl font-black text-white">
+            Panel de administración
           </h1>
 
           <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#91889d]">
-            Gestiona productos, pedidos, portadas,
-            estadísticas y configuración desde un solo lugar.
+            Gestiona productos, pedidos, ventas y la
+            información de tu tienda desde un solo lugar.
           </p>
 
-          <div className="mt-7 flex justify-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#342c45] bg-[#17151f] px-4 py-2.5 text-xs font-semibold text-[#91889d]">
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  conectado
-                    ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                    : "bg-red-500"
-                }`}
-              />
-
-              {conectado
-                ? "Supabase conectado"
-                : "Revisar conexión"}
-            </span>
-          </div>
         </div>
 
-        <div className="mt-14 grid w-full grid-cols-1 justify-items-center gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          {tarjetas.map((item) => (
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+          {disponibles.map((seccion) => (
             <button
-              key={item.id}
+              key={seccion.id}
               type="button"
               onClick={() =>
-                cambiarSeccion(item.id)
+                onSeleccionar(seccion.id)
               }
-              className={`${tarjeta} group flex min-h-[210px] w-full max-w-[360px] flex-col items-center justify-center p-8 text-center transition duration-200 hover:-translate-y-1 hover:border-[#6d4ca0] hover:shadow-[0_18px_50px_rgba(124,58,237,0.14)]`}
+              className={`${tarjeta} group flex min-h-[190px] flex-col items-center justify-center p-8 text-center transition duration-200 hover:-translate-y-1 hover:border-[#7c3aed]`}
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#241b32] text-xl text-[#a978ff] transition group-hover:bg-[#7c3aed] group-hover:text-white">
-                {item.icono}
-              </div>
 
-              <h2 className="mt-6 text-base font-bold text-white">
-                {item.nombre}
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#211a2e] text-2xl text-[#b993ff] transition group-hover:bg-[#7c3aed] group-hover:text-white">
+                {seccion.icono}
+              </span>
+
+              <h2 className="mt-6 text-base font-black text-white">
+                {seccion.nombre}
               </h2>
 
-              <p className="mt-3 text-xs leading-5 text-[#81798e]">
-                Administrar esta sección.
+              <p className="mt-3 text-sm leading-6 text-[#81798e]">
+                Administrar{" "}
+                {seccion.nombre.toLowerCase()}.
               </p>
+
             </button>
           ))}
+
         </div>
 
-        <div className="mx-auto mt-14 w-full max-w-md rounded-2xl border border-[#342c45] bg-[#17151f] p-7 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#766d80]">
-            Cuenta actual
-          </p>
-
-          <p className="mt-3 text-sm font-bold capitalize text-[#b993ff]">
-            {rol}
-          </p>
-        </div>
       </div>
     </section>
   );
 }
 
 /* =========================================================
-   PEDIDOS
+   PEDIDOS Y VENTAS
 ========================================================= */
 
 function PedidosAdmin() {
   const [pedidos, setPedidos] = useState([]);
+  const [productos, setProductos] = useState([]);
+
   const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+
   const [error, setError] = useState("");
-  const [filtro, setFiltro] = useState("todos");
+  const [mensaje, setMensaje] = useState("");
+
+  const [filtroEstado, setFiltroEstado] =
+    useState("todos");
+
+  const [filtroTipo, setFiltroTipo] =
+    useState("todos");
+
+  const [ventaAbierta, setVentaAbierta] =
+    useState(false);
+
+  const [detallePedido, setDetallePedido] =
+    useState(null);
 
   useEffect(() => {
-    cargarPedidos();
+    cargarDatos();
   }, []);
 
-  async function cargarPedidos() {
+  async function cargarDatos() {
     setCargando(true);
     setError("");
 
-    const { data, error: errorPedidos } =
-      await supabase
+    const [
+      {
+        data: pedidosData,
+        error: pedidosError,
+      },
+      {
+        data: productosData,
+        error: productosError,
+      },
+    ] = await Promise.all([
+      supabase
         .from("orders")
         .select(`
           *,
           order_items (
             id,
-            quantity,
-            unit_price,
+            order_id,
+            product_id,
+            product_name,
             size,
             color,
+            quantity,
+            unit_price,
             subtotal,
-            product_id
+            variant_id
           )
         `)
         .order("created_at", {
           ascending: false,
-        });
+        }),
 
-    if (errorPedidos) {
-      console.error(errorPedidos);
+      supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          price,
+          category,
+          subcategory,
+          is_active,
+          sold_count,
+          product_variants (
+            id,
+            product_id,
+            size,
+            color,
+            stock,
+            sku,
+            color_hex,
+            color_image_url,
+            product_variant_images (
+              id,
+              image_url,
+              position
+            )
+          )
+        `)
+        .eq("is_active", true)
+        .order("created_at", {
+          ascending: false,
+        }),
+    ]);
 
+    if (pedidosError) {
+      console.error(pedidosError);
       setError(
         "No se pudieron cargar los pedidos."
       );
-
-      setCargando(false);
-      return;
     }
 
-    setPedidos(data || []);
+    if (productosError) {
+      console.error(productosError);
+      setError(
+        "No se pudieron cargar los productos reales de GMISH."
+      );
+    }
+
+    setPedidos(pedidosData || []);
+    setProductos(productosData || []);
     setCargando(false);
   }
 
-  async function cambiarEstado(id, estado) {
+  async function cambiarEstado(
+    pedido,
+    nuevoEstado
+  ) {
     const estadosPermitidos = [
-      "pendiente",
-      "enviado",
-      "entregado",
-      "cancelado",
+      "Pendiente",
+      "Entregado",
+      "Cancelado",
     ];
 
-    if (!estadosPermitidos.includes(estado)) {
+    if (
+      !estadosPermitidos.includes(
+        nuevoEstado
+      )
+    ) {
       return;
     }
 
-    const fecha = new Date().toISOString();
+    if (
+      pedido.status === nuevoEstado
+    ) {
+      return;
+    }
 
-    const { error: errorActualizar } =
-      await supabase
+    setGuardando(true);
+    setError("");
+    setMensaje("");
+
+    try {
+      /*
+        Las ventas físicas ya descuentan stock
+        al registrarse.
+
+        Si se cancelan, devolvemos stock y
+        sold_count.
+      */
+
+      if (
+        nuevoEstado === "Cancelado" &&
+        pedido.status !== "Cancelado" &&
+        obtenerTipoVenta(pedido) ===
+          "fisica"
+      ) {
+        for (
+          const item of
+          pedido.order_items || []
+        ) {
+          if (!item.variant_id) {
+            continue;
+          }
+
+          const cantidad = Number(
+            item.quantity || 0
+          );
+
+          if (cantidad <= 0) {
+            continue;
+          }
+
+          const {
+            data: variante,
+            error: errorVariante,
+          } = await supabase
+            .from("product_variants")
+            .select(
+              "id, product_id, stock"
+            )
+            .eq(
+              "id",
+              item.variant_id
+            )
+            .single();
+
+          if (errorVariante) {
+            throw errorVariante;
+          }
+
+          const nuevoStock =
+            Number(
+              variante.stock || 0
+            ) + cantidad;
+
+          const {
+            error: errorStock,
+          } = await supabase
+            .from("product_variants")
+            .update({
+              stock: nuevoStock,
+            })
+            .eq(
+              "id",
+              item.variant_id
+            );
+
+          if (errorStock) {
+            throw errorStock;
+          }
+
+          if (item.product_id) {
+            const {
+              data: producto,
+              error: errorProducto,
+            } = await supabase
+              .from("products")
+              .select(
+                "id, sold_count"
+              )
+              .eq(
+                "id",
+                item.product_id
+              )
+              .single();
+
+            if (errorProducto) {
+              throw errorProducto;
+            }
+
+            const nuevoSoldCount =
+              Math.max(
+                0,
+                Number(
+                  producto.sold_count ||
+                    0
+                ) - cantidad
+              );
+
+            const {
+              error: errorSoldCount,
+            } = await supabase
+              .from("products")
+              .update({
+                sold_count:
+                  nuevoSoldCount,
+                updated_at:
+                  new Date().toISOString(),
+              })
+              .eq(
+                "id",
+                item.product_id
+              );
+
+            if (errorSoldCount) {
+              throw errorSoldCount;
+            }
+          }
+        }
+      }
+
+      const fecha =
+        new Date().toISOString();
+
+      const {
+        error: errorActualizar,
+      } = await supabase
         .from("orders")
         .update({
-          status: estado,
+          status: nuevoEstado,
           updated_at: fecha,
         })
-        .eq("id", id);
+        .eq("id", pedido.id);
 
-    if (errorActualizar) {
-      console.error(errorActualizar);
+      if (errorActualizar) {
+        throw errorActualizar;
+      }
 
-      alert(
-        "No se pudo actualizar el pedido."
+      setMensaje(
+        nuevoEstado === "Cancelado"
+          ? "Pedido cancelado correctamente."
+          : "Estado actualizado correctamente."
       );
 
-      return;
-    }
+      await cargarDatos();
+    } catch (err) {
+      console.error(err);
 
-    setPedidos((actuales) =>
-      actuales.map((pedido) =>
-        pedido.id === id
-          ? {
-              ...pedido,
-              status: estado,
-              updated_at: fecha,
-            }
-          : pedido
-      )
-    );
+      setError(
+        err?.message ||
+          "No se pudo actualizar el pedido."
+      );
+    } finally {
+      setGuardando(false);
+    }
   }
 
   const pedidosFiltrados =
-    filtro === "todos"
-      ? pedidos
-      : pedidos.filter(
-          (pedido) =>
-            pedido.status === filtro
-        );
+    pedidos.filter((pedido) => {
+      const coincideEstado =
+        filtroEstado === "todos" ||
+        pedido.status ===
+          filtroEstado;
+
+      const tipo =
+        obtenerTipoVenta(pedido);
+
+      const coincideTipo =
+        filtroTipo === "todos" ||
+        tipo === filtroTipo;
+
+      return (
+        coincideEstado &&
+        coincideTipo
+      );
+    });
 
   if (cargando) {
     return (
-      <div className="flex w-full justify-center py-24 text-center">
+      <div className="flex w-full justify-center py-28 text-center">
         <p className="text-sm text-[#81798e]">
-          Cargando pedidos...
+          Cargando pedidos y ventas...
         </p>
       </div>
     );
@@ -889,196 +492,1945 @@ function PedidosAdmin() {
 
   return (
     <section className="flex w-full justify-center">
-      <div className="flex w-full max-w-5xl flex-col items-center">
-        <div className="w-full text-center">
+      <div className="flex w-full max-w-6xl flex-col items-center">
+
+        <div className="mx-auto w-full max-w-4xl text-center">
+
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
             Ventas
           </span>
 
-          <h1 className="mt-7 text-3xl font-black text-white">
+          <h1 className="mt-8 text-3xl font-black text-white">
             Pedidos y ventas
           </h1>
 
-          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
-            Consulta pedidos y actualiza su estado.
+          <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#91889d]">
+            Administra pedidos online y ventas
+            realizadas en la tienda física.
           </p>
+
+          <div className="mt-10 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setMensaje("");
+                setVentaAbierta(true);
+              }}
+              className={botonMorado}
+            >
+              + Registrar venta
+            </button>
+          </div>
+
         </div>
 
-        <div className="mt-12 flex w-full flex-wrap justify-center gap-4">
-          {[
-            ["todos", "Todos"],
-            ["pendiente", "Pendientes"],
-            ["enviado", "Enviados"],
-            ["entregado", "Entregados"],
-            ["cancelado", "Cancelados"],
-          ].map(([valor, nombre]) => (
-            <button
-              key={valor}
-              type="button"
-              onClick={() => setFiltro(valor)}
-              className={`rounded-full px-5 py-2.5 text-xs font-bold transition ${
-                filtro === valor
-                  ? "bg-[#7c3aed] text-white shadow-[0_5px_20px_rgba(124,58,237,0.2)]"
-                  : "border border-[#342c45] bg-[#17151f] text-[#91889d] hover:border-[#7c3aed] hover:text-[#b993ff]"
-              }`}
-            >
-              {nombre}
-            </button>
-          ))}
-        </div>
+        {mensaje && (
+          <div className="mx-auto mt-10 w-full max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+            {mensaje}
+          </div>
+        )}
 
         {error && (
-          <div className="mx-auto mt-10 w-full max-w-2xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+          <div className="mx-auto mt-8 w-full max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
             {error}
           </div>
         )}
 
-        <div className="mt-12 w-full space-y-8">
-          {pedidosFiltrados.length === 0 ? (
-            <div className={`${tarjeta} p-14 text-center`}>
+        <div className="mt-16 w-full space-y-10">
+
+          <div className="text-center">
+
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Estado
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-[0.7875rem]">
+
+              {[
+                ["todos", "Todos"],
+                [
+                  "Pendiente",
+                  "Pendientes",
+                ],
+                [
+                  "Entregado",
+                  "Entregados",
+                ],
+                [
+                  "Cancelado",
+                  "Cancelados",
+                ],
+              ].map(
+                ([valor, nombre]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() =>
+                      setFiltroEstado(
+                        valor
+                      )
+                    }
+                    className={`rounded-full px-[1.3125rem] py-[0.65625rem] text-xs font-bold transition ${
+                      filtroEstado ===
+                      valor
+                        ? "bg-[#7c3aed] text-white"
+                        : "border border-[#342c45] bg-[#17151f] text-[#91889d] hover:border-[#7c3aed] hover:text-[#b993ff]"
+                    }`}
+                  >
+                    {nombre}
+                  </button>
+                )
+              )}
+
+            </div>
+          </div>
+
+          <div className="text-center">
+
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Tipo de venta
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-[0.7875rem]">
+
+              {[
+                ["todos", "Todas"],
+                ["online", "🌐 Online"],
+                [
+                  "fisica",
+                  "🏪 Tienda física",
+                ],
+              ].map(
+                ([valor, nombre]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() =>
+                      setFiltroTipo(
+                        valor
+                      )
+                    }
+                    className={`rounded-full px-[1.3125rem] py-[0.65625rem] text-xs font-bold transition ${
+                      filtroTipo ===
+                      valor
+                        ? "bg-[#7c3aed] text-white"
+                        : "border border-[#342c45] bg-[#17151f] text-[#91889d] hover:border-[#7c3aed] hover:text-[#b993ff]"
+                    }`}
+                  >
+                    {nombre}
+                  </button>
+                )
+              )}
+
+            </div>
+          </div>
+
+        </div>
+
+        <div className="mt-16 w-full space-y-10">
+
+          {pedidosFiltrados.length ===
+          0 ? (
+            <div
+              className={`${tarjeta} p-16 text-center`}
+            >
               <p className="text-sm font-semibold text-[#aaa1b3]">
-                No hay pedidos en esta categoría.
+                No hay ventas o pedidos
+                en esta categoría.
               </p>
             </div>
           ) : (
-            pedidosFiltrados.map((pedido) => (
-              <article
-                key={pedido.id}
-                className={`${tarjeta} p-7 sm:p-9`}
-              >
-                <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="text-center lg:text-left">
-                    <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-                      <h2 className="text-base font-black text-white">
-                        Pedido{" "}
-                        {pedido.order_number ||
-                          `#${pedido.id}`}
-                      </h2>
+            pedidosFiltrados.map(
+              (pedido) => {
+                const esFisica =
+                  obtenerTipoVenta(
+                    pedido
+                  ) === "fisica";
 
-                      <span className="rounded-full bg-[#291d3b] px-3 py-1 text-xs font-bold capitalize text-[#b993ff]">
-                        {pedido.status ||
-                          "pendiente"}
-                      </span>
+                const cantidadProductos =
+                  (
+                    pedido.order_items ||
+                    []
+                  ).reduce(
+                    (
+                      total,
+                      item
+                    ) =>
+                      total +
+                      Number(
+                        item.quantity ||
+                          0
+                      ),
+                    0
+                  );
+
+                return (
+                  <article
+                    key={pedido.id}
+                    className={`${tarjeta} p-8 sm:p-10`}
+                  >
+
+                    <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between">
+
+                      <div className="min-w-0 text-center lg:text-left">
+
+                        <div className="flex flex-wrap items-center justify-center gap-[0.7875rem] lg:justify-start">
+
+                          <h2 className="text-base font-black text-white">
+                            {esFisica
+                              ? "Venta"
+                              : "Pedido"}{" "}
+                            #
+                            {
+                              pedido.order_number
+                            }
+                          </h2>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold ${
+                              pedido.status ===
+                              "Entregado"
+                                ? "bg-green-950/40 text-green-300"
+                                : pedido.status ===
+                                  "Cancelado"
+                                ? "bg-red-950/40 text-red-300"
+                                : "bg-[#291d3b] text-[#b993ff]"
+                            }`}
+                          >
+                            {pedido.status ===
+                            "Entregado"
+                              ? "Entregado"
+                              : pedido.status ===
+                                "Cancelado"
+                              ? "Cancelado"
+                              : "Pendiente"}
+                          </span>
+
+                          <span className="rounded-full border border-[#342c45] bg-[#121019] px-3 py-1 text-xs font-bold text-[#aaa1b3]">
+                            {esFisica
+                              ? "🏪 Tienda física"
+                              : "🌐 Online"}
+                          </span>
+
+                        </div>
+
+                        <div className="mt-7 space-y-4 text-sm text-[#91889d]">
+
+                          <p>
+                            <strong className="text-[#cfc7d8]">
+                              Cliente:
+                            </strong>{" "}
+                            {pedido.customer_name ||
+                              (esFisica
+                                ? "Venta en tienda"
+                                : "-")}
+                          </p>
+
+                          <p>
+                            <strong className="text-[#cfc7d8]">
+                              Fecha:
+                            </strong>{" "}
+                            {formatearFechaHora(
+                              pedido.created_at
+                            )}
+                          </p>
+
+                          <p>
+                            <strong className="text-[#cfc7d8]">
+                              Productos:
+                            </strong>{" "}
+                            {cantidadProductos}
+                          </p>
+
+                          {!esFisica && (
+                            <>
+                              <p>
+                                <strong className="text-[#cfc7d8]">
+                                  Dirección:
+                                </strong>{" "}
+                                {pedido.delivery_address ||
+                                  "-"}
+                              </p>
+
+                              <p>
+                                <strong className="text-[#cfc7d8]">
+                                  Referencia:
+                                </strong>{" "}
+                                {pedido.delivery_reference ||
+                                  "-"}
+                              </p>
+                            </>
+                          )}
+
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-center lg:text-right">
+
+                        <p className="text-xs font-semibold uppercase tracking-widest text-[#71687e]">
+                          Total
+                        </p>
+
+                        <p className="mt-2 text-2xl font-black text-[#a978ff]">
+                          {formatearPrecio(
+                            pedido.total
+                          )}
+                        </p>
+
+                        <div className="mt-6 flex flex-wrap justify-center gap-[0.7875rem] lg:justify-end">
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDetallePedido(
+                                pedido
+                              )
+                            }
+                            className={
+                              botonPrincipal
+                            }
+                          >
+                            VER DETALLE
+                          </button>
+
+                          <select
+                            value={
+                              pedido.status ||
+                              "Pendiente"
+                            }
+                            disabled={
+                              guardando ||
+                              pedido.status ===
+                                "Cancelado"
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              cambiarEstado(
+                                pedido,
+                                event.target
+                                  .value
+                              )
+                            }
+                            className="rounded-xl border border-[#342c45] bg-[#121019] px-4 py-[0.65625rem] text-xs font-semibold text-[#ddd5e7] outline-none focus:border-[#8b5cf6] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="Pendiente">
+                              Pendiente
+                            </option>
+
+                            <option value="Entregado">
+                              Entregado
+                            </option>
+
+                            <option value="Cancelado">
+                              Cancelado
+                            </option>
+                          </select>
+
+                        </div>
+                      </div>
+
                     </div>
 
-                    <div className="mt-6 space-y-3 text-sm text-[#91889d]">
-                      <p>
-                        <strong className="text-[#cfc7d8]">
-                          Cliente:
-                        </strong>{" "}
-                        {pedido.customer_name ||
-                          "-"}
-                      </p>
+                    {pedido.order_items
+                      ?.length > 0 && (
+                      <div className="mt-10 border-t border-[#29233a] pt-8">
 
-                      <p>
-                        <strong className="text-[#cfc7d8]">
-                          Fecha:
-                        </strong>{" "}
-                        {formatearFechaHora(
-                          pedido.created_at
-                        )}
-                      </p>
+                        <p className="mb-6 text-center text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                          Productos
+                        </p>
 
-                      <p>
-                        <strong className="text-[#cfc7d8]">
-                          Dirección:
-                        </strong>{" "}
-                        {pedido.delivery_address ||
-                          "-"}
-                      </p>
+                        <div className="space-y-[0.7875rem]">
 
-                      <p>
-                        <strong className="text-[#cfc7d8]">
-                          Referencia:
-                        </strong>{" "}
-                        {pedido.delivery_reference ||
-                          "-"}
-                      </p>
-                    </div>
-                  </div>
+                          {pedido.order_items.map(
+                            (item) => (
+                              <div
+                                key={item.id}
+                                className="flex flex-wrap items-center justify-between gap-[0.7875rem] rounded-xl bg-[#121019] px-5 py-4"
+                              >
+                                <span className="font-semibold text-[#cfc7d8]">
+                                  {item.product_name ||
+                                    "Producto"}
+                                </span>
 
-                  <div className="text-center lg:text-right">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#71687e]">
-                      Total
-                    </p>
+                                <span className="text-[#81798e]">
+                                  {item.size ||
+                                    "-"}{" "}
+                                  /{" "}
+                                  {item.color ||
+                                    "-"}
+                                </span>
 
-                    <p className="mt-2 text-2xl font-black text-[#a978ff]">
-                      {formatearPrecio(
-                        pedido.total
-                      )}
-                    </p>
+                                <span className="text-[#81798e]">
+                                  x
+                                  {
+                                    item.quantity
+                                  }
+                                </span>
 
-                    <select
-                      value={
-                        pedido.status ||
-                        "pendiente"
+                                <span className="font-bold text-[#ddd5e7]">
+                                  {formatearPrecio(
+                                    item.subtotal
+                                  )}
+                                </span>
+                              </div>
+                            )
+                          )}
+
+                        </div>
+                      </div>
+                    )}
+
+                  </article>
+                );
+              }
+            )
+          )}
+
+        </div>
+      </div>
+
+      {ventaAbierta && (
+        <RegistrarVentaModal
+          productos={productos}
+          guardando={guardando}
+          onCerrar={() =>
+            setVentaAbierta(false)
+          }
+          onGuardado={async () => {
+            setVentaAbierta(false);
+            setMensaje(
+              "Venta registrada correctamente."
+            );
+            await cargarDatos();
+          }}
+          onError={(mensajeError) =>
+            setError(mensajeError)
+          }
+          setGuardando={setGuardando}
+        />
+      )}
+
+      {detallePedido && (
+        <DetallePedidoModal
+          pedido={detallePedido}
+          onCerrar={() =>
+            setDetallePedido(null)
+          }
+        />
+      )}
+
+    </section>
+  );
+}
+
+/* =========================================================
+   REGISTRAR VENTA FÍSICA
+========================================================= */
+
+function RegistrarVentaModal({
+  productos,
+  guardando,
+  onCerrar,
+  onGuardado,
+  onError,
+  setGuardando,
+}) {
+  const [cliente, setCliente] =
+    useState("");
+
+  const [descuento, setDescuento] =
+    useState("");
+
+  const [productoId, setProductoId] =
+    useState("");
+
+  const [variantId, setVariantId] =
+    useState("");
+
+  const [cantidad, setCantidad] =
+    useState(1);
+
+  const [items, setItems] =
+    useState([]);
+
+  const productoSeleccionado =
+    productos.find(
+      (producto) =>
+        producto.id === productoId
+    );
+
+  const variantes =
+    productoSeleccionado?.product_variants ||
+    [];
+
+  const varianteSeleccionada =
+    variantes.find(
+      (variante) =>
+        variante.id === variantId
+    );
+
+  const subtotal = items.reduce(
+    (total, item) =>
+      total +
+      Number(item.subtotal || 0),
+    0
+  );
+
+  const descuentoNumero =
+    Math.max(
+      0,
+      Number(descuento || 0)
+    );
+
+  const total = Math.max(
+    0,
+    subtotal - descuentoNumero
+  );
+
+  function cambiarProducto(id) {
+    setProductoId(id);
+    setVariantId("");
+    setCantidad(1);
+    onError("");
+  }
+
+  function agregarProducto() {
+    onError("");
+
+    if (!productoSeleccionado) {
+      onError(
+        "Selecciona un producto."
+      );
+      return;
+    }
+
+    if (!varianteSeleccionada) {
+      onError(
+        "Selecciona talla y color."
+      );
+      return;
+    }
+
+    const cantidadNumero =
+      Number(cantidad);
+
+    if (
+      !Number.isInteger(
+        cantidadNumero
+      ) ||
+      cantidadNumero <= 0
+    ) {
+      onError(
+        "La cantidad debe ser mayor que cero."
+      );
+      return;
+    }
+
+    const stockDisponible =
+      Number(
+        varianteSeleccionada.stock ||
+          0
+      );
+
+    const existente = items.find(
+      (item) =>
+        item.variant_id ===
+        varianteSeleccionada.id
+    );
+
+    const cantidadFinal =
+      (existente?.quantity || 0) +
+      cantidadNumero;
+
+    if (
+      cantidadFinal >
+      stockDisponible
+    ) {
+      onError(
+        `Solo hay ${stockDisponible} unidad(es) disponibles.`
+      );
+      return;
+    }
+
+    const precio =
+      Number(
+        productoSeleccionado.price ||
+          0
+      );
+
+    if (existente) {
+      setItems((actuales) =>
+        actuales.map((item) =>
+          item.variant_id ===
+          varianteSeleccionada.id
+            ? {
+                ...item,
+                quantity:
+                  cantidadFinal,
+                subtotal:
+                  cantidadFinal *
+                  Number(
+                    item.unit_price
+                  ),
+              }
+            : item
+        )
+      );
+    } else {
+      setItems((actuales) => [
+        ...actuales,
+        {
+          variant_id:
+            varianteSeleccionada.id,
+
+          product_id:
+            productoSeleccionado.id,
+
+          product_name:
+            productoSeleccionado.name,
+
+          size:
+            varianteSeleccionada.size,
+
+          color:
+            varianteSeleccionada.color,
+
+          color_hex:
+            varianteSeleccionada.color_hex ||
+            "",
+
+          quantity:
+            cantidadNumero,
+
+          unit_price:
+            precio,
+
+          subtotal:
+            precio *
+            cantidadNumero,
+
+          stock:
+            stockDisponible,
+        },
+      ]);
+    }
+
+    setCantidad(1);
+  }
+
+  function quitarItem(id) {
+    setItems((actuales) =>
+      actuales.filter(
+        (item) =>
+          item.variant_id !== id
+      )
+    );
+  }
+
+  async function guardarVenta() {
+    onError("");
+
+    if (items.length === 0) {
+      onError(
+        "Agrega al menos un producto a la venta."
+      );
+      return;
+    }
+
+    if (
+      descuentoNumero >
+      subtotal
+    ) {
+      onError(
+        "El descuento no puede ser mayor que el subtotal."
+      );
+      return;
+    }
+
+    setGuardando(true);
+
+    try {
+      const { error } =
+        await supabase.rpc(
+          "registrar_venta_fisica",
+          {
+            p_customer_name:
+              cliente.trim() ||
+              null,
+
+            p_discount:
+              descuentoNumero,
+
+            p_items:
+              items.map(
+                (item) => ({
+                  product_id:
+                    item.product_id,
+
+                  variant_id:
+                    item.variant_id,
+
+                  product_name:
+                    item.product_name,
+
+                  size:
+                    item.size,
+
+                  color:
+                    item.color,
+
+                  quantity:
+                    item.quantity,
+
+                  unit_price:
+                    item.unit_price,
+                })
+              ),
+          }
+        );
+
+      if (error) {
+        throw error;
+      }
+
+      await onGuardado();
+    } catch (err) {
+      console.error(err);
+
+      onError(
+        err?.message ||
+          "No se pudo registrar la venta."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#342c45] bg-[#17151f] shadow-[0_25px_90px_rgba(0,0,0,0.6)]">
+
+        <div className="flex items-center justify-between border-b border-[#29233a] px-6 py-5 sm:px-8">
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Tienda física
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-white">
+              Registrar venta
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#342c45] text-lg text-[#aaa1b3] transition hover:border-[#7c3aed] hover:text-white"
+          >
+            ×
+          </button>
+
+        </div>
+
+        <div className="overflow-y-auto px-6 py-8 sm:px-8">
+
+          <div className="grid gap-6 md:grid-cols-2">
+
+            <div>
+              <label className={etiqueta}>
+                Cliente
+              </label>
+
+              <input
+                type="text"
+                value={cliente}
+                onChange={(event) =>
+                  setCliente(
+                    event.target.value
+                  )
+                }
+                placeholder="Opcional"
+                className={campo}
+              />
+            </div>
+
+            <div>
+              <label className={etiqueta}>
+                Descuento
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={descuento}
+                onChange={(event) =>
+                  setDescuento(
+                    event.target.value
+                  )
+                }
+                placeholder="0.00"
+                className={campo}
+              />
+            </div>
+
+          </div>
+
+          <div className="mt-9 rounded-2xl border border-[#29233a] bg-[#121019] p-5 sm:p-6">
+
+            <p className="text-sm font-black text-white">
+              Agregar producto
+            </p>
+
+            <div className="mt-6 grid gap-5 md:grid-cols-2">
+
+              <div>
+                <label className={etiqueta}>
+                  Producto
+                </label>
+
+                <select
+                  value={productoId}
+                  onChange={(event) =>
+                    cambiarProducto(
+                      event.target.value
+                    )
+                  }
+                  className={campo}
+                >
+                  <option value="">
+                    Selecciona un producto
+                  </option>
+
+                  {productos.map(
+                    (producto) => (
+                      <option
+                        key={producto.id}
+                        value={producto.id}
+                      >
+                        {producto.name}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className={etiqueta}>
+                  Talla / color
+                </label>
+
+                <select
+                  value={variantId}
+                  onChange={(event) =>
+                    setVariantId(
+                      event.target.value
+                    )
+                  }
+                  disabled={
+                    !productoSeleccionado
+                  }
+                  className={campo}
+                >
+                  <option value="">
+                    Selecciona una variante
+                  </option>
+
+                  {variantes.map(
+                    (variante) => (
+                      <option
+                        key={variante.id}
+                        value={variante.id}
+                        disabled={
+                          Number(
+                            variante.stock ||
+                              0
+                          ) <= 0
+                        }
+                      >
+                        {variante.size} /{" "}
+                        {variante.color} ·
+                        Stock:{" "}
+                        {variante.stock}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className={etiqueta}>
+                  Cantidad
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  max={
+                    varianteSeleccionada?.stock ||
+                    undefined
+                  }
+                  value={cantidad}
+                  onChange={(event) =>
+                    setCantidad(
+                      Number(
+                        event.target.value
+                      )
+                    )
+                  }
+                  className={campo}
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={
+                    agregarProducto
+                  }
+                  disabled={
+                    !productoSeleccionado ||
+                    !varianteSeleccionada
+                  }
+                  className={`${botonPrincipal} w-full`}
+                >
+                  + Agregar producto
+                </button>
+              </div>
+
+            </div>
+
+            {varianteSeleccionada && (
+              <div className="mt-5 rounded-xl border border-[#342c45] bg-[#17151f] px-4 py-3 text-xs text-[#91889d]">
+                Stock disponible:{" "}
+                <strong className="text-[#b993ff]">
+                  {
+                    varianteSeleccionada.stock
+                  }
+                </strong>{" "}
+                · Precio:{" "}
+                <strong className="text-[#ddd5e7]">
+                  {formatearPrecio(
+                    productoSeleccionado?.price
+                  )}
+                </strong>
+              </div>
+            )}
+
+          </div>
+
+          <div className="mt-9">
+
+            <p className="mb-5 text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Productos de la venta
+            </p>
+
+            {items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#342c45] p-9 text-center">
+                <p className="text-sm text-[#81798e]">
+                  Todavía no agregaste
+                  productos.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-[0.7875rem]">
+
+                {items.map(
+                  (item) => (
+                    <div
+                      key={
+                        item.variant_id
                       }
-                      onChange={(event) =>
-                        cambiarEstado(
-                          pedido.id,
-                          event.target.value
-                        )
-                      }
-                      className="mt-6 rounded-xl border border-[#342c45] bg-[#121019] px-4 py-2.5 text-xs font-semibold text-[#ddd5e7] outline-none focus:border-[#8b5cf6]"
+                      className="flex flex-wrap items-center justify-between gap-[0.7875rem] rounded-xl border border-[#29233a] bg-[#121019] px-5 py-4"
                     >
-                      <option value="pendiente">
-                        Pendiente
-                      </option>
 
-                      <option value="enviado">
-                        Enviado
-                      </option>
+                      <div className="min-w-0">
 
-                      <option value="entregado">
-                        Entregado
-                      </option>
+                        <p className="truncate text-sm font-bold text-[#ddd5e7]">
+                          {
+                            item.product_name
+                          }
+                        </p>
 
-                      <option value="cancelado">
-                        Cancelado
-                      </option>
-                    </select>
-                  </div>
+                        <p className="mt-1 text-xs text-[#81798e]">
+                          {item.size} /{" "}
+                          {item.color}
+                        </p>
+
+                      </div>
+
+                      <span className="text-xs text-[#91889d]">
+                        x
+                        {
+                          item.quantity
+                        }
+                      </span>
+
+                      <span className="text-sm font-black text-[#b993ff]">
+                        {formatearPrecio(
+                          item.subtotal
+                        )}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          quitarItem(
+                            item.variant_id
+                          )
+                        }
+                        className="rounded-lg px-[1.05rem] py-[0.525rem] text-xs font-bold text-red-400 transition hover:bg-red-950/20 hover:text-red-300"
+                      >
+                        Quitar
+                      </button>
+
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+          </div>
+
+          <div className="mt-9 rounded-2xl border border-[#29233a] bg-[#121019] p-6">
+
+            <div className="space-y-4">
+
+              <div className="flex items-center justify-between gap-5 text-sm">
+                <span className="text-[#91889d]">
+                  Subtotal
+                </span>
+
+                <span className="font-bold text-[#ddd5e7]">
+                  {formatearPrecio(
+                    subtotal
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-5 text-sm">
+                <span className="text-[#91889d]">
+                  Descuento
+                </span>
+
+                <span className="font-bold text-[#ddd5e7]">
+                  -{" "}
+                  {formatearPrecio(
+                    descuentoNumero
+                  )}
+                </span>
+              </div>
+
+              <div className="border-t border-[#29233a] pt-4">
+
+                <div className="flex items-center justify-between gap-5">
+
+                  <span className="text-base font-black text-white">
+                    Total
+                  </span>
+
+                  <span className="text-2xl font-black text-[#a978ff]">
+                    {formatearPrecio(
+                      total
+                    )}
+                  </span>
+
                 </div>
 
-                {pedido.order_items?.length >
-                  0 && (
-                  <div className="mt-8 border-t border-[#29233a] pt-7">
-                    <p className="mb-5 text-center text-xs font-bold uppercase tracking-widest text-[#71687e]">
-                      Productos
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="flex flex-col-reverse gap-[0.7875rem] border-t border-[#29233a] px-6 py-5 sm:flex-row sm:justify-end sm:px-8">
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={guardando}
+            className={botonPrincipal}
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            onClick={guardarVenta}
+            disabled={
+              guardando ||
+              items.length === 0
+            }
+            className={botonMorado}
+          >
+            {guardando
+              ? "Guardando..."
+              : "Registrar venta"}
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   DETALLE DEL PEDIDO / VENTA
+========================================================= */
+
+function DetallePedidoModal({
+  pedido,
+  onCerrar,
+}) {
+  const esFisica =
+    obtenerTipoVenta(pedido) ===
+    "fisica";
+
+  const items =
+    pedido?.order_items || [];
+
+  const subtotal = items.reduce(
+    (total, item) =>
+      total +
+      Number(item.subtotal || 0),
+    0
+  );
+
+  const descuento = Number(
+    pedido?.discount || 0
+  );
+
+  const total = Number(
+    pedido?.total || 0
+  );
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#342c45] bg-[#17151f] shadow-[0_25px_90px_rgba(0,0,0,0.6)]">
+
+        <div className="flex items-center justify-between border-b border-[#29233a] px-6 py-5 sm:px-8">
+
+          <div>
+
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              {esFisica
+                ? "Venta física"
+                : "Pedido online"}
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-white">
+              {esFisica
+                ? "Venta"
+                : "Pedido"}{" "}
+              #
+              {pedido?.order_number ||
+                "-"}
+            </h2>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#342c45] text-lg text-[#aaa1b3] transition hover:border-[#7c3aed] hover:text-white"
+          >
+            ×
+          </button>
+
+        </div>
+
+        <div className="overflow-y-auto px-6 py-8 sm:px-8">
+
+          <div className="grid gap-4 sm:grid-cols-2">
+
+            <div className="rounded-xl border border-[#29233a] bg-[#121019] p-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Cliente
+              </p>
+
+              <p className="mt-2 text-sm font-bold text-[#ddd5e7]">
+                {pedido?.customer_name ||
+                  (esFisica
+                    ? "Venta en tienda"
+                    : "-")}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[#29233a] bg-[#121019] p-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Fecha
+              </p>
+
+              <p className="mt-2 text-sm font-bold text-[#ddd5e7]">
+                {formatearFechaHora(
+                  pedido?.created_at
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[#29233a] bg-[#121019] p-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Tipo de venta
+              </p>
+
+              <p className="mt-2 text-sm font-bold text-[#ddd5e7]">
+                {esFisica
+                  ? "🏪 Tienda física"
+                  : "🌐 Online"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[#29233a] bg-[#121019] p-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Estado
+              </p>
+
+              <p
+                className={`mt-2 text-sm font-bold ${
+                  pedido?.status ===
+                  "Entregado"
+                    ? "text-green-400"
+                    : pedido?.status ===
+                      "Cancelado"
+                    ? "text-red-400"
+                    : "text-[#b993ff]"
+                }`}
+              >
+                {pedido?.status ||
+                  "Pendiente"}
+              </p>
+            </div>
+
+          </div>
+
+          {!esFisica && (
+            <div className="mt-8 rounded-2xl border border-[#29233a] bg-[#121019] p-6">
+
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Información de entrega
+              </p>
+
+              <div className="mt-5 space-y-4 text-sm">
+
+                <div>
+                  <p className="font-semibold text-[#71687e]">
+                    Dirección
+                  </p>
+
+                  <p className="mt-1 text-[#ddd5e7]">
+                    {pedido?.delivery_address ||
+                      "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-[#71687e]">
+                    Referencia
+                  </p>
+
+                  <p className="mt-1 text-[#ddd5e7]">
+                    {pedido?.delivery_reference ||
+                      "-"}
+                  </p>
+                </div>
+
+                {pedido?.delivery_zone && (
+                  <div>
+                    <p className="font-semibold text-[#71687e]">
+                      Zona
                     </p>
 
-                    <div className="space-y-4">
-                      {pedido.order_items.map(
-                        (item) => (
-                          <div
-                            key={item.id}
-                            className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[#121019] px-5 py-4 text-xs"
-                          >
-                            <span className="font-semibold text-[#cfc7d8]">
-                              {item.size || "-"}{" "}
-                              /{" "}
-                              {item.color || "-"}
-                            </span>
-
-                            <span className="text-[#81798e]">
-                              x{item.quantity}
-                            </span>
-
-                            <span className="font-bold text-[#ddd5e7]">
-                              {formatearPrecio(
-                                item.subtotal
-                              )}
-                            </span>
-                          </div>
-                        )
-                      )}
-                    </div>
+                    <p className="mt-1 text-[#ddd5e7]">
+                      {pedido.delivery_zone}
+                    </p>
                   </div>
                 )}
-              </article>
-            ))
+
+              </div>
+            </div>
           )}
+
+          <div className="mt-8">
+
+            <p className="mb-5 text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Productos
+            </p>
+
+            {items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#342c45] p-8 text-center">
+                <p className="text-sm text-[#81798e]">
+                  No hay productos
+                  registrados.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+
+                {items.map(
+                  (item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-[#29233a] bg-[#121019] p-5"
+                    >
+
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                        <div className="min-w-0">
+
+                          <p className="text-sm font-bold text-[#ddd5e7]">
+                            {item.product_name ||
+                              "Producto"}
+                          </p>
+
+                          <div className="mt-2 flex flex-wrap gap-2">
+
+                            <span className="rounded-lg bg-[#211a2e] px-3 py-1 text-xs font-semibold text-[#b993ff]">
+                              Talla:{" "}
+                              {item.size ||
+                                "-"}
+                            </span>
+
+                            <span className="rounded-lg bg-[#211a2e] px-3 py-1 text-xs font-semibold text-[#b993ff]">
+                              Color:{" "}
+                              {item.color ||
+                                "-"}
+                            </span>
+
+                            <span className="rounded-lg bg-[#211a2e] px-3 py-1 text-xs font-semibold text-[#aaa1b3]">
+                              Cantidad:{" "}
+                              {item.quantity ||
+                                0}
+                            </span>
+
+                          </div>
+
+                        </div>
+
+                        <div className="shrink-0 text-left sm:text-right">
+
+                          <p className="text-xs text-[#71687e]">
+                            Precio unitario
+                          </p>
+
+                          <p className="mt-1 text-sm font-bold text-[#ddd5e7]">
+                            {formatearPrecio(
+                              item.unit_price
+                            )}
+                          </p>
+
+                          <p className="mt-2 text-xs text-[#71687e]">
+                            Subtotal
+                          </p>
+
+                          <p className="mt-1 text-base font-black text-[#b993ff]">
+                            {formatearPrecio(
+                              item.subtotal
+                            )}
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+          </div>
+
+          <div className="mt-8 rounded-2xl border border-[#29233a] bg-[#121019] p-6">
+
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Resumen
+            </p>
+
+            <div className="mt-5 space-y-4">
+
+              <div className="flex items-center justify-between gap-5 text-sm">
+                <span className="text-[#91889d]">
+                  Subtotal
+                </span>
+
+                <span className="font-bold text-[#ddd5e7]">
+                  {formatearPrecio(
+                    subtotal
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-5 text-sm">
+                <span className="text-[#91889d]">
+                  Descuento
+                </span>
+
+                <span className="font-bold text-[#ddd5e7]">
+                  -{" "}
+                  {formatearPrecio(
+                    descuento
+                  )}
+                </span>
+              </div>
+
+              <div className="border-t border-[#29233a] pt-5">
+
+                <div className="flex items-center justify-between gap-5">
+
+                  <span className="text-base font-black text-white">
+                    Total
+                  </span>
+
+                  <span className="text-2xl font-black text-[#a978ff]">
+                    {formatearPrecio(
+                      total
+                    )}
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {pedido?.notes && (
+            <div className="mt-8 rounded-2xl border border-[#29233a] bg-[#121019] p-6">
+
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Observaciones
+              </p>
+
+              <p className="mt-3 text-sm leading-6 text-[#aaa1b3]">
+                {pedido.notes}
+              </p>
+
+            </div>
+          )}
+
         </div>
+
+        <div className="flex justify-end border-t border-[#29233a] px-6 py-5 sm:px-8">
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            className={botonPrincipal}
+          >
+            Cerrar
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   ESTADÍSTICAS
+========================================================= */
+
+function EstadisticasAdmin() {
+  const [pedidos, setPedidos] =
+    useState([]);
+
+  const [cargando, setCargando] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  useEffect(() => {
+    cargarEstadisticas();
+  }, []);
+
+  async function cargarEstadisticas() {
+    setCargando(true);
+    setError("");
+
+    const {
+      data,
+      error: errorConsulta,
+    } = await supabase
+      .from("orders")
+      .select(`
+        id,
+        order_number,
+        total,
+        status,
+        sale_type,
+        created_at,
+        order_items (
+          quantity,
+          product_id,
+          product_name,
+          subtotal
+        )
+      `)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (errorConsulta) {
+      console.error(
+        errorConsulta
+      );
+
+      setError(
+        "No se pudieron cargar las estadísticas."
+      );
+    }
+
+    setPedidos(data || []);
+    setCargando(false);
+  }
+
+  const pedidosEntregados =
+    pedidos.filter(
+      (pedido) =>
+        pedido.status ===
+        "Entregado"
+    );
+
+  const ventasOnline =
+    pedidosEntregados.filter(
+      (pedido) =>
+        obtenerTipoVenta(
+          pedido
+        ) === "online"
+    );
+
+  const ventasFisicas =
+    pedidosEntregados.filter(
+      (pedido) =>
+        obtenerTipoVenta(
+          pedido
+        ) === "fisica"
+    );
+
+  const totalVendido =
+    pedidosEntregados.reduce(
+      (total, pedido) =>
+        total +
+        Number(
+          pedido.total || 0
+        ),
+      0
+    );
+
+  const cantidadPedidos =
+    pedidosEntregados.length;
+
+  const cantidadProductos =
+    pedidosEntregados.reduce(
+      (total, pedido) =>
+        total +
+        (
+          pedido.order_items ||
+          []
+        ).reduce(
+          (
+            subtotal,
+            item
+          ) =>
+            subtotal +
+            Number(
+              item.quantity ||
+                0
+            ),
+          0
+        ),
+      0
+    );
+
+  const totalOnline =
+    ventasOnline.reduce(
+      (total, pedido) =>
+        total +
+        Number(
+          pedido.total || 0
+        ),
+      0
+    );
+
+  const totalFisico =
+    ventasFisicas.reduce(
+      (total, pedido) =>
+        total +
+        Number(
+          pedido.total || 0
+        ),
+      0
+    );
+
+  const productosVendidos = {};
+
+  pedidosEntregados.forEach(
+    (pedido) => {
+      (
+        pedido.order_items ||
+        []
+      ).forEach((item) => {
+        const nombre =
+          item.product_name ||
+          "Producto";
+
+        if (
+          !productosVendidos[
+            nombre
+          ]
+        ) {
+          productosVendidos[
+            nombre
+          ] = {
+            nombre,
+            cantidad: 0,
+            total: 0,
+          };
+        }
+
+        productosVendidos[
+          nombre
+        ].cantidad +=
+          Number(
+            item.quantity || 0
+          );
+
+        productosVendidos[
+          nombre
+        ].total +=
+          Number(
+            item.subtotal || 0
+          );
+      });
+    }
+  );
+
+  const rankingProductos =
+    Object.values(
+      productosVendidos
+    ).sort(
+      (a, b) =>
+        b.cantidad -
+        a.cantidad
+    );
+
+  if (cargando) {
+    return (
+      <div className="flex w-full justify-center py-28 text-center">
+        <p className="text-sm text-[#81798e]">
+          Cargando estadísticas...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="flex w-full justify-center">
+      <div className="w-full max-w-6xl">
+
+        <div className="mx-auto max-w-4xl text-center">
+
+          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
+            Resumen
+          </span>
+
+          <h1 className="mt-8 text-3xl font-black text-white">
+            Estadísticas
+          </h1>
+
+          <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#91889d]">
+            Ventas reales de GMISH.
+            Las ventas canceladas no
+            se incluyen.
+          </p>
+
+        </div>
+
+        {error && (
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+
+          <div className={`${tarjeta} p-7`}>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Total vendido
+            </p>
+
+            <p className="mt-4 text-3xl font-black text-[#b993ff]">
+              {formatearPrecio(
+                totalVendido
+              )}
+            </p>
+          </div>
+
+          <div className={`${tarjeta} p-7`}>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Ventas entregadas
+            </p>
+
+            <p className="mt-4 text-3xl font-black text-white">
+              {cantidadPedidos}
+            </p>
+          </div>
+
+          <div className={`${tarjeta} p-7`}>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Productos vendidos
+            </p>
+
+            <p className="mt-4 text-3xl font-black text-white">
+              {cantidadProductos}
+            </p>
+          </div>
+
+          <div className={`${tarjeta} p-7`}>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Ticket promedio
+            </p>
+
+            <p className="mt-4 text-3xl font-black text-white">
+              {formatearPrecio(
+                cantidadPedidos >
+                0
+                  ? totalVendido /
+                    cantidadPedidos
+                  : 0
+              )}
+            </p>
+          </div>
+
+        </div>
+
+        <div className="mt-8 grid gap-5 md:grid-cols-2">
+
+          <div className={`${tarjeta} p-8`}>
+
+            <div className="flex items-center justify-between gap-5">
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                  🌐 Online
+                </p>
+
+                <p className="mt-3 text-2xl font-black text-white">
+                  {formatearPrecio(
+                    totalOnline
+                  )}
+                </p>
+              </div>
+
+              <span className="text-3xl">
+                🌐
+              </span>
+
+            </div>
+
+            <p className="mt-4 text-sm text-[#81798e]">
+              {ventasOnline.length}{" "}
+              pedido(s) entregado(s)
+            </p>
+
+          </div>
+
+          <div className={`${tarjeta} p-8`}>
+
+            <div className="flex items-center justify-between gap-5">
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                  🏪 Tienda física
+                </p>
+
+                <p className="mt-3 text-2xl font-black text-white">
+                  {formatearPrecio(
+                    totalFisico
+                  )}
+                </p>
+              </div>
+
+              <span className="text-3xl">
+                🏪
+              </span>
+
+            </div>
+
+            <p className="mt-4 text-sm text-[#81798e]">
+              {ventasFisicas.length}{" "}
+              venta(s) entregada(s)
+            </p>
+
+          </div>
+
+        </div>
+
+        <div className={`${tarjeta} mt-8 p-8`}>
+
+          <div className="text-center">
+
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Ranking
+            </p>
+
+            <h2 className="mt-3 text-xl font-black text-white">
+              Productos más vendidos
+            </h2>
+
+          </div>
+
+          {rankingProductos.length ===
+          0 ? (
+            <div className="mt-8 rounded-xl border border-dashed border-[#342c45] p-10 text-center">
+              <p className="text-sm text-[#81798e]">
+                Todavía no hay productos
+                vendidos.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-8 space-y-3">
+
+              {rankingProductos
+                .slice(0, 10)
+                .map(
+                  (
+                    producto,
+                    index
+                  ) => (
+                    <div
+                      key={
+                        producto.nombre
+                      }
+                      className="flex flex-col gap-4 rounded-xl border border-[#29233a] bg-[#121019] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+
+                      <div className="flex min-w-0 items-center gap-4">
+
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#211a2e] text-sm font-black text-[#b993ff]">
+                          {index + 1}
+                        </span>
+
+                        <p className="truncate text-sm font-bold text-[#ddd5e7]">
+                          {
+                            producto.nombre
+                          }
+                        </p>
+
+                      </div>
+
+                      <div className="flex items-center justify-between gap-6 sm:justify-end">
+
+                        <span className="text-xs font-semibold text-[#91889d]">
+                          {
+                            producto.cantidad
+                          }{" "}
+                          unidad(es)
+                        </span>
+
+                        <span className="text-sm font-black text-[#b993ff]">
+                          {formatearPrecio(
+                            producto.total
+                          )}
+                        </span>
+
+                      </div>
+
+                    </div>
+                  )
+                )}
+
+            </div>
+          )}
+
+        </div>
+
+        <div className={`${tarjeta} mt-8 p-8`}>
+
+          <div className="text-center">
+
+            <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+              Pedidos
+            </p>
+
+            <h2 className="mt-3 text-xl font-black text-white">
+              Estado de pedidos y ventas
+            </h2>
+
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+
+            <div className="rounded-xl bg-[#121019] p-5 text-center">
+
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Pendientes
+              </p>
+
+              <p className="mt-3 text-2xl font-black text-[#b993ff]">
+                {
+                  pedidos.filter(
+                    (pedido) =>
+                      pedido.status ===
+                      "Pendiente"
+                  ).length
+                }
+              </p>
+
+            </div>
+
+            <div className="rounded-xl bg-[#121019] p-5 text-center">
+
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Entregados
+              </p>
+
+              <p className="mt-3 text-2xl font-black text-green-400">
+                {
+                  pedidos.filter(
+                    (pedido) =>
+                      pedido.status ===
+                      "Entregado"
+                  ).length
+                }
+              </p>
+
+            </div>
+
+            <div className="rounded-xl bg-[#121019] p-5 text-center">
+
+              <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                Cancelados
+              </p>
+
+              <p className="mt-3 text-2xl font-black text-red-400">
+                {
+                  pedidos.filter(
+                    (pedido) =>
+                      pedido.status ===
+                      "Cancelado"
+                  ).length
+                }
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
     </section>
   );
@@ -1089,184 +2441,180 @@ function PedidosAdmin() {
 ========================================================= */
 
 function PortadasAdmin() {
-  const [portadas, setPortadas] = useState({
-    principal: "",
-    hombre: "",
-    mujer: "",
-  });
+  const [cargando, setCargando] =
+    useState(true);
 
-  const [archivos, setArchivos] = useState({
-    principal: null,
-    hombre: null,
-    mujer: null,
-  });
+  const [guardando, setGuardando] =
+    useState(false);
 
-  const [cargando, setCargando] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [mensaje, setMensaje] = useState("");
-  const [error, setError] = useState("");
+  const [mensaje, setMensaje] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const [configId, setConfigId] =
+    useState(null);
+
+  const [titulo, setTitulo] =
+    useState("");
+
+  const [subtitulo, setSubtitulo] =
+    useState("");
+
+  const [boton, setBoton] =
+    useState("Ver colección");
+
+  const [imagen, setImagen] =
+    useState("");
 
   useEffect(() => {
-    cargarPortadas();
+    cargarPortada();
   }, []);
 
-  async function cargarPortadas() {
+  async function cargarPortada() {
     setCargando(true);
+    setError("");
 
-    const { data, error: errorPortadas } =
-      await supabase
-        .from("store_settings")
-        .select(
-          "setting_key, setting_value"
-        )
-        .in("setting_key", [
-          "portada_principal",
-          "portada_hombre",
-          "portada_mujer",
-        ]);
+    const {
+      data,
+      error: errorConsulta,
+    } = await supabase
+      .from("store_settings")
+      .select(`
+        id,
+        store_name,
+        setting_key,
+        setting_value
+      `)
+      .eq(
+        "setting_key",
+        "portada_principal"
+      )
+      .maybeSingle();
 
-    if (errorPortadas) {
-      console.error(errorPortadas);
+    if (errorConsulta) {
+      console.error(
+        errorConsulta
+      );
 
       setError(
-        "No se pudieron cargar las portadas."
+        "No se pudo cargar la portada."
       );
 
       setCargando(false);
       return;
     }
 
-    const nuevasPortadas = {
-      principal: "",
-      hombre: "",
-      mujer: "",
-    };
+    if (data) {
+      setConfigId(data.id);
 
-    (data || []).forEach((item) => {
-      if (
-        item.setting_key ===
-        "portada_principal"
-      ) {
-        nuevasPortadas.principal =
-          item.setting_value || "";
+      try {
+        const contenido =
+          JSON.parse(
+            data.setting_value ||
+              "{}"
+          );
+
+        setTitulo(
+          contenido.titulo || ""
+        );
+
+        setSubtitulo(
+          contenido.subtitulo ||
+            ""
+        );
+
+        setBoton(
+          contenido.boton ||
+            "Ver colección"
+        );
+
+        setImagen(
+          contenido.imagen || ""
+        );
+      } catch {
+        setTitulo(
+          data.setting_value ||
+            ""
+        );
       }
+    }
 
-      if (
-        item.setting_key === "portada_hombre"
-      ) {
-        nuevasPortadas.hombre =
-          item.setting_value || "";
-      }
-
-      if (
-        item.setting_key === "portada_mujer"
-      ) {
-        nuevasPortadas.mujer =
-          item.setting_value || "";
-      }
-    });
-
-    setPortadas(nuevasPortadas);
     setCargando(false);
   }
 
-  function seleccionarArchivo(tipo, archivo) {
-    setArchivos((actuales) => ({
-      ...actuales,
-      [tipo]: archivo,
-    }));
-
-    setMensaje("");
-    setError("");
-  }
-
-  async function guardarPortada(tipo) {
-    const archivo = archivos[tipo];
-
-    if (!archivo) {
-      setError(
-        "Selecciona una imagen primero."
-      );
-      return;
-    }
-
+  async function guardarPortada() {
     setGuardando(true);
-    setMensaje("");
     setError("");
+    setMensaje("");
 
     try {
-      const extension =
-        archivo.name
-          .split(".")
-          .pop()
-          ?.toLowerCase() || "jpg";
+      const contenido =
+        JSON.stringify({
+          titulo:
+            titulo.trim(),
+          subtitulo:
+            subtitulo.trim(),
+          boton:
+            boton.trim() ||
+            "Ver colección",
+          imagen:
+            imagen.trim(),
+        });
 
-      const nombreArchivo =
-        `${tipo}-${Date.now()}.${extension}`;
+      const ahora =
+        new Date().toISOString();
 
-      const ruta =
-        `portadas/${nombreArchivo}`;
-
-      const { error: errorUpload } =
-        await supabase.storage
-          .from("product-images")
-          .upload(ruta, archivo, {
-            upsert: true,
-            contentType: archivo.type,
-          });
-
-      if (errorUpload) {
-        throw errorUpload;
-      }
-
-      const { data: urlData } =
-        supabase.storage
-          .from("product-images")
-          .getPublicUrl(ruta);
-
-      const url = urlData.publicUrl;
-
-      const settingKey =
-        `portada_${tipo}`;
-
-      const { error: errorGuardar } =
-        await supabase
+      if (configId) {
+        const {
+          error: errorUpdate,
+        } = await supabase
           .from("store_settings")
-          .upsert(
-            {
-              id:
-                tipo === "principal"
-                  ? 6
-                  : tipo === "hombre"
-                    ? 7
-                    : 5,
-              store_name: "GMISH",
-              setting_key: settingKey,
-              setting_value: url,
-              updated_at:
-                new Date().toISOString(),
-            },
-            {
-              onConflict: "id",
-            }
+          .update({
+            store_name: "GMISH",
+            setting_value:
+              contenido,
+            updated_at: ahora,
+          })
+          .eq(
+            "id",
+            configId
           );
 
-      if (errorGuardar) {
-        throw errorGuardar;
+        if (errorUpdate) {
+          throw errorUpdate;
+        }
+      } else {
+        const {
+          data,
+          error: errorInsert,
+        } = await supabase
+          .from("store_settings")
+          .insert({
+            store_name: "GMISH",
+            setting_key:
+              "portada_principal",
+            setting_value:
+              contenido,
+            updated_at: ahora,
+          })
+          .select(
+            "id"
+          )
+          .single();
+
+        if (errorInsert) {
+          throw errorInsert;
+        }
+
+        setConfigId(
+          data.id
+        );
       }
 
-      setPortadas((actuales) => ({
-        ...actuales,
-        [tipo]: url,
-      }));
-
-      setArchivos((actuales) => ({
-        ...actuales,
-        [tipo]: null,
-      }));
-
       setMensaje(
-        `Portada de ${tipo} actualizada correctamente.`
+        "Portada guardada correctamente."
       );
     } catch (err) {
       console.error(err);
@@ -1282,380 +2630,151 @@ function PortadasAdmin() {
 
   if (cargando) {
     return (
-      <div className="flex w-full justify-center py-24 text-center">
+      <div className="flex w-full justify-center py-28 text-center">
         <p className="text-sm text-[#81798e]">
-          Cargando portadas...
+          Cargando portada...
         </p>
       </div>
     );
   }
 
-  const opciones = [
-    {
-      id: "principal",
-      titulo: "Portada principal",
-      descripcion:
-        "Imagen principal que aparece en Inicio.",
-    },
-    {
-      id: "hombre",
-      titulo: "Portada Hombre",
-      descripcion:
-        "Imagen utilizada para la sección Hombre.",
-    },
-    {
-      id: "mujer",
-      titulo: "Portada Mujer",
-      descripcion:
-        "Imagen utilizada para la sección Mujer.",
-    },
-  ];
-
   return (
     <section className="flex w-full justify-center">
-      <div className="flex w-full max-w-5xl flex-col items-center">
-        <div className="w-full text-center">
+      <div className="w-full max-w-5xl">
+
+        <div className="text-center">
+
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
-            Imágenes
+            Apariencia
           </span>
 
           <h1 className="mt-7 text-3xl font-black text-white">
-            Portadas
+            Portada principal
           </h1>
 
-          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
-            Administra las imágenes principales de la tienda.
+          <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#91889d]">
+            Administra el contenido principal
+            que aparece en la portada de GMISH.
           </p>
+
         </div>
 
         {mensaje && (
-          <div className="mx-auto mt-10 w-full max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
             {mensaje}
           </div>
         )}
 
         {error && (
-          <div className="mx-auto mt-7 w-full max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
             {error}
           </div>
         )}
 
-        <div className="mt-12 grid w-full justify-items-center gap-x-8 gap-y-10 md:grid-cols-2">
-          {opciones.map((opcion) => (
-            <div
-              key={opcion.id}
-              className={`${tarjeta} w-full max-w-[500px] overflow-hidden`}
-            >
-              <div className="aspect-[16/9] bg-[#121019]">
-                {portadas[opcion.id] ? (
-                  <img
-                    src={portadas[opcion.id]}
-                    alt={opcion.titulo}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-[#71687e]">
-                    Sin imagen
-                  </div>
-                )}
-              </div>
+        <div className={`${tarjeta} mt-12 p-7 sm:p-9`}>
 
-              <div className="p-8 text-center">
-                <h2 className="text-base font-bold text-white">
-                  {opcion.titulo}
-                </h2>
+          <div className="grid gap-6">
 
-                <p className="mt-3 text-xs leading-5 text-[#81798e]">
-                  {opcion.descripcion}
-                </p>
+            <div>
+              <label className={etiqueta}>
+                Título principal
+              </label>
 
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    seleccionarArchivo(
-                      opcion.id,
-                      event.target.files?.[0] ||
-                        null
-                    )
-                  }
-                  className="mt-7 w-full text-xs text-[#91889d]"
-                />
-
-                <button
-                  type="button"
-                  disabled={
-                    guardando ||
-                    !archivos[opcion.id]
-                  }
-                  onClick={() =>
-                    guardarPortada(opcion.id)
-                  }
-                  className={`${botonMorado} mt-6 w-full`}
-                >
-                  Guardar portada
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* =========================================================
-   ESTADÍSTICAS
-========================================================= */
-
-function EstadisticasAdmin() {
-  const [pedidos, setPedidos] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [cargando, setCargando] = useState(true);
-
-  useEffect(() => {
-    cargarEstadisticas();
-  }, []);
-
-  async function cargarEstadisticas() {
-    setCargando(true);
-
-    const [
-      { data: pedidosData, error: pedidosError },
-      {
-        data: productosData,
-        error: productosError,
-      },
-    ] = await Promise.all([
-      supabase
-        .from("orders")
-        .select(
-          "id, status, total, created_at, discount"
-        ),
-
-      supabase
-        .from("products")
-        .select(
-          "id, name, sold_count, price, is_active, is_new, is_best_seller"
-        ),
-    ]);
-
-    if (pedidosError) {
-      console.error(pedidosError);
-    }
-
-    if (productosError) {
-      console.error(productosError);
-    }
-
-    setPedidos(pedidosData || []);
-    setProductos(productosData || []);
-    setCargando(false);
-  }
-
-  const pedidosValidos = pedidos.filter(
-    (pedido) =>
-      pedido.status !== "cancelado"
-  );
-
-  const pedidosEntregados = pedidos.filter(
-    (pedido) =>
-      pedido.status === "entregado"
-  );
-
-  const ventasEntregadas =
-    pedidosEntregados.reduce(
-      (total, pedido) =>
-        total + Number(pedido.total || 0),
-      0
-    );
-
-  const ventasGenerales =
-    pedidosValidos.reduce(
-      (total, pedido) =>
-        total + Number(pedido.total || 0),
-      0
-    );
-
-  const descuentos = pedidosValidos.reduce(
-    (total, pedido) =>
-      total + Number(pedido.discount || 0),
-    0
-  );
-
-  const productosVendidos = productos
-    .filter(
-      (producto) =>
-        Number(producto.sold_count || 0) > 0
-    )
-    .sort(
-      (a, b) =>
-        Number(b.sold_count || 0) -
-        Number(a.sold_count || 0)
-    )
-    .slice(0, 5);
-
-  if (cargando) {
-    return (
-      <div className="flex w-full justify-center py-24 text-center">
-        <p className="text-sm text-[#81798e]">
-          Calculando estadísticas...
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <section className="flex w-full justify-center">
-      <div className="flex w-full max-w-5xl flex-col items-center">
-        <div className="w-full text-center">
-          <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
-            Análisis
-          </span>
-
-          <h1 className="mt-7 text-3xl font-black text-white">
-            Estadísticas
-          </h1>
-
-          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
-            Resumen general del rendimiento de GMISH.
-          </p>
-        </div>
-
-        <div className="mt-12 grid w-full justify-items-center gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            titulo="Pedidos"
-            valor={pedidosValidos.length}
-          />
-
-          <StatCard
-            titulo="Entregados"
-            valor={pedidosEntregados.length}
-          />
-
-          <StatCard
-            titulo="Ventas entregadas"
-            valor={formatearPrecio(
-              ventasEntregadas
-            )}
-          />
-
-          <StatCard
-            titulo="Descuentos"
-            valor={formatearPrecio(
-              descuentos
-            )}
-          />
-        </div>
-
-        <div className="mt-10 grid w-full justify-items-center gap-x-8 gap-y-10 lg:grid-cols-2">
-          <div className={`${tarjeta} w-full p-8`}>
-            <h2 className="text-center text-base font-black text-white lg:text-left">
-              Resumen de ventas
-            </h2>
-
-            <div className="mt-7 space-y-6">
-              <FilaEstadistica
-                nombre="Ventas no canceladas"
-                valor={formatearPrecio(
-                  ventasGenerales
-                )}
-              />
-
-              <FilaEstadistica
-                nombre="Ventas entregadas"
-                valor={formatearPrecio(
-                  ventasEntregadas
-                )}
-              />
-
-              <FilaEstadistica
-                nombre="Pedidos cancelados"
-                valor={
-                  pedidos.filter(
-                    (pedido) =>
-                      pedido.status ===
-                      "cancelado"
-                  ).length
-                }
-              />
-            </div>
-          </div>
-
-          <div className={`${tarjeta} w-full p-8`}>
-            <h2 className="text-center text-base font-black text-white lg:text-left">
-              Productos más vendidos
-            </h2>
-
-            <div className="mt-7 space-y-4">
-              {productosVendidos.length ===
-              0 ? (
-                <p className="text-center text-sm text-[#81798e]">
-                  Todavía no hay productos vendidos.
-                </p>
-              ) : (
-                productosVendidos.map(
-                  (producto) => (
-                    <div
-                      key={producto.id}
-                      className="flex items-center justify-between gap-4 rounded-xl bg-[#121019] px-5 py-4"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-[#ddd5e7]">
-                          {producto.name}
-                        </p>
-
-                        <p className="mt-1 text-xs text-[#71687e]">
-                          {formatearPrecio(
-                            producto.price
-                          )}
-                        </p>
-                      </div>
-
-                      <span className="shrink-0 rounded-full bg-[#291d3b] px-3 py-1 text-xs font-bold text-[#b993ff]">
-                        {producto.sold_count ||
-                          0}{" "}
-                        vendidos
-                      </span>
-                    </div>
+              <input
+                type="text"
+                value={titulo}
+                onChange={(event) =>
+                  setTitulo(
+                    event.target.value
                   )
-                )
-              )}
+                }
+                placeholder="Nueva colección"
+                className={campo}
+              />
             </div>
+
+            <div>
+              <label className={etiqueta}>
+                Subtítulo
+              </label>
+
+              <textarea
+                value={subtitulo}
+                onChange={(event) =>
+                  setSubtitulo(
+                    event.target.value
+                  )
+                }
+                placeholder="Descubre las últimas novedades de GMISH."
+                rows={4}
+                className={`${campo} resize-none`}
+              />
+            </div>
+
+            <div>
+              <label className={etiqueta}>
+                Texto del botón
+              </label>
+
+              <input
+                type="text"
+                value={boton}
+                onChange={(event) =>
+                  setBoton(
+                    event.target.value
+                  )
+                }
+                placeholder="Ver colección"
+                className={campo}
+              />
+            </div>
+
+            <div>
+              <label className={etiqueta}>
+                URL de imagen
+              </label>
+
+              <input
+                type="text"
+                value={imagen}
+                onChange={(event) =>
+                  setImagen(
+                    event.target.value
+                  )
+                }
+                placeholder="https://..."
+                className={campo}
+              />
+
+              <p className="mt-2 text-xs text-[#71687e]">
+                Puedes dejarlo vacío mientras
+                terminas de preparar la imagen.
+              </p>
+            </div>
+
           </div>
+
+          <div className="mt-8 flex justify-end">
+
+            <button
+              type="button"
+              onClick={
+                guardarPortada
+              }
+              disabled={guardando}
+              className={botonMorado}
+            >
+              {guardando
+                ? "Guardando..."
+                : "Guardar portada"}
+            </button>
+
+          </div>
+
         </div>
+
       </div>
     </section>
-  );
-}
-
-function StatCard({ titulo, valor }) {
-  return (
-    <div
-      className={`${tarjeta} flex min-h-[150px] w-full flex-col items-center justify-center p-7 text-center`}
-    >
-      <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
-        {titulo}
-      </p>
-
-      <p className="mt-4 text-2xl font-black text-[#a978ff]">
-        {valor}
-      </p>
-    </div>
-  );
-}
-
-function FilaEstadistica({ nombre, valor }) {
-  return (
-    <div className="flex items-center justify-between gap-5 border-b border-[#29233a] pb-5">
-      <span className="text-sm text-[#91889d]">
-        {nombre}
-      </span>
-
-      <span className="text-right text-sm font-black text-[#ddd5e7]">
-        {valor}
-      </span>
-    </div>
   );
 }
 
@@ -1664,36 +2783,48 @@ function FilaEstadistica({ nombre, valor }) {
 ========================================================= */
 
 function ConfiguracionAdmin() {
-  const [config, setConfig] = useState({
-    whatsapp_principal: "",
-    whatsapp_secundario: "",
-    address: "",
-    maps_url: "",
-    instagram_url: "",
-    tiktok_url: "",
-    facebook_url: "",
-  });
+  const [cargando, setCargando] =
+    useState(true);
 
-  const [contenido, setContenido] = useState({
-    home_title: "",
-    home_text: "",
-    home_button: "",
-    home_featured: "",
-    hombre_text: "",
-    mujer_text: "",
-    ofertas_text: "",
-    promo_title: "",
-    campaign_name: "",
-    campaign_active: "false",
-    campaign_start: "",
-    campaign_end: "",
-    campaign_message: "",
-  });
+  const [guardando, setGuardando] =
+    useState(false);
 
-  const [cargando, setCargando] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [mensaje, setMensaje] = useState("");
-  const [error, setError] = useState("");
+  const [mensaje, setMensaje] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const [configId, setConfigId] =
+    useState(null);
+
+  const [nombre, setNombre] =
+    useState("GMISH");
+
+  const [direccion, setDireccion] =
+    useState("");
+
+  const [mapsUrl, setMapsUrl] =
+    useState("");
+
+  const [instagram, setInstagram] =
+    useState("");
+
+  const [tiktok, setTiktok] =
+    useState("");
+
+  const [facebook, setFacebook] =
+    useState("");
+
+  const [
+    whatsappPrincipal,
+    setWhatsappPrincipal,
+  ] = useState("");
+
+  const [
+    whatsappSecundario,
+    setWhatsappSecundario,
+  ] = useState("");
 
   useEffect(() => {
     cargarConfiguracion();
@@ -1703,16 +2834,34 @@ function ConfiguracionAdmin() {
     setCargando(true);
     setError("");
 
-    const { data, error: errorConfig } =
-      await supabase
-        .from("store_settings")
-        .select("*")
-        .order("id", {
-          ascending: true,
-        });
+    const {
+      data,
+      error: errorConsulta,
+    } = await supabase
+      .from("store_settings")
+      .select(`
+        id,
+        store_name,
+        address,
+        maps_url,
+        instagram_url,
+        tiktok_url,
+        facebook_url,
+        whatsapp_principal,
+        whatsapp_secundario,
+        setting_key,
+        setting_value
+      `)
+      .eq(
+        "setting_key",
+        "configuracion_general"
+      )
+      .maybeSingle();
 
-    if (errorConfig) {
-      console.error(errorConfig);
+    if (errorConsulta) {
+      console.error(
+        errorConsulta
+      );
 
       setError(
         "No se pudo cargar la configuración."
@@ -1722,132 +2871,134 @@ function ConfiguracionAdmin() {
       return;
     }
 
-    const filaGeneral =
-      (data || []).find(
-        (item) => item.setting_key === null
-      ) || data?.[0];
+    if (data) {
+      setConfigId(data.id);
 
-    setConfig({
-      whatsapp_principal:
-        filaGeneral?.whatsapp_principal ||
-        "",
-      whatsapp_secundario:
-        filaGeneral?.whatsapp_secundario ||
-        "",
-      address: filaGeneral?.address || "",
-      maps_url: filaGeneral?.maps_url || "",
-      instagram_url:
-        filaGeneral?.instagram_url || "",
-      tiktok_url:
-        filaGeneral?.tiktok_url || "",
-      facebook_url:
-        filaGeneral?.facebook_url || "",
-    });
+      setNombre(
+        data.store_name ||
+          "GMISH"
+      );
 
-    const nuevoContenido = {
-      home_title: "",
-      home_text: "",
-      home_button: "",
-      home_featured: "",
-      hombre_text: "",
-      mujer_text: "",
-      ofertas_text: "",
-      promo_title: "",
-      campaign_name: "",
-      campaign_active: "false",
-      campaign_start: "",
-      campaign_end: "",
-      campaign_message: "",
-    };
+      setDireccion(
+        data.address || ""
+      );
 
-    (data || []).forEach((item) => {
-      if (
-        Object.prototype.hasOwnProperty.call(
-          nuevoContenido,
-          item.setting_key
-        )
-      ) {
-        nuevoContenido[item.setting_key] =
-          item.setting_value || "";
-      }
-    });
+      setMapsUrl(
+        data.maps_url || ""
+      );
 
-    setContenido(nuevoContenido);
+      setInstagram(
+        data.instagram_url ||
+          ""
+      );
+
+      setTiktok(
+        data.tiktok_url || ""
+      );
+
+      setFacebook(
+        data.facebook_url ||
+          ""
+      );
+
+      setWhatsappPrincipal(
+        data.whatsapp_principal ||
+          ""
+      );
+
+      setWhatsappSecundario(
+        data.whatsapp_secundario ||
+          ""
+      );
+    }
+
     setCargando(false);
   }
 
-  function cambiarConfig(campo, valor) {
-    setConfig((actual) => ({
-      ...actual,
-      [campo]: valor,
-    }));
-  }
-
-  function cambiarContenido(campo, valor) {
-    setContenido((actual) => ({
-      ...actual,
-      [campo]: valor,
-    }));
-  }
-
-  async function guardarConfiguracion(event) {
-    event.preventDefault();
-
+  async function guardarConfiguracion() {
     setGuardando(true);
-    setMensaje("");
     setError("");
+    setMensaje("");
 
     try {
-      const { error: errorGeneral } =
-        await supabase
-          .from("store_settings")
-          .update({
-            store_name: "GMISH",
-            address: config.address,
-            maps_url: config.maps_url,
-            instagram_url:
-              config.instagram_url,
-            tiktok_url:
-              config.tiktok_url,
-            facebook_url:
-              config.facebook_url,
-            whatsapp_principal:
-              config.whatsapp_principal,
-            whatsapp_secundario:
-              config.whatsapp_secundario,
-            updated_at:
-              new Date().toISOString(),
-          })
-          .eq("id", 1);
+      const ahora =
+        new Date().toISOString();
 
-      if (errorGeneral) {
-        throw errorGeneral;
-      }
+      const datos = {
+        store_name:
+          nombre.trim() ||
+          "GMISH",
 
-      const claves = Object.keys(contenido);
+        address:
+          direccion.trim() ||
+          null,
 
-      for (const clave of claves) {
+        maps_url:
+          mapsUrl.trim() ||
+          null,
+
+        instagram_url:
+          instagram.trim() ||
+          null,
+
+        tiktok_url:
+          tiktok.trim() ||
+          null,
+
+        facebook_url:
+          facebook.trim() ||
+          null,
+
+        whatsapp_principal:
+          whatsappPrincipal.trim() ||
+          null,
+
+        whatsapp_secundario:
+          whatsappSecundario.trim() ||
+          null,
+
+        setting_key:
+          "configuracion_general",
+
+        setting_value:
+          "general",
+
+        updated_at: ahora,
+      };
+
+      if (configId) {
         const {
-          error: errorContenido,
+          error: errorUpdate,
         } = await supabase
           .from("store_settings")
-          .upsert(
-            {
-              store_name: "GMISH",
-              setting_key: clave,
-              setting_value:
-                contenido[clave] ?? "",
-              updated_at:
-                new Date().toISOString(),
-            },
-            {
-              onConflict: "setting_key",
-            }
+          .update(datos)
+          .eq(
+            "id",
+            configId
           );
 
-        if (errorContenido) {
-          throw errorContenido;
+        if (errorUpdate) {
+          throw errorUpdate;
         }
+      } else {
+        const {
+          data,
+          error: errorInsert,
+        } = await supabase
+          .from("store_settings")
+          .insert(datos)
+          .select(
+            "id"
+          )
+          .single();
+
+        if (errorInsert) {
+          throw errorInsert;
+        }
+
+        setConfigId(
+          data.id
+        );
       }
 
       setMensaje(
@@ -1867,7 +3018,7 @@ function ConfiguracionAdmin() {
 
   if (cargando) {
     return (
-      <div className="flex w-full justify-center py-24 text-center">
+      <div className="flex w-full justify-center py-28 text-center">
         <p className="text-sm text-[#81798e]">
           Cargando configuración...
         </p>
@@ -1877,474 +3028,511 @@ function ConfiguracionAdmin() {
 
   return (
     <section className="flex w-full justify-center">
-      <div className="flex w-full max-w-5xl flex-col items-center">
-        <div className="w-full text-center">
+      <div className="w-full max-w-5xl">
+
+        <div className="text-center">
+
           <span className="inline-flex rounded-full border border-[#3b3150] bg-[#211a2e] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#b993ff]">
-            Sistema
+            GMISH
           </span>
 
           <h1 className="mt-7 text-3xl font-black text-white">
             Configuración
           </h1>
 
-          <p className="mx-auto mt-5 max-w-2xl text-sm text-[#91889d]">
-            Administra los datos generales y el contenido de la tienda.
+          <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#91889d]">
+            Configura la información general,
+            redes sociales y canales de contacto
+            de tu tienda.
           </p>
+
         </div>
 
         {mensaje && (
-          <div className="mx-auto mt-10 w-full max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-green-900/50 bg-green-950/30 p-4 text-center text-sm text-green-300">
             {mensaje}
           </div>
         )}
 
         {error && (
-          <div className="mx-auto mt-7 w-full max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
+          <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-center text-sm text-red-300">
             {error}
           </div>
         )}
 
-        <form
-          onSubmit={guardarConfiguracion}
-          className="mt-12 w-full space-y-10"
-        >
-          {/* CONTACTO */}
+        <div className="mt-12 space-y-6">
 
-          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
-            <div className="text-center">
-              <h2 className="text-lg font-black text-white">
-                Contacto
-              </h2>
+          <div className={`${tarjeta} p-7 sm:p-9`}>
 
-              <p className="mt-2 text-xs text-[#81798e]">
-                Datos utilizados por la tienda.
-              </p>
-            </div>
+            <h2 className="text-lg font-black text-white">
+              Información de la tienda
+            </h2>
 
-            <div className="mt-8 grid gap-x-8 gap-y-7 md:grid-cols-2">
-              <CampoConfiguracion
-                etiqueta="WhatsApp principal"
-                valor={
-                  config.whatsapp_principal
-                }
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "whatsapp_principal",
-                    valor
-                  )
-                }
-                placeholder="519xxxxxxxx"
-              />
-
-              <CampoConfiguracion
-                etiqueta="WhatsApp secundario"
-                valor={
-                  config.whatsapp_secundario
-                }
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "whatsapp_secundario",
-                    valor
-                  )
-                }
-                placeholder="519xxxxxxxx"
-              />
-
-              <CampoConfiguracion
-                etiqueta="Dirección"
-                valor={config.address}
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "address",
-                    valor
-                  )
-                }
-                placeholder="Dirección del local"
-              />
-
-              <CampoConfiguracion
-                etiqueta="Google Maps"
-                valor={config.maps_url}
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "maps_url",
-                    valor
-                  )
-                }
-                placeholder="Enlace de Google Maps"
-              />
-            </div>
-          </div>
-
-          {/* REDES */}
-
-          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
-            <div className="text-center">
-              <h2 className="text-lg font-black text-white">
-                Redes sociales
-              </h2>
-
-              <p className="mt-2 text-xs text-[#81798e]">
-                Enlaces oficiales de GMISH.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-x-8 gap-y-7 md:grid-cols-3">
-              <CampoConfiguracion
-                etiqueta="Instagram"
-                valor={
-                  config.instagram_url
-                }
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "instagram_url",
-                    valor
-                  )
-                }
-                placeholder="https://instagram.com/..."
-              />
-
-              <CampoConfiguracion
-                etiqueta="TikTok"
-                valor={config.tiktok_url}
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "tiktok_url",
-                    valor
-                  )
-                }
-                placeholder="https://tiktok.com/..."
-              />
-
-              <CampoConfiguracion
-                etiqueta="Facebook"
-                valor={
-                  config.facebook_url
-                }
-                onChange={(valor) =>
-                  cambiarConfig(
-                    "facebook_url",
-                    valor
-                  )
-                }
-                placeholder="https://facebook.com/..."
-              />
-            </div>
-          </div>
-
-          {/* INICIO */}
-
-          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
-            <div className="text-center">
-              <h2 className="text-lg font-black text-white">
-                Página de inicio
-              </h2>
-
-              <p className="mt-2 text-xs text-[#81798e]">
-                Textos de la página principal.
-              </p>
-            </div>
-
-            <div className="mt-8 space-y-7">
-              <CampoConfiguracion
-                etiqueta="Título"
-                valor={contenido.home_title}
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "home_title",
-                    valor
-                  )
-                }
-                placeholder="Nueva colección GMISH"
-              />
-
-              <CampoGrande
-                etiqueta="Descripción"
-                valor={contenido.home_text}
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "home_text",
-                    valor
-                  )
-                }
-                placeholder="Texto de la página principal"
-              />
-
-              <CampoConfiguracion
-                etiqueta="Texto del botón"
-                valor={
-                  contenido.home_button
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "home_button",
-                    valor
-                  )
-                }
-                placeholder="Ver novedades"
-              />
-
-              <CampoConfiguracion
-                etiqueta="Productos destacados"
-                valor={
-                  contenido.home_featured
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "home_featured",
-                    valor
-                  )
-                }
-                placeholder="Opcional"
-              />
-            </div>
-          </div>
-
-          {/* CATEGORÍAS */}
-
-          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
-            <div className="text-center">
-              <h2 className="text-lg font-black text-white">
-                Categorías
-              </h2>
-
-              <p className="mt-2 text-xs text-[#81798e]">
-                Textos mostrados en las categorías.
-              </p>
-            </div>
-
-            <div className="mt-8 space-y-7">
-              <CampoGrande
-                etiqueta="Texto Hombre"
-                valor={
-                  contenido.hombre_text
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "hombre_text",
-                    valor
-                  )
-                }
-                placeholder="Descripción de Hombre"
-              />
-
-              <CampoGrande
-                etiqueta="Texto Mujer"
-                valor={
-                  contenido.mujer_text
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "mujer_text",
-                    valor
-                  )
-                }
-                placeholder="Descripción de Mujer"
-              />
-
-              <CampoGrande
-                etiqueta="Texto Ofertas"
-                valor={
-                  contenido.ofertas_text
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "ofertas_text",
-                    valor
-                  )
-                }
-                placeholder="Descripción de Ofertas"
-              />
-            </div>
-          </div>
-
-          {/* PROMOCIONES */}
-
-          <div className={`${tarjeta} w-full p-8 sm:p-10`}>
-            <div className="text-center">
-              <h2 className="text-lg font-black text-white">
-                Promociones y campañas
-              </h2>
-
-              <p className="mt-2 text-xs text-[#81798e]">
-                Preparado para campañas futuras.
-              </p>
-            </div>
-
-            <div className="mt-8 space-y-7">
-              <CampoConfiguracion
-                etiqueta="Título de promociones"
-                valor={
-                  contenido.promo_title
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "promo_title",
-                    valor
-                  )
-                }
-                placeholder="Promociones GMISH"
-              />
-
-              <CampoConfiguracion
-                etiqueta="Nombre de campaña"
-                valor={
-                  contenido.campaign_name
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "campaign_name",
-                    valor
-                  )
-                }
-                placeholder="Nombre de campaña"
-              />
+            <div className="mt-7 grid gap-6">
 
               <div>
                 <label className={etiqueta}>
-                  Campaña activa
+                  Nombre de la tienda
                 </label>
 
-                <select
-                  value={
-                    contenido.campaign_active
-                  }
+                <input
+                  type="text"
+                  value={nombre}
                   onChange={(event) =>
-                    cambiarContenido(
-                      "campaign_active",
+                    setNombre(
                       event.target.value
                     )
                   }
                   className={campo}
-                >
-                  <option value="false">
-                    No
-                  </option>
-
-                  <option value="true">
-                    Sí
-                  </option>
-                </select>
-              </div>
-
-              <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
-                <CampoConfiguracion
-                  etiqueta="Inicio"
-                  tipo="datetime-local"
-                  valor={
-                    contenido.campaign_start
-                  }
-                  onChange={(valor) =>
-                    cambiarContenido(
-                      "campaign_start",
-                      valor
-                    )
-                  }
-                />
-
-                <CampoConfiguracion
-                  etiqueta="Fin"
-                  tipo="datetime-local"
-                  valor={
-                    contenido.campaign_end
-                  }
-                  onChange={(valor) =>
-                    cambiarContenido(
-                      "campaign_end",
-                      valor
-                    )
-                  }
                 />
               </div>
 
-              <CampoGrande
-                etiqueta="Mensaje de campaña"
-                valor={
-                  contenido.campaign_message
-                }
-                onChange={(valor) =>
-                  cambiarContenido(
-                    "campaign_message",
-                    valor
-                  )
-                }
-                placeholder="Mensaje que verá el cliente"
-              />
+              <div>
+                <label className={etiqueta}>
+                  Dirección
+                </label>
+
+                <input
+                  type="text"
+                  value={direccion}
+                  onChange={(event) =>
+                    setDireccion(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Dirección de la tienda"
+                  className={campo}
+                />
+              </div>
+
+              <div>
+                <label className={etiqueta}>
+                  Google Maps
+                </label>
+
+                <input
+                  type="text"
+                  value={mapsUrl}
+                  onChange={(event) =>
+                    setMapsUrl(
+                      event.target.value
+                    )
+                  }
+                  placeholder="https://maps.google.com/..."
+                  className={campo}
+                />
+              </div>
+
             </div>
+
           </div>
 
-          {/* BOTÓN GUARDAR */}
+          <div className={`${tarjeta} p-7 sm:p-9`}>
 
-          <div className="flex justify-center pb-8 pt-2">
+            <h2 className="text-lg font-black text-white">
+              Redes sociales
+            </h2>
+
+            <div className="mt-7 grid gap-6">
+
+              <div>
+                <label className={etiqueta}>
+                  Instagram
+                </label>
+
+                <input
+                  type="text"
+                  value={instagram}
+                  onChange={(event) =>
+                    setInstagram(
+                      event.target.value
+                    )
+                  }
+                  placeholder="https://instagram.com/..."
+                  className={campo}
+                />
+              </div>
+
+              <div>
+                <label className={etiqueta}>
+                  TikTok
+                </label>
+
+                <input
+                  type="text"
+                  value={tiktok}
+                  onChange={(event) =>
+                    setTiktok(
+                      event.target.value
+                    )
+                  }
+                  placeholder="https://tiktok.com/@..."
+                  className={campo}
+                />
+              </div>
+
+              <div>
+                <label className={etiqueta}>
+                  Facebook
+                </label>
+
+                <input
+                  type="text"
+                  value={facebook}
+                  onChange={(event) =>
+                    setFacebook(
+                      event.target.value
+                    )
+                  }
+                  placeholder="https://facebook.com/..."
+                  className={campo}
+                />
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className={`${tarjeta} p-7 sm:p-9`}>
+
+            <h2 className="text-lg font-black text-white">
+              WhatsApp
+            </h2>
+
+            <div className="mt-7 grid gap-6 md:grid-cols-2">
+
+              <div>
+                <label className={etiqueta}>
+                  WhatsApp principal
+                </label>
+
+                <input
+                  type="text"
+                  value={
+                    whatsappPrincipal
+                  }
+                  onChange={(event) =>
+                    setWhatsappPrincipal(
+                      event.target
+                        .value
+                    )
+                  }
+                  placeholder="51999999999"
+                  className={campo}
+                />
+              </div>
+
+              <div>
+                <label className={etiqueta}>
+                  WhatsApp secundario
+                </label>
+
+                <input
+                  type="text"
+                  value={
+                    whatsappSecundario
+                  }
+                  onChange={(event) =>
+                    setWhatsappSecundario(
+                      event.target
+                        .value
+                    )
+                  }
+                  placeholder="51999999999"
+                  className={campo}
+                />
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className="flex justify-end">
+
             <button
-              type="submit"
+              type="button"
+              onClick={
+                guardarConfiguracion
+              }
               disabled={guardando}
-              className={`${botonMorado} min-w-60 px-8 py-3.5`}
+              className={botonMorado}
             >
               {guardando
                 ? "Guardando..."
                 : "Guardar configuración"}
             </button>
+
           </div>
-        </form>
+
+        </div>
+
       </div>
     </section>
   );
 }
 
 /* =========================================================
-   CAMPOS
+   APP PRINCIPAL DEL ADMIN
 ========================================================= */
 
-function CampoConfiguracion({
-  etiqueta,
-  valor,
-  onChange,
-  placeholder,
-  tipo = "text",
-}) {
-  return (
-    <div className="w-full">
-      <label className={etiqueta}>
-        {etiqueta}
-      </label>
+export default function AdminPanel() {
+  const [rol, setRol] =
+    useState("principal");
 
-      <input
-        type={tipo}
-        value={valor || ""}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        placeholder={placeholder}
-        className={campo}
-      />
+  const [
+    seccionActiva,
+    setSeccionActiva,
+  ] = useState("inicio");
+
+  const [
+    menuAbierto,
+    setMenuAbierto,
+  ] = useState(false);
+
+  const seccionesDisponibles =
+    useMemo(
+      () =>
+        secciones.filter(
+          (seccion) =>
+            seccion.acceso.includes(
+              rol
+            )
+        ),
+      [rol]
+    );
+
+  function seleccionarSeccion(id) {
+    setSeccionActiva(id);
+    setMenuAbierto(false);
+  }
+
+  function renderSeccion() {
+    switch (seccionActiva) {
+
+      case "inicio":
+        return (
+          <InicioAdmin
+            rol={rol}
+            onSeleccionar={
+              seleccionarSeccion
+            }
+          />
+        );
+
+      case "productos":
+        return <ProductsAdmin />;
+
+      case "pedidos":
+        return <PedidosAdmin />;
+
+      case "estadisticas":
+        return <EstadisticasAdmin />;
+
+      case "portadas":
+        return <PortadasAdmin />;
+
+      case "configuracion":
+        return (
+          <ConfiguracionAdmin />
+        );
+
+      default:
+        return (
+          <InicioAdmin
+            rol={rol}
+            onSeleccionar={
+              seleccionarSeccion
+            }
+          />
+        );
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0f0d14] text-white">
+
+      {/* =================================================
+          BARRA SUPERIOR
+      ================================================= */}
+
+      <header className="sticky top-0 z-50 border-b border-[#29233a] bg-[#121019]/95 backdrop-blur">
+
+        <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-5 sm:px-8">
+
+          <button
+            type="button"
+            onClick={() =>
+              setMenuAbierto(
+                (actual) =>
+                  !actual
+              )
+            }
+            aria-label="Abrir menú"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#342c45] text-xl text-[#ddd5e7] transition hover:border-[#7c3aed] hover:text-white"
+          >
+            ☰
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              seleccionarSeccion(
+                "inicio"
+              )
+            }
+            className="text-center"
+          >
+            <p className="text-lg font-black tracking-[0.18em] text-white">
+              GMISH
+            </p>
+
+            <p className="mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.2em] text-[#71687e] sm:block">
+              Administración
+            </p>
+          </button>
+
+          <div className="flex items-center gap-3">
+
+            <span className="hidden rounded-full border border-[#342c45] bg-[#17151f] px-3 py-2 text-xs font-bold text-[#b993ff] sm:inline-flex">
+              {rol ===
+              "principal"
+                ? "Principal"
+                : "Secundario"}
+            </span>
+
+          </div>
+
+        </div>
+
+      </header>
+
+      {/* =================================================
+          MENÚ LATERAL
+      ================================================= */}
+
+      {menuAbierto && (
+        <>
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() =>
+              setMenuAbierto(
+                false
+              )
+            }
+            className="fixed inset-0 z-40 bg-black/50"
+          />
+
+          <aside className="fixed left-0 top-0 z-[60] flex h-full w-[290px] flex-col border-r border-[#29233a] bg-[#121019] shadow-[0_20px_80px_rgba(0,0,0,0.5)]">
+
+            <div className="flex items-center justify-between border-b border-[#29233a] px-6 py-5">
+
+              <div>
+
+                <p className="text-lg font-black tracking-[0.15em] text-white">
+                  GMISH
+                </p>
+
+                <p className="mt-1 text-xs text-[#71687e]">
+                  Panel de administración
+                </p>
+
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setMenuAbierto(
+                    false
+                  )
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#342c45] text-[#aaa1b3] transition hover:border-[#7c3aed] hover:text-white"
+              >
+                ×
+              </button>
+
+            </div>
+
+            <nav className="flex-1 overflow-y-auto p-4">
+
+              <div className="space-y-2">
+
+                {seccionesDisponibles.map(
+                  (seccion) => (
+                    <button
+                      key={
+                        seccion.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        seleccionarSeccion(
+                          seccion.id
+                        )
+                      }
+                      className={`flex w-full items-center gap-4 rounded-xl px-4 py-4 text-left text-sm font-bold transition ${
+                        seccionActiva ===
+                        seccion.id
+                          ? "bg-[#7c3aed] text-white"
+                          : "text-[#aaa1b3] hover:bg-[#1b1824] hover:text-white"
+                      }`}
+                    >
+
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-black/10 text-base">
+                        {
+                          seccion.icono
+                        }
+                      </span>
+
+                      <span>
+                        {
+                          seccion.nombre
+                        }
+                      </span>
+
+                    </button>
+                  )
+                )}
+
+              </div>
+
+            </nav>
+
+            <div className="border-t border-[#29233a] p-5">
+
+              <div className="rounded-xl bg-[#17151f] p-4">
+
+                <p className="text-xs font-bold uppercase tracking-widest text-[#71687e]">
+                  Sesión
+                </p>
+
+                <p className="mt-2 text-sm font-bold text-[#ddd5e7]">
+                  Administrador
+                </p>
+
+                <p className="mt-1 text-xs text-[#81798e]">
+                  Acceso{" "}
+                  {rol ===
+                  "principal"
+                    ? "principal"
+                    : "secundario"}
+                </p>
+
+              </div>
+
+            </div>
+
+          </aside>
+        </>
+      )}
+
+      {/* =================================================
+          CONTENIDO
+      ================================================= */}
+
+      <main className="mx-auto w-full max-w-7xl px-5 py-10 pb-20 sm:px-8 sm:py-14">
+        {renderSeccion()}
+      </main>
+
     </div>
   );
 }
-
-function CampoGrande({
-  etiqueta,
-  valor,
-  onChange,
-  placeholder,
-}) {
-  return (
-    <div className="w-full">
-      <label className={etiqueta}>
-        {etiqueta}
-      </label>
-
-      <textarea
-        value={valor || ""}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        placeholder={placeholder}
-        rows={4}
-        className={`${campo} resize-y`}
-      />
-    </div>
-  );
-}
-
-export default Admin;
