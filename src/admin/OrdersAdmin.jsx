@@ -1,1153 +1,617 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-/* =========================================================
-   UTILIDADES
-========================================================= */
+const estados = ["Pendiente", "Completado"];
 
-function formatearPrecio(valor) {
-  return `S/ ${Number(valor || 0).toFixed(2)}`;
-}
+function normalizarEstado(estado) {
+  const valor = String(estado || "").toLowerCase();
 
-function formatearFechaHora(fecha) {
-  if (!fecha) return "-";
+  if (valor === "pendiente" || valor === "confirmado") {
+    return "Pendiente";
+  }
 
-  return new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(fecha));
-}
+  if (valor === "completado" || valor === "entregado") {
+    return "Completado";
+  }
 
-function obtenerTipoVenta(pedido) {
-  return pedido?.sale_type === "fisica" ? "fisica" : "online";
-}
+  if (valor === "cancelado") {
+    return "Pendiente";
+  }
 
-function obtenerTextoEstado(estado) {
-  if (estado === "Entregado") return "Entregado";
-  if (estado === "Cancelado") return "Cancelado";
   return "Pendiente";
 }
 
-function obtenerClaseEstado(estado) {
-  if (estado === "Entregado") {
-    return "bg-green-50 text-green-700 border-green-200";
-  }
-
-  if (estado === "Cancelado") {
-    return "bg-red-50 text-red-700 border-red-200";
-  }
-
-  return "bg-neutral-50 text-neutral-700 border-neutral-200";
+function obtenerTipoTexto(tipo) {
+  return String(tipo || "").toLowerCase() === "fisica"
+    ? "TIENDA"
+    : "ONLINE";
 }
 
-/* =========================================================
-   ESTILOS
-========================================================= */
-
-const tarjeta =
-  "w-full rounded-2xl border border-neutral-200 bg-white shadow-[0_8px_28px_rgba(0,0,0,0.045)]";
-
-const botonSecundario =
-  "inline-flex min-h-[46px] items-center justify-center rounded-xl border border-neutral-200 bg-white px-5 py-3 text-sm font-semibold text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-40";
-
-const botonPrincipal =
-  "inline-flex min-h-[46px] items-center justify-center rounded-xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40";
-
-const botonPeligro =
-  "inline-flex min-h-[46px] items-center justify-center rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40";
-
-const campo =
-  "w-full rounded-xl border border-neutral-200 bg-white px-[17px] py-[13px] text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-900/10";
-
-const etiqueta =
-  "mb-2 block text-sm font-semibold text-neutral-800";
-
-/* =========================================================
-   PEDIDOS Y VENTAS
-========================================================= */
-
-export default function OrdersAdmin() {
-  const [pedidos, setPedidos] = useState([]);
-  const [productos, setProductos] = useState([]);
-
-  const [cargando, setCargando] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [eliminandoId, setEliminandoId] = useState(null);
-
-  const [error, setError] = useState("");
-  const [mensaje, setMensaje] = useState("");
-
-  const [filtroEstado, setFiltroEstado] = useState("todos");
-  const [filtroTipo, setFiltroTipo] = useState("todos");
-
-  const [ventaAbierta, setVentaAbierta] = useState(false);
-  const [detallePedido, setDetallePedido] = useState(null);
-
-  useEffect(() => {
-    cargarDatos();
-  }, []);
-
-  /* =======================================================
-     CARGAR DATOS
-  ======================================================= */
-
-  async function cargarDatos() {
-    setCargando(true);
-    setError("");
-
-    const [
-      {
-        data: pedidosData,
-        error: pedidosError,
-      },
-      {
-        data: productosData,
-        error: productosError,
-      },
-    ] = await Promise.all([
-      supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items (
-            id,
-            order_id,
-            product_id,
-            product_name,
-            size,
-            color,
-            quantity,
-            unit_price,
-            subtotal,
-            variant_id
-          )
-        `)
-        .order("created_at", {
-          ascending: false,
-        }),
-
-      supabase
-        .from("products")
-        .select(`
-          id,
-          name,
-          price,
-          category,
-          subcategory,
-          is_active,
-          sold_count,
-          product_variants (
-            id,
-            product_id,
-            size,
-            color,
-            stock,
-            sku,
-            color_hex,
-            color_image_url,
-            product_variant_images (
-              id,
-              image_url,
-              position
-            )
-          )
-        `)
-        .eq("is_active", true)
-        .order("created_at", {
-          ascending: false,
-        }),
-    ]);
-
-    if (pedidosError) {
-      console.error(pedidosError);
-      setError("No se pudieron cargar los pedidos.");
-    }
-
-    if (productosError) {
-      console.error(productosError);
-      setError(
-        "No se pudieron cargar los productos reales de GMISH."
-      );
-    }
-
-    setPedidos(pedidosData || []);
-    setProductos(productosData || []);
-    setCargando(false);
+function obtenerEstadoClase(estado) {
+  if (estado === "Completado") {
+    return "bg-emerald-50 text-emerald-700 border-emerald-200";
   }
 
-  /* =======================================================
-     CAMBIAR ESTADO
-  ======================================================= */
+  return "bg-amber-50 text-amber-700 border-amber-200";
+}
 
-  async function cambiarEstado(pedido, nuevoEstado) {
-    const estadosPermitidos = [
-      "Pendiente",
-      "Entregado",
-      "Cancelado",
-    ];
-
-    if (!estadosPermitidos.includes(nuevoEstado)) {
-      return;
-    }
-
-    if (pedido.status === nuevoEstado) {
-      return;
-    }
-
-    setGuardando(true);
-    setError("");
-    setMensaje("");
-
-    try {
-      /*
-        Las ventas físicas descuentan stock
-        al momento de registrarse.
-
-        Si una venta física pasa a Cancelado,
-        devolvemos stock y sold_count.
-      */
-
-      if (
-        nuevoEstado === "Cancelado" &&
-        pedido.status !== "Cancelado" &&
-        obtenerTipoVenta(pedido) === "fisica"
-      ) {
-        for (const item of pedido.order_items || []) {
-          if (!item.variant_id) {
-            continue;
-          }
-
-          const cantidad = Number(item.quantity || 0);
-
-          if (cantidad <= 0) {
-            continue;
-          }
-
-          const {
-            data: variante,
-            error: errorVariante,
-          } = await supabase
-            .from("product_variants")
-            .select("id, product_id, stock")
-            .eq("id", item.variant_id)
-            .single();
-
-          if (errorVariante) {
-            throw errorVariante;
-          }
-
-          const nuevoStock =
-            Number(variante.stock || 0) + cantidad;
-
-          const {
-            error: errorStock,
-          } = await supabase
-            .from("product_variants")
-            .update({
-              stock: nuevoStock,
-            })
-            .eq("id", item.variant_id);
-
-          if (errorStock) {
-            throw errorStock;
-          }
-
-          if (item.product_id) {
-            const {
-              data: producto,
-              error: errorProducto,
-            } = await supabase
-              .from("products")
-              .select("id, sold_count")
-              .eq("id", item.product_id)
-              .single();
-
-            if (errorProducto) {
-              throw errorProducto;
-            }
-
-            const nuevoSoldCount = Math.max(
-              0,
-              Number(producto.sold_count || 0) - cantidad
-            );
-
-            const {
-              error: errorSoldCount,
-            } = await supabase
-              .from("products")
-              .update({
-                sold_count: nuevoSoldCount,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", item.product_id);
-
-            if (errorSoldCount) {
-              throw errorSoldCount;
-            }
-          }
-        }
-      }
-
-      const {
-        error: errorActualizar,
-      } = await supabase
-        .from("orders")
-        .update({
-          status: nuevoEstado,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", pedido.id);
-
-      if (errorActualizar) {
-        throw errorActualizar;
-      }
-
-      setMensaje(
-        nuevoEstado === "Cancelado"
-          ? "Pedido cancelado correctamente."
-          : "Estado actualizado correctamente."
-      );
-
-      await cargarDatos();
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err?.message ||
-          "No se pudo actualizar el pedido."
-      );
-    } finally {
-      setGuardando(false);
-    }
+function obtenerTipoClase(tipo) {
+  if (tipo === "TIENDA") {
+    return "bg-violet-50 text-violet-700 border-violet-200";
   }
 
-  /* =======================================================
-     ELIMINAR PEDIDO
-  ======================================================= */
+  return "bg-sky-50 text-sky-700 border-sky-200";
+}
 
-  async function eliminarPedido(pedido) {
-    if (!pedido?.id) {
-      return;
+function obtenerNumeroPedido(orders, order) {
+  const ordenados = [...orders].sort((a, b) => {
+    const fechaA = new Date(a.created_at || 0).getTime();
+    const fechaB = new Date(b.created_at || 0).getTime();
+
+    if (fechaA !== fechaB) {
+      return fechaA - fechaB;
     }
 
-    const esFisica =
-      obtenerTipoVenta(pedido) === "fisica";
-
-    const numeroPedido =
-      pedido.order_number || pedido.id;
-
-    const confirmado = window.confirm(
-      `¿Eliminar ${
-        esFisica ? "la venta" : "el pedido"
-      } #${numeroPedido}?\n\nEsta acción eliminará el pedido y sus productos registrados y no se puede deshacer.`
-    );
-
-    if (!confirmado) {
-      return;
-    }
-
-    setEliminandoId(pedido.id);
-    setError("");
-    setMensaje("");
-
-    try {
-      /*
-        Primero eliminamos los productos del pedido.
-        Esto evita problemas con claves foráneas
-        entre order_items y orders.
-      */
-
-      const {
-        error: errorItems,
-      } = await supabase
-        .from("order_items")
-        .delete()
-        .eq("order_id", pedido.id);
-
-      if (errorItems) {
-        throw errorItems;
-      }
-
-      const {
-        error: errorPedido,
-      } = await supabase
-        .from("orders")
-        .delete()
-        .eq("id", pedido.id);
-
-      if (errorPedido) {
-        throw errorPedido;
-      }
-
-      setPedidos((actuales) =>
-        actuales.filter(
-          (item) => item.id !== pedido.id
-        )
-      );
-
-      setDetallePedido(null);
-
-      setMensaje(
-        `${esFisica ? "Venta" : "Pedido"} #${numeroPedido} eliminado correctamente.`
-      );
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err?.message ||
-          "No se pudo eliminar el pedido."
-      );
-    } finally {
-      setEliminandoId(null);
-    }
-  }
-
-  /* =======================================================
-     FILTROS
-  ======================================================= */
-
-  const pedidosFiltrados = pedidos.filter((pedido) => {
-    const coincideEstado =
-      filtroEstado === "todos" ||
-      pedido.status === filtroEstado;
-
-    const tipo = obtenerTipoVenta(pedido);
-
-    const coincideTipo =
-      filtroTipo === "todos" ||
-      tipo === filtroTipo;
-
-    return coincideEstado && coincideTipo;
+    return String(a.id).localeCompare(String(b.id));
   });
 
-  /* =======================================================
-     RESUMEN
-  ======================================================= */
+  const posicion = ordenados.findIndex(
+    (item) => String(item.id) === String(order.id)
+  );
 
-  const totalPedidos = pedidos.length;
+  return posicion >= 0 ? posicion + 1 : 1;
+}
 
-  const pendientes = pedidos.filter(
-    (pedido) =>
-      pedido.status !== "Entregado" &&
-      pedido.status !== "Cancelado"
-  ).length;
+function Icono({ nombre, size = 18 }) {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": true,
+  };
 
-  const entregados = pedidos.filter(
-    (pedido) =>
-      pedido.status === "Entregado"
-  ).length;
-
-  const cancelados = pedidos.filter(
-    (pedido) =>
-      pedido.status === "Cancelado"
-  ).length;
-
-  /* =======================================================
-     CARGANDO
-  ======================================================= */
-
-  if (cargando) {
+  if (nombre === "plus") {
     return (
-      <div className="flex w-full justify-center px-5 py-24 pb-32 text-center">
-        <div>
-          <div className="mx-auto mb-5 h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900" />
-
-          <p className="text-sm text-neutral-500">
-            Cargando pedidos y ventas...
-          </p>
-        </div>
-      </div>
+      <svg {...common}>
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </svg>
     );
   }
 
-  /* =======================================================
-     RETURN
-  ======================================================= */
+  if (nombre === "search") {
+    return (
+      <svg {...common}>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+      </svg>
+    );
+  }
 
+  if (nombre === "edit") {
+    return (
+      <svg {...common}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+      </svg>
+    );
+  }
+
+  if (nombre === "trash") {
+    return (
+      <svg {...common}>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
+      </svg>
+    );
+  }
+
+  if (nombre === "close") {
+    return (
+      <svg {...common}>
+        <path d="m6 6 12 12" />
+        <path d="M18 6 6 18" />
+      </svg>
+    );
+  }
+
+  if (nombre === "store") {
+    return (
+      <svg {...common}>
+        <path d="M4 10v10h16V10" />
+        <path d="M3 10 5 4h14l2 6" />
+        <path d="M3 10c1.5 1.5 3 1.5 4.5 0 1.5 1.5 3 1.5 4.5 0 1.5 1.5 3 1.5 4.5 0 1.5 1.5 3 1.5 4.5 0 1.5 1.5 3 1.5 4.5 0 1.5 1.5 3 3 4.5 0" />
+        <path d="M9 20v-5h6v5" />
+      </svg>
+    );
+  }
+
+  if (nombre === "globe") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18" />
+        <path d="M12 3c2.5 2.4 3.5 5.4 3.5 9s-1 6.6-3.5 9" />
+        <path d="M12 3c-2.5 2.4-3.5 5.4-3.5 9s1 6.6 3.5 9" />
+      </svg>
+    );
+  }
+
+  if (nombre === "minus") {
+    return (
+      <svg {...common}>
+        <path d="M5 12h14" />
+      </svg>
+    );
+  }
+
+  return null;
+}
+
+function Modal({ children, onClose, title, width = "max-w-3xl" }) {
   return (
-    <section className="w-full px-5 pb-24 sm:px-8 sm:pb-28 lg:px-10 lg:pb-32">
-
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center">
-
-        {/* =================================================
-            ACCIÓN PRINCIPAL
-        ================================================== */}
-
-        <div className="flex w-full justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+      <div
+        className={`max-h-[92vh] w-full ${width} overflow-hidden rounded-2xl bg-white shadow-2xl`}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-5">
+          <h2 className="text-lg font-semibold text-neutral-900">
+            {title}
+          </h2>
 
           <button
             type="button"
-            onClick={() => {
-              setError("");
-              setMensaje("");
-              setVentaAbierta(true);
-            }}
-            className={botonPrincipal}
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
           >
-            + Registrar venta
+            <Icono nombre="close" size={19} />
           </button>
-
         </div>
 
-        {/* =================================================
-            MENSAJES
-        ================================================== */}
+        <div className="max-h-[calc(92vh-80px)] overflow-y-auto p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        {(mensaje || error) && (
-          <div className="mt-8 flex w-full flex-col items-center gap-3">
+function EditarPedidoModal({ order, onClose, onSaved }) {
+  const [cliente, setCliente] = useState(order.customer_name || "");
+  const [direccion, setDireccion] = useState(
+    order.delivery_address || ""
+  );
+  const [referencia, setReferencia] = useState(
+    order.delivery_reference || ""
+  );
+  const [descuento, setDescuento] = useState(
+    Number(order.discount || 0)
+  );
+  const [total, setTotal] = useState(Number(order.total || 0));
+  const [estado, setEstado] = useState(
+    normalizarEstado(order.status)
+  );
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
 
-            {mensaje && (
-              <div className="w-full max-w-3xl rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-center text-sm font-medium text-green-700">
-                {mensaje}
-              </div>
-            )}
+  const esOnline =
+    String(order.order_type || "").toLowerCase() !== "fisica";
 
-            {error && (
-              <div className="w-full max-w-3xl rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-center text-sm font-medium text-red-700">
-                {error}
-              </div>
-            )}
+  const subtotal = useMemo(() => {
+    return Number(order.subtotal || order.total || 0);
+  }, [order]);
 
+  useEffect(() => {
+    const nuevoTotal = Math.max(
+      0,
+      subtotal - Number(descuento || 0)
+    );
+
+    setTotal(nuevoTotal);
+  }, [descuento, subtotal]);
+
+  async function guardar() {
+    setGuardando(true);
+    setError("");
+
+    const payload = {
+      customer_name: cliente.trim(),
+      discount: Number(descuento || 0),
+      total: Number(total || 0),
+      status: estado,
+    };
+
+    if (esOnline) {
+      payload.delivery_address = direccion.trim();
+      payload.delivery_reference = referencia.trim();
+    }
+
+    const { data, error: updateError } = await supabase
+      .from("orders")
+      .update(payload)
+      .eq("id", order.id)
+      .select("*")
+      .single();
+
+    if (updateError) {
+      setError(updateError.message);
+      setGuardando(false);
+      return;
+    }
+
+    setGuardando(false);
+    onSaved(data);
+  }
+
+  return (
+    <Modal title="Editar pedido" onClose={onClose}>
+      <div className="space-y-7">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Cliente
+            </label>
+
+            <input
+              value={cliente}
+              onChange={(e) => setCliente(e.target.value)}
+              className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Estado
+            </label>
+
+            <select
+              value={estado}
+              onChange={(e) => setEstado(e.target.value)}
+              className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+            >
+              {estados.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {esOnline && (
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Dirección de entrega
+              </label>
+
+              <input
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
+                className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Referencia
+              </label>
+
+              <input
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+              />
+            </div>
           </div>
         )}
 
-        {/* =================================================
-            RESUMEN
-        ================================================== */}
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
+          <div className="mb-4 text-sm font-semibold text-neutral-900">
+            Productos
+          </div>
 
-        <div className="mt-12 grid w-full grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="space-y-3">
+            {(order.order_items || []).map((item, index) => (
+              <div
+                key={item.id || index}
+                className="rounded-xl bg-white px-4 py-4"
+              >
+                <p className="text-sm font-medium text-neutral-900">
+                  {item.product_name || "Producto"}
+                </p>
 
-          <ResumenCard
-            titulo="Total"
-            valor={totalPedidos}
-          />
-
-          <ResumenCard
-            titulo="Pendientes"
-            valor={pendientes}
-          />
-
-          <ResumenCard
-            titulo="Entregados"
-            valor={entregados}
-          />
-
-          <ResumenCard
-            titulo="Cancelados"
-            valor={cancelados}
-          />
-
-        </div>
-
-        {/* =================================================
-            FILTROS
-        ================================================== */}
-
-        <div
-          className={`${tarjeta} mt-10 p-6 sm:p-8`}
-        >
-
-          <div className="flex flex-col gap-8">
-
-            {/* ESTADO */}
-
-            <div>
-              <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                Estado
-              </p>
-
-              <div className="flex flex-wrap justify-center gap-2.5">
-
-                {[
-                  ["todos", "Todos"],
-                  ["Pendiente", "Pendientes"],
-                  ["Entregado", "Entregados"],
-                  ["Cancelado", "Cancelados"],
-                ].map(([valor, nombre]) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    onClick={() =>
-                      setFiltroEstado(valor)
-                    }
-                    className={`min-h-[42px] rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-                      filtroEstado === valor
-                        ? "bg-neutral-900 text-white"
-                        : "border border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400 hover:text-neutral-900"
-                    }`}
-                  >
-                    {nombre}
-                  </button>
-                ))}
-
+                <p className="mt-1 text-xs text-neutral-500">
+                  Talla: {item.size || "Sin talla"}
+                  {" · "}
+                  Color: {item.color || "Sin color"}
+                  {" · "}
+                  Cantidad: {item.quantity || 1}
+                </p>
               </div>
-            </div>
-
-            <div className="h-px w-full bg-neutral-100" />
-
-            {/* TIPO */}
-
-            <div>
-              <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                Tipo de venta
-              </p>
-
-              <div className="flex flex-wrap justify-center gap-2.5">
-
-                {[
-                  ["todos", "Todas"],
-                  ["online", "Online"],
-                  ["fisica", "Tienda física"],
-                ].map(([valor, nombre]) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    onClick={() =>
-                      setFiltroTipo(valor)
-                    }
-                    className={`min-h-[42px] rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-                      filtroTipo === valor
-                        ? "bg-neutral-900 text-white"
-                        : "border border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400 hover:text-neutral-900"
-                    }`}
-                  >
-                    {nombre}
-                  </button>
-                ))}
-
-              </div>
-            </div>
-
+            ))}
           </div>
         </div>
 
-        {/* =================================================
-            RESULTADOS
-        ================================================== */}
+        <div className="grid gap-5 sm:grid-cols-3">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Subtotal
+            </label>
 
-        <div className="mt-12 flex w-full flex-col">
-
-          <div className="mb-6 flex flex-col items-center justify-center gap-2 text-center">
-
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-              Pedidos registrados
-            </p>
-
-            <p className="text-sm text-neutral-500">
-              {pedidosFiltrados.length}{" "}
-              {pedidosFiltrados.length === 1
-                ? "resultado"
-                : "resultados"}
-            </p>
-
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-700">
+              S/ {subtotal.toFixed(2)}
+            </div>
           </div>
 
-          {pedidosFiltrados.length === 0 ? (
-            <div
-              className={`${tarjeta} px-6 py-16 text-center`}
-            >
-              <p className="text-sm font-semibold text-neutral-600">
-                No hay pedidos o ventas con estos filtros.
-              </p>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Descuento
+            </label>
 
-              <p className="mt-2 text-sm text-neutral-400">
-                Prueba cambiando el estado o el tipo de venta.
-              </p>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={descuento}
+              onChange={(e) =>
+                setDescuento(Number(e.target.value || 0))
+              }
+              className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Total
+            </label>
+
+            <div className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-3 text-sm font-semibold text-white">
+              S/ {total.toFixed(2)}
             </div>
-          ) : (
-            <div className="flex w-full flex-col gap-6">
-
-              {pedidosFiltrados.map((pedido) => {
-                const esFisica =
-                  obtenerTipoVenta(pedido) ===
-                  "fisica";
-
-                const cantidadProductos =
-                  (
-                    pedido.order_items || []
-                  ).reduce(
-                    (total, item) =>
-                      total +
-                      Number(
-                        item.quantity || 0
-                      ),
-                    0
-                  );
-
-                const estaEliminando =
-                  eliminandoId ===
-                  pedido.id;
-
-                return (
-                  <article
-                    key={pedido.id}
-                    className={`${tarjeta} overflow-hidden`}
-                  >
-
-                    {/* ===================================
-                        CABECERA
-                    ==================================== */}
-
-                    <div className="p-6 sm:p-8">
-
-                      <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-
-                        <div className="min-w-0 flex-1">
-
-                          <div className="flex flex-wrap items-center justify-center gap-2.5 lg:justify-start">
-
-                            <h2 className="text-base font-semibold text-neutral-900">
-                              {esFisica
-                                ? "Venta"
-                                : "Pedido"}{" "}
-                              #{pedido.order_number}
-                            </h2>
-
-                            <span
-                              className={`rounded-full border px-3 py-1 text-xs font-semibold ${obtenerClaseEstado(
-                                pedido.status
-                              )}`}
-                            >
-                              {obtenerTextoEstado(
-                                pedido.status
-                              )}
-                            </span>
-
-                            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
-                              {esFisica
-                                ? "Tienda física"
-                                : "Online"}
-                            </span>
-
-                          </div>
-
-                          <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-
-                            <DatoPedido
-                              titulo="Cliente"
-                              valor={
-                                pedido.customer_name ||
-                                (esFisica
-                                  ? "Venta en tienda"
-                                  : "-")
-                              }
-                            />
-
-                            <DatoPedido
-                              titulo="Fecha"
-                              valor={formatearFechaHora(
-                                pedido.created_at
-                              )}
-                            />
-
-                            <DatoPedido
-                              titulo="Productos"
-                              valor={`${cantidadProductos} ${
-                                cantidadProductos ===
-                                1
-                                  ? "unidad"
-                                  : "unidades"
-                              }`}
-                            />
-
-                            {!esFisica && (
-                              <>
-                                <DatoPedido
-                                  titulo="Dirección"
-                                  valor={
-                                    pedido.delivery_address ||
-                                    "-"
-                                  }
-                                />
-
-                                <DatoPedido
-                                  titulo="Referencia"
-                                  valor={
-                                    pedido.delivery_reference ||
-                                    "-"
-                                  }
-                                />
-                              </>
-                            )}
-
-                          </div>
-
-                        </div>
-
-                        {/* =============================
-                            TOTAL
-                        ============================== */}
-
-                        <div className="flex shrink-0 flex-col items-center lg:items-end">
-
-                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                            Total
-                          </p>
-
-                          <p className="mt-1 text-2xl font-semibold text-neutral-900">
-                            {formatearPrecio(
-                              pedido.total
-                            )}
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      {/* =================================
-                          ACCIONES
-                      ================================== */}
-
-                      <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5 border-t border-neutral-100 pt-7 lg:justify-end">
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDetallePedido(
-                              pedido
-                            )
-                          }
-                          className={botonSecundario}
-                        >
-                          Ver detalle
-                        </button>
-
-                        <select
-                          value={
-                            pedido.status ||
-                            "Pendiente"
-                          }
-                          disabled={
-                            guardando ||
-                            pedido.status ===
-                              "Cancelado" ||
-                            estaEliminando
-                          }
-                          onChange={(event) =>
-                            cambiarEstado(
-                              pedido,
-                              event.target.value
-                            )
-                          }
-                          className="min-h-[46px] rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-700 outline-none transition focus:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <option value="Pendiente">
-                            Pendiente
-                          </option>
-
-                          <option value="Entregado">
-                            Entregado
-                          </option>
-
-                          <option value="Cancelado">
-                            Cancelado
-                          </option>
-                        </select>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            eliminarPedido(
-                              pedido
-                            )
-                          }
-                          disabled={
-                            guardando ||
-                            estaEliminando
-                          }
-                          className={botonPeligro}
-                        >
-                          {estaEliminando
-                            ? "Eliminando..."
-                            : "Eliminar"}
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                    {/* ===================================
-                        PRODUCTOS RESUMIDOS
-                    ==================================== */}
-
-                    {pedido.order_items?.length >
-                      0 && (
-                      <div className="border-t border-neutral-200 bg-neutral-50/60 px-6 py-7 sm:px-8">
-
-                        <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                          Productos
-                        </p>
-
-                        <div className="flex flex-col gap-2.5">
-
-                          {pedido.order_items.map(
-                            (item) => (
-                              <div
-                                key={item.id}
-                                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3.5"
-                              >
-
-                                <span className="min-w-0 flex-1 text-sm font-semibold text-neutral-800">
-                                  {item.product_name ||
-                                    "Producto"}
-                                </span>
-
-                                <span className="text-sm text-neutral-500">
-                                  {item.size ||
-                                    "-"}{" "}
-                                  /{" "}
-                                  {item.color ||
-                                    "-"}
-                                </span>
-
-                                <span className="text-sm text-neutral-500">
-                                  x{" "}
-                                  {item.quantity}
-                                </span>
-
-                                <span className="text-sm font-semibold text-neutral-900">
-                                  {formatearPrecio(
-                                    item.subtotal
-                                  )}
-                                </span>
-
-                              </div>
-                            )
-                          )}
-
-                        </div>
-
-                      </div>
-                    )}
-
-                  </article>
-                );
-              })}
-
-            </div>
-          )}
-
+          </div>
         </div>
 
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-neutral-200 px-5 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            disabled={guardando}
+            onClick={guardar}
+            className="rounded-xl bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {guardando ? "Guardando..." : "Guardar cambios"}
+          </button>
+        </div>
       </div>
-
-      {/* =================================================
-          MODAL REGISTRAR VENTA
-      ================================================== */}
-
-      {ventaAbierta && (
-        <RegistrarVentaModal
-          productos={productos}
-          guardando={guardando}
-          onCerrar={() =>
-            setVentaAbierta(false)
-          }
-          onGuardado={async () => {
-            setVentaAbierta(false);
-
-            setMensaje(
-              "Venta registrada correctamente."
-            );
-
-            await cargarDatos();
-          }}
-          onError={(mensajeError) =>
-            setError(mensajeError)
-          }
-          setGuardando={setGuardando}
-        />
-      )}
-
-      {/* =================================================
-          MODAL DETALLE
-      ================================================== */}
-
-      {detallePedido && (
-        <DetallePedidoModal
-          pedido={detallePedido}
-          onCerrar={() =>
-            setDetallePedido(null)
-          }
-          onEliminar={() =>
-            eliminarPedido(detallePedido)
-          }
-          eliminando={
-            eliminandoId ===
-            detallePedido.id
-          }
-        />
-      )}
-
-    </section>
+    </Modal>
   );
 }
 
-/* =========================================================
-   COMPONENTE RESUMEN
-========================================================= */
+function VentaFisicaModal({ onClose, onSaved }) {
+  const [productos, setProductos] = useState([]);
+  const [cargandoProductos, setCargandoProductos] = useState(true);
 
-function ResumenCard({ titulo, valor }) {
-  return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-6 text-center shadow-[0_6px_22px_rgba(0,0,0,0.035)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-        {titulo}
-      </p>
-
-      <p className="mt-2 text-2xl font-semibold text-neutral-900">
-        {valor}
-      </p>
-    </div>
-  );
-}
-
-/* =========================================================
-   DATO DEL PEDIDO
-========================================================= */
-
-function DatoPedido({ titulo, valor }) {
-  return (
-    <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
-        {titulo}
-      </p>
-
-      <p className="mt-1 break-words text-sm text-neutral-800">
-        {valor}
-      </p>
-    </div>
-  );
-}
-
-/* =========================================================
-   REGISTRAR VENTA FÍSICA
-========================================================= */
-
-function RegistrarVentaModal({
-  productos,
-  guardando,
-  onCerrar,
-  onGuardado,
-  onError,
-  setGuardando,
-}) {
   const [cliente, setCliente] = useState("");
-  const [descuento, setDescuento] = useState("");
-  const [productoId, setProductoId] = useState("");
-  const [variantId, setVariantId] = useState("");
-  const [cantidad, setCantidad] = useState(1);
+  const [descuento, setDescuento] = useState(0);
+
+  const [productoSeleccionado, setProductoSeleccionado] =
+    useState(null);
+
+  const [colorSeleccionado, setColorSeleccionado] =
+    useState("");
+
+  const [tallaSeleccionada, setTallaSeleccionada] =
+    useState("");
+
+  const [mostrarProductos, setMostrarProductos] =
+    useState(false);
+
   const [items, setItems] = useState([]);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
 
-  const productoSeleccionado =
-    productos.find(
-      (producto) =>
-        producto.id === productoId
+  useEffect(() => {
+    async function cargarProductos() {
+      setCargandoProductos(true);
+      setError("");
+
+      const { data, error: productosError } = await supabase
+        .from("products")
+        .select(
+          `
+            id,
+            name,
+            price,
+            is_active,
+            owner_role,
+            product_variants (
+              id,
+              size,
+              color,
+              stock
+            )
+          `
+        )
+        .eq("is_active", true)
+        .eq("owner_role", "principal")
+        .order("name");
+
+      if (productosError) {
+        setError(productosError.message);
+        setProductos([]);
+        setCargandoProductos(false);
+        return;
+      }
+
+      const productosConStock = (data || []).filter(
+        (producto) =>
+          producto.owner_role === "principal" &&
+          (producto.product_variants || []).some(
+            (variant) => Number(variant.stock || 0) > 0
+          )
+      );
+
+      setProductos(productosConStock);
+      setCargandoProductos(false);
+    }
+
+    cargarProductos();
+  }, []);
+
+  const coloresDisponibles = useMemo(() => {
+    if (!productoSeleccionado) {
+      return [];
+    }
+
+    return [
+      ...new Set(
+        (productoSeleccionado.product_variants || [])
+          .filter(
+            (variant) => Number(variant.stock || 0) > 0
+          )
+          .map((variant) => variant.color)
+          .filter(Boolean)
+      ),
+    ];
+  }, [productoSeleccionado]);
+
+  const tallasDisponibles = useMemo(() => {
+    if (!productoSeleccionado || !colorSeleccionado) {
+      return [];
+    }
+
+    return (productoSeleccionado.product_variants || [])
+      .filter(
+        (variant) =>
+          variant.color === colorSeleccionado &&
+          Number(variant.stock || 0) > 0
+      )
+      .sort((a, b) =>
+        String(a.size || "").localeCompare(
+          String(b.size || ""),
+          undefined,
+          { numeric: true }
+        )
+      );
+  }, [productoSeleccionado, colorSeleccionado]);
+
+  const subtotal = useMemo(() => {
+    return items.reduce(
+      (total, item) =>
+        total +
+        Number(item.price || 0) *
+          Number(item.quantity || 1),
+      0
     );
-
-  const variantes =
-    productoSeleccionado?.product_variants ||
-    [];
-
-  const varianteSeleccionada =
-    variantes.find(
-      (variante) =>
-        variante.id === variantId
-    );
-
-  const subtotal = items.reduce(
-    (total, item) =>
-      total +
-      Number(item.subtotal || 0),
-    0
-  );
-
-  const descuentoNumero = Math.max(
-    0,
-    Number(descuento || 0)
-  );
+  }, [items]);
 
   const total = Math.max(
     0,
-    subtotal - descuentoNumero
+    subtotal - Number(descuento || 0)
   );
 
-  function cambiarProducto(id) {
-    setProductoId(id);
-    setVariantId("");
-    setCantidad(1);
-    onError("");
+  function abrirSelectorProductos() {
+    if (cargandoProductos) {
+      return;
+    }
+
+    setMostrarProductos((actual) => !actual);
+    setError("");
+  }
+
+  function seleccionarProducto(producto) {
+    setProductoSeleccionado(producto);
+    setColorSeleccionado("");
+    setTallaSeleccionada("");
+    setMostrarProductos(false);
+    setError("");
+  }
+
+  function seleccionarColor(color) {
+    setColorSeleccionado(color);
+    setTallaSeleccionada("");
+    setError("");
+  }
+
+  function seleccionarTalla(talla) {
+    setTallaSeleccionada(talla);
+    setError("");
   }
 
   function agregarProducto() {
-    onError("");
+    setError("");
 
     if (!productoSeleccionado) {
-      onError("Selecciona un producto.");
+      setError("Selecciona un producto.");
       return;
     }
 
-    if (!varianteSeleccionada) {
-      onError(
-        "Selecciona talla y color."
-      );
+    if (!colorSeleccionado) {
+      setError("Selecciona un color.");
       return;
     }
 
-    const cantidadNumero = Number(cantidad);
-
-    if (
-      !Number.isInteger(
-        cantidadNumero
-      ) ||
-      cantidadNumero <= 0
-    ) {
-      onError(
-        "La cantidad debe ser mayor que cero."
-      );
+    if (!tallaSeleccionada) {
+      setError("Selecciona una talla.");
       return;
     }
 
-    const stockDisponible = Number(
-      varianteSeleccionada.stock || 0
+    const variante = (
+      productoSeleccionado.product_variants || []
+    ).find(
+      (item) =>
+        item.color === colorSeleccionado &&
+        item.size === tallaSeleccionada
     );
+
+    if (!variante) {
+      setError("No se encontró esa variante.");
+      return;
+    }
 
     const existente = items.find(
-      (item) =>
-        item.variant_id ===
-        varianteSeleccionada.id
-    );
-
-    const cantidadFinal =
-      (existente?.quantity || 0) +
-      cantidadNumero;
-
-    if (
-      cantidadFinal >
-      stockDisponible
-    ) {
-      onError(
-        `Solo hay ${stockDisponible} unidad(es) disponibles.`
-      );
-      return;
-    }
-
-    const precio = Number(
-      productoSeleccionado.price || 0
+      (item) => item.variant_id === variante.id
     );
 
     if (existente) {
+      if (
+        existente.quantity + 1 >
+        Number(variante.stock || 0)
+      ) {
+        setError(
+          "No hay más stock disponible para esta variante."
+        );
+        return;
+      }
+
       setItems((actuales) =>
         actuales.map((item) =>
-          item.variant_id ===
-          varianteSeleccionada.id
+          item.variant_id === variante.id
             ? {
                 ...item,
-                quantity:
-                  cantidadFinal,
-                subtotal:
-                  cantidadFinal *
-                  Number(
-                    item.unit_price
-                  ),
+                quantity: item.quantity + 1,
               }
             : item
         )
@@ -1156,888 +620,898 @@ function RegistrarVentaModal({
       setItems((actuales) => [
         ...actuales,
         {
-          variant_id:
-            varianteSeleccionada.id,
-          product_id:
-            productoSeleccionado.id,
-          product_name:
-            productoSeleccionado.name,
-          size:
-            varianteSeleccionada.size,
-          color:
-            varianteSeleccionada.color,
-          color_hex:
-            varianteSeleccionada.color_hex ||
-            "",
-          quantity:
-            cantidadNumero,
-          unit_price:
-            precio,
-          subtotal:
-            precio *
-            cantidadNumero,
-          stock:
-            stockDisponible,
+          product_id: productoSeleccionado.id,
+          variant_id: variante.id,
+          product_name: productoSeleccionado.name,
+          size: variante.size,
+          color: variante.color,
+          price: Number(productoSeleccionado.price || 0),
+          quantity: 1,
+          stock: Number(variante.stock || 0),
         },
       ]);
     }
 
-    setCantidad(1);
+    setProductoSeleccionado(null);
+    setColorSeleccionado("");
+    setTallaSeleccionada("");
+    setMostrarProductos(false);
   }
 
-  function quitarItem(id) {
+  function cambiarCantidad(variantId, cantidad) {
+    setItems((actuales) =>
+      actuales
+        .map((item) => {
+          if (item.variant_id !== variantId) {
+            return item;
+          }
+
+          const nuevaCantidad = Math.max(
+            0,
+            Math.min(cantidad, item.stock)
+          );
+
+          return {
+            ...item,
+            quantity: nuevaCantidad,
+          };
+        })
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
+  function eliminarItem(variantId) {
     setItems((actuales) =>
       actuales.filter(
-        (item) =>
-          item.variant_id !== id
+        (item) => item.variant_id !== variantId
       )
     );
   }
 
-  async function guardarVenta() {
-    onError("");
+  async function registrarVenta() {
+    setError("");
 
-    if (items.length === 0) {
-      onError(
-        "Agrega al menos un producto a la venta."
-      );
+    if (!cliente.trim()) {
+      setError("Ingresa el nombre del cliente.");
       return;
     }
 
-    if (descuentoNumero > subtotal) {
-      onError(
-        "El descuento no puede ser mayor que el subtotal."
-      );
+    if (!items.length) {
+      setError("Agrega al menos un producto.");
       return;
     }
 
     setGuardando(true);
 
-    try {
-      const { error } =
-        await supabase.rpc(
-          "registrar_venta_fisica",
-          {
-            p_customer_name:
-              cliente.trim() ||
-              null,
+    const p_items = items.map((item) => ({
+      product_id: item.product_id,
+      variant_id: item.variant_id,
+      quantity: item.quantity,
+      price: item.price,
+      size: item.size,
+      color: item.color,
+    }));
 
-            p_discount:
-              descuentoNumero,
-
-            p_items:
-              items.map((item) => ({
-                product_id:
-                  item.product_id,
-                variant_id:
-                  item.variant_id,
-                product_name:
-                  item.product_name,
-                size:
-                  item.size,
-                color:
-                  item.color,
-                quantity:
-                  item.quantity,
-                unit_price:
-                  item.unit_price,
-              })),
-          }
-        );
-
-      if (error) {
-        throw error;
+    const { data, error: rpcError } = await supabase.rpc(
+      "registrar_venta_fisica",
+      {
+        p_customer_name: cliente.trim(),
+        p_discount: Number(descuento || 0),
+        p_items,
       }
+    );
 
-      await onGuardado();
-    } catch (err) {
-      console.error(err);
-
-      onError(
-        err?.message ||
-          "No se pudo registrar la venta."
-      );
-    } finally {
+    if (rpcError) {
+      setError(rpcError.message);
       setGuardando(false);
+      return;
     }
+
+    setGuardando(false);
+    onSaved(data);
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]">
+    <Modal
+      title="Nueva venta física"
+      onClose={onClose}
+      width="max-w-4xl"
+    >
+      <div className="space-y-6">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-neutral-700">
+            Cliente
+          </label>
 
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_25px_90px_rgba(0,0,0,0.2)]">
-
-        {/* CABECERA */}
-
-        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-5 sm:px-8">
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-              Tienda física
-            </p>
-
-            <h2 className="mt-1 text-xl font-semibold text-neutral-900">
-              Registrar venta
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={onCerrar}
-            disabled={guardando}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-200 text-lg text-neutral-500 transition hover:bg-neutral-50 hover:text-neutral-900 disabled:opacity-40"
-            aria-label="Cerrar"
-          >
-            ×
-          </button>
-
+          <input
+            value={cliente}
+            onChange={(e) => setCliente(e.target.value)}
+            placeholder="Nombre del cliente"
+            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+          />
         </div>
 
-        {/* CONTENIDO */}
+        <div className="rounded-2xl border border-neutral-200 p-5">
+          <h3 className="mb-5 text-sm font-semibold text-neutral-900">
+            Agregar producto
+          </h3>
 
-        <div className="overflow-y-auto px-6 py-7 sm:px-8 sm:py-8">
-
-          {/* CLIENTE Y DESCUENTO */}
-
-          <div className="grid gap-6 md:grid-cols-2">
-
-            <div>
-              <label className={etiqueta}>
-                Cliente
+          <div className="space-y-5">
+            <div className="relative">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Producto
               </label>
 
-              <input
-                type="text"
-                value={cliente}
-                onChange={(event) =>
-                  setCliente(
-                    event.target.value
-                  )
-                }
-                placeholder="Opcional"
-                className={campo}
-              />
+              <button
+                type="button"
+                onClick={abrirSelectorProductos}
+                disabled={cargandoProductos}
+                className="flex w-full items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left text-sm outline-none transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:bg-neutral-50"
+              >
+                <span
+                  className={
+                    productoSeleccionado
+                      ? "text-neutral-900"
+                      : "text-neutral-500"
+                  }
+                >
+                  {cargandoProductos
+                    ? "Cargando productos..."
+                    : productoSeleccionado
+                    ? `${productoSeleccionado.name} · S/ ${Number(
+                        productoSeleccionado.price || 0
+                      ).toFixed(2)}`
+                    : "Seleccionar producto"}
+                </span>
+
+                <span className="text-neutral-400">
+                  {mostrarProductos ? "▲" : "▼"}
+                </span>
+              </button>
+
+              {mostrarProductos && (
+                <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-64 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1 shadow-xl">
+                  {productos.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-neutral-500">
+                      No hay productos disponibles.
+                    </div>
+                  ) : (
+                    productos.map((producto) => (
+                      <button
+                        key={producto.id}
+                        type="button"
+                        onClick={() =>
+                          seleccionarProducto(producto)
+                        }
+                        className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm transition hover:bg-neutral-50"
+                      >
+                        <span className="min-w-0 truncate font-medium text-neutral-900">
+                          {producto.name}
+                        </span>
+
+                        <span className="ml-4 shrink-0 text-xs text-neutral-500">
+                          S/{" "}
+                          {Number(
+                            producto.price || 0
+                          ).toFixed(2)}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className={etiqueta}>
-                Descuento
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={descuento}
-                onChange={(event) =>
-                  setDescuento(
-                    event.target.value
-                  )
-                }
-                placeholder="0.00"
-                className={campo}
-              />
-            </div>
-
-          </div>
-
-          {/* AGREGAR PRODUCTO */}
-
-          <div className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 sm:p-6">
-
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-semibold text-neutral-900">
-                Agregar producto
-              </p>
-
-              <p className="text-xs text-neutral-500">
-                Selecciona el producto, su variante y la cantidad.
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
-
+            {productoSeleccionado && (
               <div>
-                <label className={etiqueta}>
-                  Producto
+                <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+                  Color
                 </label>
 
                 <select
-                  value={productoId}
-                  onChange={(event) =>
-                    cambiarProducto(
-                      event.target.value
-                    )
+                  value={colorSeleccionado}
+                  onChange={(e) =>
+                    seleccionarColor(e.target.value)
                   }
-                  className={campo}
+                  className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
                 >
                   <option value="">
-                    Selecciona un producto
+                    Seleccionar color
                   </option>
 
-                  {productos.map(
-                    (producto) => (
-                      <option
-                        key={
-                          producto.id
-                        }
-                        value={
-                          producto.id
-                        }
-                      >
-                        {producto.name}
-                      </option>
-                    )
-                  )}
+                  {coloresDisponibles.map((color) => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
                 </select>
-              </div>
-
-              <div>
-                <label className={etiqueta}>
-                  Talla / color
-                </label>
-
-                <select
-                  value={variantId}
-                  onChange={(event) =>
-                    setVariantId(
-                      event.target.value
-                    )
-                  }
-                  disabled={
-                    !productoSeleccionado
-                  }
-                  className={campo}
-                >
-                  <option value="">
-                    Selecciona una variante
-                  </option>
-
-                  {variantes.map(
-                    (variante) => (
-                      <option
-                        key={
-                          variante.id
-                        }
-                        value={
-                          variante.id
-                        }
-                        disabled={
-                          Number(
-                            variante.stock ||
-                              0
-                          ) <= 0
-                        }
-                      >
-                        {variante.size} /{" "}
-                        {variante.color} · Stock:{" "}
-                        {variante.stock}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className={etiqueta}>
-                  Cantidad
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  max={
-                    varianteSeleccionada?.stock ||
-                    undefined
-                  }
-                  value={cantidad}
-                  onChange={(event) =>
-                    setCantidad(
-                      Number(
-                        event.target
-                          .value
-                      )
-                    )
-                  }
-                  className={campo}
-                />
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={
-                    agregarProducto
-                  }
-                  disabled={
-                    !productoSeleccionado ||
-                    !varianteSeleccionada
-                  }
-                  className={`${botonPrincipal} w-full`}
-                >
-                  + Agregar producto
-                </button>
-              </div>
-
-            </div>
-
-            {varianteSeleccionada && (
-              <div className="mt-5 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-500">
-                Stock disponible:{" "}
-                <strong className="text-neutral-900">
-                  {
-                    varianteSeleccionada.stock
-                  }
-                </strong>{" "}
-                · Precio:{" "}
-                <strong className="text-neutral-900">
-                  {formatearPrecio(
-                    productoSeleccionado?.price
-                  )}
-                </strong>
               </div>
             )}
 
+            {productoSeleccionado &&
+              colorSeleccionado && (
+                <div>
+                  <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Talla
+                  </label>
+
+                  <select
+                    value={tallaSeleccionada}
+                    onChange={(e) =>
+                      seleccionarTalla(e.target.value)
+                    }
+                    className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+                  >
+                    <option value="">
+                      Seleccionar talla
+                    </option>
+
+                    {tallasDisponibles.map((variant) => (
+                      <option
+                        key={variant.id}
+                        value={variant.size}
+                      >
+                        {variant.size} · Stock{" "}
+                        {variant.stock}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+            {productoSeleccionado &&
+              colorSeleccionado &&
+              tallaSeleccionada && (
+                <button
+                  type="button"
+                  onClick={agregarProducto}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-neutral-800"
+                >
+                  <Icono nombre="plus" size={17} />
+                  Agregar producto
+                </button>
+              )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-neutral-200">
+          <div className="border-b border-neutral-200 px-5 py-4">
+            <h3 className="text-sm font-semibold text-neutral-900">
+              Productos de la venta
+            </h3>
           </div>
 
-          {/* PRODUCTOS */}
-
-          <div className="mt-8">
-
-            <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-              Productos de la venta
-            </p>
-
+          <div className="p-4">
             {items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-9 text-center">
-                <p className="text-sm text-neutral-500">
-                  Todavía no agregaste productos.
-                </p>
-              </div>
+              <p className="py-6 text-center text-sm text-neutral-500">
+                Todavía no agregaste productos.
+              </p>
             ) : (
-              <div className="flex flex-col gap-3">
-
+              <div className="space-y-3">
                 {items.map((item) => (
                   <div
-                    key={
-                      item.variant_id
-                    }
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4"
+                    key={item.variant_id}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 p-4"
                   >
-
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-neutral-900">
-                        {
-                          item.product_name
-                        }
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-neutral-900">
+                        {item.product_name}
                       </p>
 
                       <p className="mt-1 text-xs text-neutral-500">
-                        {item.size} /{" "}
-                        {item.color}
+                        Talla: {item.size}
+                        {" · "}
+                        Color: {item.color}
+                      </p>
+
+                      <p className="mt-1 text-xs text-neutral-500">
+                        S/{" "}
+                        {Number(item.price).toFixed(2)}
                       </p>
                     </div>
 
-                    <span className="text-xs text-neutral-500">
-                      x{" "}
-                      {item.quantity}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-4">
+                      <div className="flex items-center rounded-lg border border-neutral-200">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            cambiarCantidad(
+                              item.variant_id,
+                              item.quantity - 1
+                            )
+                          }
+                          className="flex h-9 w-9 items-center justify-center text-neutral-600 hover:bg-neutral-50"
+                        >
+                          <Icono
+                            nombre="minus"
+                            size={15}
+                          />
+                        </button>
 
-                    <span className="text-sm font-semibold text-neutral-900">
-                      {formatearPrecio(
-                        item.subtotal
-                      )}
-                    </span>
+                        <span className="w-9 text-center text-sm font-medium">
+                          {item.quantity}
+                        </span>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        quitarItem(
-                          item.variant_id
-                        )
-                      }
-                      className="rounded-lg px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
-                    >
-                      Quitar
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            cambiarCantidad(
+                              item.variant_id,
+                              item.quantity + 1
+                            )
+                          }
+                          disabled={
+                            item.quantity >= item.stock
+                          }
+                          className="flex h-9 w-9 items-center justify-center text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Icono
+                            nombre="plus"
+                            size={15}
+                          />
+                        </button>
+                      </div>
 
+                      <span className="min-w-[80px] text-right text-sm font-semibold text-neutral-900">
+                        S/{" "}
+                        {(
+                          Number(item.price) *
+                          Number(item.quantity)
+                        ).toFixed(2)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          eliminarItem(item.variant_id)
+                        }
+                        className="text-xs font-medium text-red-600 hover:text-red-700"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 ))}
-
               </div>
             )}
-
           </div>
-
-          {/* RESUMEN */}
-
-          <div className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-6">
-
-            <div className="space-y-4">
-
-              <div className="flex items-center justify-between gap-5 text-sm">
-                <span className="text-neutral-500">
-                  Subtotal
-                </span>
-
-                <span className="font-semibold text-neutral-900">
-                  {formatearPrecio(
-                    subtotal
-                  )}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-5 text-sm">
-                <span className="text-neutral-500">
-                  Descuento
-                </span>
-
-                <span className="font-semibold text-neutral-900">
-                  -{" "}
-                  {formatearPrecio(
-                    descuentoNumero
-                  )}
-                </span>
-              </div>
-
-              <div className="border-t border-neutral-200 pt-4">
-                <div className="flex items-center justify-between gap-5">
-
-                  <span className="text-base font-semibold text-neutral-900">
-                    Total
-                  </span>
-
-                  <span className="text-2xl font-semibold text-neutral-900">
-                    {formatearPrecio(
-                      total
-                    )}
-                  </span>
-
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
         </div>
 
-        {/* BOTONES */}
+        <div className="grid gap-5 sm:grid-cols-3">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Subtotal
+            </label>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 px-6 py-5 sm:flex-row sm:justify-end sm:px-8">
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-medium">
+              S/ {subtotal.toFixed(2)}
+            </div>
+          </div>
 
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Descuento
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={descuento}
+              onChange={(e) =>
+                setDescuento(
+                  Number(e.target.value || 0)
+                )
+              }
+              className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">
+              Total
+            </label>
+
+            <div className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-3 text-sm font-semibold text-white">
+              S/ {total.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={onCerrar}
-            disabled={guardando}
-            className={botonSecundario}
+            onClick={onClose}
+            className="rounded-xl border border-neutral-200 px-5 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
           >
             Cancelar
           </button>
 
           <button
             type="button"
-            onClick={
-              guardarVenta
-            }
-            disabled={
-              guardando ||
-              items.length === 0
-            }
-            className={botonPrincipal}
+            onClick={registrarVenta}
+            disabled={guardando}
+            className="rounded-xl bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {guardando
-              ? "Guardando..."
+              ? "Registrando..."
               : "Registrar venta"}
           </button>
-
         </div>
-
       </div>
-    </div>
+    </Modal>
   );
 }
 
-/* =========================================================
-   DETALLE DEL PEDIDO / VENTA
-========================================================= */
+export default function OrdersAdmin() {
+  const [orders, setOrders] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
-function DetallePedidoModal({
-  pedido,
-  onCerrar,
-  onEliminar,
-  eliminando,
-}) {
-  const esFisica =
-    obtenerTipoVenta(pedido) ===
-    "fisica";
+  const [busqueda, setBusqueda] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("TODOS");
+  const [estadoFiltro, setEstadoFiltro] = useState("TODOS");
 
-  const items =
-    pedido?.order_items || [];
+  const [pedidoEditar, setPedidoEditar] = useState(null);
+  const [mostrarVentaFisica, setMostrarVentaFisica] =
+    useState(false);
 
-  const subtotal = items.reduce(
-    (total, item) =>
-      total +
-      Number(item.subtotal || 0),
-    0
-  );
+  async function cargarPedidos() {
+    setCargando(true);
+    setError("");
 
-  const descuento = Number(
-    pedido?.discount || 0
-  );
+    const { data, error: ordersError } = await supabase
+      .from("orders")
+      .select(
+        `
+          *,
+          order_items (
+            id,
+            product_id,
+            product_name,
+            size,
+            color,
+            quantity
+          )
+        `
+      )
+      .order("created_at", {
+        ascending: true,
+      });
 
-  const total = Number(
-    pedido?.total || 0
-  );
+    if (ordersError) {
+      setError(ordersError.message);
+      setOrders([]);
+      setCargando(false);
+      return;
+    }
+
+    setOrders(data || []);
+    setCargando(false);
+  }
+
+  useEffect(() => {
+    cargarPedidos();
+  }, []);
+
+  async function eliminarPedido(order) {
+    const confirmado = window.confirm(
+      `¿Eliminar el pedido de ${
+        order.customer_name || "este cliente"
+      }?`
+    );
+
+    if (!confirmado) {
+      return;
+    }
+
+    setError("");
+
+    const { error: deleteError } = await supabase.rpc(
+      "admin_delete_order",
+      {
+        p_order_id: order.id,
+      }
+    );
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setOrders((actuales) =>
+      actuales.filter(
+        (item) => String(item.id) !== String(order.id)
+      )
+    );
+  }
+
+  function pedidoActualizado(updatedOrder) {
+    setOrders((actuales) =>
+      actuales.map((item) =>
+        String(item.id) === String(updatedOrder.id)
+          ? {
+              ...item,
+              ...updatedOrder,
+            }
+          : item
+      )
+    );
+
+    setPedidoEditar(null);
+  }
+
+  const pedidosFiltrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const tipo = obtenerTipoTexto(order.order_type);
+      const estado = normalizarEstado(order.status);
+
+      const coincideTipo =
+        tipoFiltro === "TODOS" || tipo === tipoFiltro;
+
+      const coincideEstado =
+        estadoFiltro === "TODOS" ||
+        estado === estadoFiltro;
+
+      const textoPedido = [
+        order.customer_name,
+        order.delivery_address,
+        order.delivery_reference,
+        order.id,
+        tipo,
+        estado,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const coincideBusqueda =
+        !texto || textoPedido.includes(texto);
+
+      return (
+        coincideTipo &&
+        coincideEstado &&
+        coincideBusqueda
+      );
+    });
+  }, [
+    orders,
+    busqueda,
+    tipoFiltro,
+    estadoFiltro,
+  ]);
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]">
-
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_25px_90px_rgba(0,0,0,0.2)]">
-
-        {/* CABECERA */}
-
-        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-5 sm:px-8">
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-              {esFisica
-                ? "Venta física"
-                : "Pedido online"}
-            </p>
-
-            <h2 className="mt-1 text-xl font-semibold text-neutral-900">
-              {esFisica
-                ? "Venta"
-                : "Pedido"}{" "}
-              #{pedido?.order_number || "-"}
-            </h2>
-          </div>
-
+    <div className="min-h-full w-full bg-white px-6 py-8 text-neutral-900 sm:px-10 sm:py-10 lg:px-14 xl:px-16 2xl:px-20">
+      <div className="w-full space-y-7">
+        <div className="flex w-full justify-end">
           <button
             type="button"
-            onClick={onCerrar}
-            disabled={eliminando}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-200 text-lg text-neutral-500 transition hover:bg-neutral-50 hover:text-neutral-900 disabled:opacity-40"
-            aria-label="Cerrar"
+            onClick={() => setMostrarVentaFisica(true)}
+            className="flex items-center gap-2 rounded-xl bg-neutral-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-neutral-800"
           >
-            ×
+            <Icono nombre="plus" size={17} />
+            Nueva venta física
           </button>
-
         </div>
 
-        {/* CONTENIDO */}
+        <div className="grid w-full gap-5 lg:grid-cols-[minmax(0,1fr)_240px_240px]">
+          <div className="relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">
+              <Icono nombre="search" size={18} />
+            </span>
 
-        <div className="overflow-y-auto px-6 py-7 sm:px-8 sm:py-8">
-
-          {/* INFORMACIÓN */}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                Cliente
-              </p>
-
-              <p className="mt-2 text-sm font-semibold text-neutral-900">
-                {pedido?.customer_name ||
-                  (esFisica
-                    ? "Venta en tienda"
-                    : "-")}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                Fecha
-              </p>
-
-              <p className="mt-2 text-sm font-semibold text-neutral-900">
-                {formatearFechaHora(
-                  pedido?.created_at
-                )}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                Tipo de venta
-              </p>
-
-              <p className="mt-2 text-sm font-semibold text-neutral-900">
-                {esFisica
-                  ? "Tienda física"
-                  : "Online"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                Estado
-              </p>
-
-              <p
-                className={`mt-2 text-sm font-semibold ${
-                  pedido?.status ===
-                  "Entregado"
-                    ? "text-green-700"
-                    : pedido?.status ===
-                      "Cancelado"
-                    ? "text-red-600"
-                    : "text-neutral-800"
-                }`}
-              >
-                {obtenerTextoEstado(
-                  pedido?.status
-                )}
-              </p>
-            </div>
-
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por cliente, dirección o pedido..."
+              className="w-full rounded-xl border border-neutral-200 bg-white py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-neutral-500"
+            />
           </div>
 
-          {/* ENTREGA */}
+          <select
+            value={tipoFiltro}
+            onChange={(e) => setTipoFiltro(e.target.value)}
+            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-sm outline-none transition focus:border-neutral-500"
+          >
+            <option value="TODOS">Todos los tipos</option>
+            <option value="ONLINE">Online</option>
+            <option value="TIENDA">Tienda</option>
+          </select>
 
-          {!esFisica && (
-            <div className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-6">
+          <select
+            value={estadoFiltro}
+            onChange={(e) => setEstadoFiltro(e.target.value)}
+            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-sm outline-none transition focus:border-neutral-500"
+          >
+            <option value="TODOS">Todos los estados</option>
 
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                Información de entrega
-              </p>
+            {estados.map((estado) => (
+              <option key={estado} value={estado}>
+                {estado}
+              </option>
+            ))}
+          </select>
+        </div>
 
-              <div className="mt-5 space-y-4 text-sm">
+        {error && (
+          <div className="w-full rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-                <div>
-                  <p className="font-semibold text-neutral-500">
-                    Dirección
-                  </p>
-
-                  <p className="mt-1 text-neutral-900">
-                    {pedido?.delivery_address ||
-                      "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="font-semibold text-neutral-500">
-                    Referencia
-                  </p>
-
-                  <p className="mt-1 text-neutral-900">
-                    {pedido?.delivery_reference ||
-                      "-"}
-                  </p>
-                </div>
-
-                {pedido?.delivery_zone && (
-                  <div>
-                    <p className="font-semibold text-neutral-500">
-                      Zona
-                    </p>
-
-                    <p className="mt-1 text-neutral-900">
-                      {
-                        pedido.delivery_zone
-                      }
-                    </p>
-                  </div>
-                )}
-
-              </div>
-            </div>
-          )}
-
-          {/* PRODUCTOS */}
-
-          <div className="mt-8">
-
-            <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-              Productos
+        {cargando ? (
+          <div className="w-full rounded-2xl border border-neutral-200 bg-white py-20 text-center text-sm text-neutral-500">
+            Cargando pedidos...
+          </div>
+        ) : pedidosFiltrados.length === 0 ? (
+          <div className="w-full rounded-2xl border border-neutral-200 bg-white py-20 text-center">
+            <p className="text-sm font-medium text-neutral-700">
+              No hay pedidos para mostrar.
             </p>
 
-            {items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center">
-                <p className="text-sm text-neutral-500">
-                  No hay productos registrados.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
+            <p className="mt-2 text-xs text-neutral-500">
+              Prueba cambiando los filtros o la búsqueda.
+            </p>
+          </div>
+        ) : (
+          <div className="w-full space-y-6">
+            {pedidosFiltrados.map((order) => {
+              const tipo = obtenerTipoTexto(
+                order.order_type
+              );
 
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-neutral-200 bg-neutral-50 p-5"
-                  >
+              const estado = normalizarEstado(
+                order.status
+              );
 
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              const numeroPedido = obtenerNumeroPedido(
+                orders,
+                order
+              );
 
-                      <div className="min-w-0">
+              const subtotal = Number(
+                order.subtotal || order.total || 0
+              );
 
-                        <p className="text-sm font-semibold text-neutral-900">
-                          {item.product_name ||
-                            "Producto"}
-                        </p>
+              const descuento = Number(
+                order.discount || 0
+              );
 
-                        <div className="mt-2 flex flex-wrap gap-2">
+              const total = Number(
+                order.total ||
+                  Math.max(0, subtotal - descuento)
+              );
 
-                          <span className="rounded-lg border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
-                            Talla:{" "}
-                            {item.size ||
-                              "-"}
-                          </span>
+              return (
+                <div
+                  key={order.id}
+                  className="w-full rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+                >
+                  <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm font-semibold text-neutral-900">
+                        Pedido #{numeroPedido}
+                      </span>
 
-                          <span className="rounded-lg border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
-                            Color:{" "}
-                            {item.color ||
-                              "-"}
-                          </span>
-
-                          <span className="rounded-lg border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
-                            Cantidad:{" "}
-                            {item.quantity ||
-                              0}
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                      <div className="shrink-0 text-left sm:text-right">
-
-                        <p className="text-xs text-neutral-400">
-                          Precio unitario
-                        </p>
-
-                        <p className="mt-1 text-sm font-semibold text-neutral-800">
-                          {formatearPrecio(
-                            item.unit_price
+                      <span
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium ${obtenerTipoClase(
+                          tipo
+                        )}`}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {tipo === "TIENDA" ? (
+                            <Icono
+                              nombre="store"
+                              size={13}
+                            />
+                          ) : (
+                            <Icono
+                              nombre="globe"
+                              size={13}
+                            />
                           )}
-                        </p>
 
-                        <p className="mt-2 text-xs text-neutral-400">
-                          Subtotal
-                        </p>
+                          {tipo}
+                        </span>
+                      </span>
 
-                        <p className="mt-1 text-base font-semibold text-neutral-900">
-                          {formatearPrecio(
-                            item.subtotal
-                          )}
-                        </p>
-
-                      </div>
-
+                      <span
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium ${obtenerEstadoClase(
+                          estado
+                        )}`}
+                      >
+                        {estado}
+                      </span>
                     </div>
 
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPedidoEditar(order)
+                        }
+                        className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-4 py-2.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50"
+                      >
+                        <Icono nombre="edit" size={15} />
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          eliminarPedido(order)
+                        }
+                        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-4 py-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      >
+                        <Icono nombre="trash" size={15} />
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
-                ))}
 
-              </div>
-            )}
+                  <div className="mt-7 grid gap-6 border-t border-neutral-100 pt-6 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="min-w-0">
+                      <p className="text-xs text-neutral-500">
+                        Cliente
+                      </p>
 
-          </div>
+                      <p className="mt-2 text-sm font-medium text-neutral-900">
+                        {order.customer_name ||
+                          "Sin nombre"}
+                      </p>
+                    </div>
 
-          {/* RESUMEN */}
+                    <div className="min-w-0">
+                      <p className="text-xs text-neutral-500">
+                        Fecha
+                      </p>
 
-          <div className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-6">
+                      <p className="mt-2 text-sm font-medium text-neutral-900">
+                        {order.created_at
+                          ? new Date(
+                              order.created_at
+                            ).toLocaleString("es-PE")
+                          : "Sin fecha"}
+                      </p>
+                    </div>
 
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-              Resumen
-            </p>
+                    <div className="min-w-0">
+                      <p className="text-xs text-neutral-500">
+                        Subtotal
+                      </p>
 
-            <div className="mt-5 space-y-4">
+                      <p className="mt-2 text-sm font-medium text-neutral-900">
+                        S/ {subtotal.toFixed(2)}
+                      </p>
+                    </div>
 
-              <div className="flex items-center justify-between gap-5 text-sm">
-                <span className="text-neutral-500">
-                  Subtotal
-                </span>
+                    <div className="min-w-0">
+                      <p className="text-xs text-neutral-500">
+                        Total
+                      </p>
 
-                <span className="font-semibold text-neutral-900">
-                  {formatearPrecio(
-                    subtotal
+                      <p className="mt-2 text-base font-semibold text-neutral-900">
+                        S/ {total.toFixed(2)}
+                      </p>
+
+                      {descuento > 0 && (
+                        <p className="mt-1 text-xs text-neutral-500">
+                          Descuento: S/{" "}
+                          {descuento.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {tipo === "ONLINE" && (
+                    <div className="mt-7 grid gap-6 rounded-xl bg-neutral-50 p-5 sm:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-neutral-500">
+                          Dirección de entrega
+                        </p>
+
+                        <p className="mt-2 text-sm leading-6 text-neutral-800">
+                          {order.delivery_address ||
+                            "No registrada"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-neutral-500">
+                          Referencia
+                        </p>
+
+                        <p className="mt-2 text-sm leading-6 text-neutral-800">
+                          {order.delivery_reference ||
+                            "No registrada"}
+                        </p>
+                      </div>
+                    </div>
                   )}
-                </span>
-              </div>
 
-              <div className="flex items-center justify-between gap-5 text-sm">
-                <span className="text-neutral-500">
-                  Descuento
-                </span>
+                  <div className="mt-7 border-t border-neutral-100 pt-6">
+                    <div className="mb-4 flex items-center justify-between gap-4">
+                      <p className="text-sm font-semibold text-neutral-900">
+                        Productos
+                      </p>
 
-                <span className="font-semibold text-neutral-900">
-                  -{" "}
-                  {formatearPrecio(
-                    descuento
-                  )}
-                </span>
-              </div>
+                      <span className="text-xs text-neutral-500">
+                        {(order.order_items || []).length}{" "}
+                        producto(s)
+                      </span>
+                    </div>
 
-              <div className="border-t border-neutral-200 pt-5">
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      {(order.order_items || []).map(
+                        (item, index) => (
+                          <div
+                            key={item.id || index}
+                            className="flex items-center justify-between gap-5 rounded-xl border border-neutral-200 px-5 py-4"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-neutral-900">
+                                {item.product_name ||
+                                  "Producto"}
+                              </p>
 
-                <div className="flex items-center justify-between gap-5">
+                              <p className="mt-1.5 text-xs leading-5 text-neutral-500">
+                                Talla:{" "}
+                                {item.size ||
+                                  "Sin talla"}
+                                {" · "}
+                                Color:{" "}
+                                {item.color ||
+                                  "Sin color"}
+                                {" · "}
+                                Cantidad:{" "}
+                                {item.quantity || 1}
+                              </p>
+                            </div>
 
-                  <span className="text-base font-semibold text-neutral-900">
-                    Total
-                  </span>
-
-                  <span className="text-2xl font-semibold text-neutral-900">
-                    {formatearPrecio(
-                      total
-                    )}
-                  </span>
-
+                            <div className="shrink-0 text-right">
+                              <p className="text-sm font-medium text-neutral-700">
+                                Cant.{" "}
+                                {item.quantity || 1}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
                 </div>
-
-              </div>
-
-            </div>
-
+              );
+            })}
           </div>
-
-          {/* OBSERVACIONES */}
-
-          {pedido?.notes && (
-            <div className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-6">
-
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                Observaciones
-              </p>
-
-              <p className="mt-3 text-sm leading-6 text-neutral-600">
-                {pedido.notes}
-              </p>
-
-            </div>
-          )}
-
-        </div>
-
-        {/* BOTONES */}
-
-        <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 px-6 py-5 sm:flex-row sm:justify-between sm:px-8">
-
-          <button
-            type="button"
-            onClick={onEliminar}
-            disabled={eliminando}
-            className={botonPeligro}
-          >
-            {eliminando
-              ? "Eliminando..."
-              : "Eliminar"}
-          </button>
-
-          <button
-            type="button"
-            onClick={onCerrar}
-            disabled={eliminando}
-            className={botonSecundario}
-          >
-            Cerrar
-          </button>
-
-        </div>
-
+        )}
       </div>
+
+      {pedidoEditar && (
+        <EditarPedidoModal
+          order={pedidoEditar}
+          onClose={() => setPedidoEditar(null)}
+          onSaved={pedidoActualizado}
+        />
+      )}
+
+      {mostrarVentaFisica && (
+        <VentaFisicaModal
+          onClose={() => setMostrarVentaFisica(false)}
+          onSaved={() => {
+            setMostrarVentaFisica(false);
+            cargarPedidos();
+          }}
+        />
+      )}
     </div>
   );
 }
