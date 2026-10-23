@@ -1,286 +1,323 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { useEffect, useMemo, useState } from "react"
+import { supabase } from "../lib/supabase"
 
-function StoreInfo({ onSelectCategory }) {
-  const [whatsapp, setWhatsapp] = useState("");
+const MAPS_DEFAULT =
+  "https://goo.gl/maps/PEaWNjMyDSjuxsi19?g_st=aw"
+
+const DIRECCION_DEFAULT =
+  "# 274 Jirón Dos de Mayo, La Merced, Junín"
+
+const DATOS_INICIALES = {
+  nombre: "GMISH",
+  direccion: DIRECCION_DEFAULT,
+  horario: "09:00 — 21:00",
+  mapsUrl: MAPS_DEFAULT,
+  imagenUrl: "",
+  descripcion:
+    "Ven a conocer nuestras prendas y descubre GMISH de cerca",
+  abierta: true,
+}
+
+export default function StoreInfo() {
+  const [tienda, setTienda] = useState(DATOS_INICIALES)
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    cargarWhatsApp();
-  }, []);
+    cargarTienda()
+  }, [])
 
-  async function cargarWhatsApp() {
-    const { data, error } = await supabase
-      .from("store_settings")
-      .select("whatsapp_principal")
-      .limit(1)
-      .maybeSingle();
+  async function cargarTienda() {
+    try {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select(
+          `
+            tienda_nombre,
+            tienda_direccion,
+            tienda_horario,
+            tienda_maps_url,
+            tienda_imagen_url,
+            tienda_descripcion,
+            tienda_abierta
+          `
+        )
+        .limit(1)
+        .maybeSingle()
 
-    if (!error && data?.whatsapp_principal) {
-      setWhatsapp(data.whatsapp_principal);
+      if (error) {
+        console.error(
+          "Error cargando datos de la tienda:",
+          error
+        )
+        return
+      }
+
+      if (data) {
+        setTienda({
+          nombre:
+            data.tienda_nombre ||
+            DATOS_INICIALES.nombre,
+
+          direccion:
+            data.tienda_direccion ||
+            DATOS_INICIALES.direccion,
+
+          horario:
+            data.tienda_horario ||
+            DATOS_INICIALES.horario,
+
+          mapsUrl:
+            data.tienda_maps_url ||
+            MAPS_DEFAULT,
+
+          imagenUrl:
+            data.tienda_imagen_url ||
+            "",
+
+          descripcion:
+            data.tienda_descripcion ||
+            DATOS_INICIALES.descripcion,
+
+          abierta:
+            typeof data.tienda_abierta === "boolean"
+              ? data.tienda_abierta
+              : true,
+        })
+      }
+    } catch (error) {
+      console.error("Error inesperado:", error)
+    } finally {
+      setCargando(false)
     }
   }
 
-  const handleDirections = () => {
-    const confirmed = window.confirm(
-      "¿Quieres abrir Google Maps?"
-    );
+  const direccionMapa = useMemo(() => {
+    return encodeURIComponent(
+      `${tienda.direccion || DIRECCION_DEFAULT}, Perú`
+    )
+  }, [tienda.direccion])
 
-    if (confirmed) {
-      window.open(
-        "https://www.google.com/maps",
-        "_blank",
-        "noopener,noreferrer"
-      );
-    }
-  };
+  const mapaUrl = useMemo(() => {
+    return `https://www.google.com/maps?q=${direccionMapa}&z=19&output=embed`
+  }, [direccionMapa])
 
-  const whatsappUrl = whatsapp
-    ? `https://wa.me/${whatsapp}`
-    : "#";
+  if (cargando) {
+    return (
+      <main className="flex min-h-[60vh] w-full items-center justify-center bg-[#f8f7f3]">
+        <div className="h-8 w-8 animate-spin rounded-full border border-black/20 border-t-black" />
+      </main>
+    )
+  }
 
   return (
-    <>
-      {/* INFORMACIÓN */}
-      <section className="mx-auto max-w-7xl px-4 py-16">
-        <div
-          className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-5"
-          style={{
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
-        >
-          {/* VISÍTANOS */}
-          <div className="w-[88vw] max-w-[420px] flex-shrink-0 snap-start rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:w-[420px] sm:p-8">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#22231F] text-2xl">
-                📍
-              </div>
+    <main className="w-full bg-[#f8f7f3] text-[#111]">
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#F0D58A]">
-                  Visítanos
-                </p>
+      <div
+        style={{
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          margin: 0,
+          padding: "32px 2.5vw",
+          boxSizing: "border-box",
+        }}
+      >
 
-                <h2 className="mt-1 text-2xl font-bold">
-                  Encuéntranos
-                </h2>
-              </div>
-            </div>
+        {/* ENCABEZADO */}
 
-            <div className="mt-6 flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-[#22231F]">
-              <p className="text-sm text-gray-500">
-                Foto del local
-              </p>
-            </div>
+        <header className="w-full text-center">
 
-            <div className="mt-5">
-              <p className="text-xs text-gray-500">
-                Dirección
-              </p>
+          <p className="text-[10px] tracking-[0.4em] text-black/40">
+            GMISH
+          </p>
 
-              <p className="mt-1 font-semibold">
-                Próximamente
-              </p>
-            </div>
+          <h1 className="mt-3 font-serif text-[34px] sm:text-[42px]">
+            VISÍTANOS
+          </h1>
 
-            <div className="mt-5 flex aspect-[16/9] items-center justify-center overflow-hidden rounded-2xl border border-[#302E28] bg-[#0D0F0C]">
-              <div className="text-center">
-                <p className="text-3xl">
-                  📍
-                </p>
+          <p className="mt-3 text-[16px] text-black/65">
+            Tu estilo también tiene un lugar
+          </p>
 
-                <p className="mt-2 text-sm text-gray-500">
-                  Aquí aparecerá nuestro mapa
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleDirections}
-              className="mt-5 w-full rounded-full bg-[#F0D58A] px-5 py-3.5 text-sm font-bold text-black transition hover:bg-white"
+          <div className="mt-4 flex justify-center">
+            <span
+              className={`inline-flex items-center gap-2 border px-4 py-2 text-[10px] tracking-[0.2em] ${
+                tienda.abierta
+                  ? "border-black/15 bg-white"
+                  : "border-black/10 bg-black/[0.03] text-black/45"
+              }`}
             >
-              Cómo llegar
-            </button>
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  tienda.abierta
+                    ? "bg-[#4b7a50]"
+                    : "bg-black/30"
+                }`}
+              />
+
+              {tienda.abierta
+                ? "ABIERTO"
+                : "CERRADO"}
+            </span>
           </div>
 
-          {/* WHATSAPP */}
-          <div className="w-[88vw] max-w-[420px] flex-shrink-0 snap-start rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:w-[420px] sm:p-8">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#22231F] text-2xl">
-                💬
-              </div>
+        </header>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#F0D58A]">
-                  WhatsApp
-                </p>
 
-                <h2 className="mt-1 text-2xl font-bold">
-                  ¿Tienes alguna consulta?
-                </h2>
-              </div>
+        {/* IMAGEN */}
+
+        <div className="mt-8 w-full aspect-[16/8] overflow-hidden bg-[#e9e7e1]">
+
+          {tienda.imagenUrl ? (
+            <img
+              src={tienda.imagenUrl}
+              alt="Tienda GMISH"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <span className="font-serif text-4xl text-black/20">
+                GMISH
+              </span>
+            </div>
+          )}
+
+        </div>
+
+
+        {/* INFORMACIÓN DE LA TIENDA */}
+
+        <section className="mt-8 w-full">
+
+          <div className="mb-5 text-center">
+
+            <p className="text-[10px] tracking-[0.3em] text-black/40">
+              ENCUÉNTRANOS
+            </p>
+
+            <h2 className="mt-2 font-serif text-[27px]">
+              Encuéntranos en:
+            </h2>
+
+          </div>
+
+
+          <div className="grid w-full grid-cols-1 border border-black/10 md:grid-cols-2">
+
+            {/* DIRECCIÓN */}
+
+            <div className="px-8 py-7 text-center">
+
+              <p className="text-[10px] tracking-[0.25em] text-black/40">
+                DIRECCIÓN
+              </p>
+
+              <p className="mt-3 text-[14px] leading-7 text-black/70">
+                {tienda.direccion}
+              </p>
+
             </div>
 
-            <p className="mt-6 leading-7 text-gray-400">
-              Escríbenos para consultar disponibilidad,
-              pagos, envíos o cualquier otra duda.
+
+            {/* HORARIO */}
+
+            <div className="border-t border-black/10 px-8 py-7 text-center md:border-l md:border-t-0">
+
+              <p className="text-[10px] tracking-[0.25em] text-black/40">
+                HORARIO DE ATENCIÓN
+              </p>
+
+              <p className="mt-3 text-[14px] text-black/70">
+                LUNES — DOMINGO
+              </p>
+
+              <p className="mt-1 text-[14px] text-black/70">
+                {tienda.horario}
+              </p>
+
+              <p
+                className={`mt-3 text-[10px] tracking-[0.15em] ${
+                  tienda.abierta
+                    ? "text-[#4b7a50]"
+                    : "text-black/40"
+                }`}
+              >
+                {tienda.abierta
+                  ? "ACTUALMENTE ABIERTO"
+                  : "ACTUALMENTE CERRADO"}
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* MAPA */}
+
+        <section className="mt-8 w-full">
+
+          <div className="mb-5 text-center">
+
+            <p className="text-[10px] tracking-[0.3em] text-black/40">
+              CÓMO LLEGAR
             </p>
+
+            <h2 className="mt-2 font-serif text-[27px]">
+              Estamos más cerca de ti
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-[500px] text-[14px] leading-7 text-black/55">
+              Consulta nuestra ubicación y encuentra la mejor ruta para llegar a GMISH.
+            </p>
+
+          </div>
+
+
+          <div className="w-full overflow-hidden border border-black/10">
+
+            <iframe
+              title="Ubicación de GMISH"
+              src={mapaUrl}
+              className="block h-[350px] w-full border-0 sm:h-[430px]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+
+          </div>
+
+
+          <div className="mt-5 flex justify-center">
 
             <a
-              href={whatsappUrl}
+              href={
+                tienda.mapsUrl ||
+                MAPS_DEFAULT
+              }
               target="_blank"
-              rel="noopener noreferrer"
-              onClick={(event) => {
-                if (!whatsapp) {
-                  event.preventDefault();
-                }
-              }}
-              className="mt-7 block w-full rounded-full border border-[#F0D58A] px-5 py-3.5 text-center text-sm font-bold text-[#F0D58A] transition hover:bg-[#F0D58A] hover:text-black"
+              rel="noreferrer"
+              className="inline-flex min-h-[44px] items-center justify-center bg-black px-8 text-[10px] font-medium tracking-[0.2em] text-white transition hover:bg-black/80"
             >
-              Escríbenos por WhatsApp
+
+              <span className="text-white">
+                ABRIR EN GOOGLE MAPS
+              </span>
+
+              <span className="ml-3 text-sm text-white">
+                ↗
+              </span>
+
             </a>
+
           </div>
 
-          {/* REDES SOCIALES */}
-          <div className="w-[88vw] max-w-[420px] flex-shrink-0 snap-start rounded-3xl border border-[#302E28] bg-[#151714] p-6 sm:w-[420px] sm:p-8">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#22231F] text-2xl">
-                ✨
-              </div>
+        </section>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#F0D58A]">
-                  Redes
-                </p>
+      </div>
 
-                <h2 className="mt-1 text-2xl font-bold">
-                  Síguenos
-                </h2>
-              </div>
-            </div>
-
-            <p className="mt-6 text-sm leading-6 text-gray-400">
-              Descubre novedades, outfits y promociones.
-            </p>
-
-            <div className="mt-6 space-y-3">
-              {/* INSTAGRAM */}
-              <button
-                className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl">
-                  ◎
-                </span>
-
-                <span>
-                  <span className="block text-sm font-semibold">
-                    Instagram
-                  </span>
-
-                  <span className="block text-xs text-gray-500">
-                    @gmish
-                  </span>
-                </span>
-              </button>
-
-              {/* TIKTOK */}
-              <button
-                className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl">
-                  ♪
-                </span>
-
-                <span>
-                  <span className="block text-sm font-semibold">
-                    TikTok
-                  </span>
-
-                  <span className="block text-xs text-gray-500">
-                    @gmish
-                  </span>
-                </span>
-              </button>
-
-              {/* FACEBOOK */}
-              <button
-                className="flex w-full items-center gap-4 rounded-2xl border border-[#302E28] p-4 text-left transition hover:border-[#F0D58A]"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#22231F] text-xl font-bold">
-                  f
-                </span>
-
-                <span>
-                  <span className="block text-sm font-semibold">
-                    Facebook
-                  </span>
-
-                  <span className="block text-xs text-gray-500">
-                    GMISH
-                  </span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* INDICADOR */}
-        <div className="mt-2 flex justify-center gap-2 sm:hidden">
-          <span className="h-1.5 w-6 rounded-full bg-[#F0D58A]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-[#302E28]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-[#302E28]" />
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="border-t border-[#302E28] bg-[#0A0C09]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xl font-bold tracking-wide">
-              GMISH
-            </p>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Tu estilo, tu esencia.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-5 text-sm text-gray-400">
-            <button
-              onClick={() =>
-                onSelectCategory("hombre")
-              }
-              className="transition hover:text-[#F0D58A]"
-            >
-              Hombre
-            </button>
-
-            <button
-              onClick={() =>
-                onSelectCategory("mujer")
-              }
-              className="transition hover:text-[#F0D58A]"
-            >
-              Mujer
-            </button>
-
-            <button
-              onClick={() =>
-                onSelectCategory("ofertas")
-              }
-              className="transition hover:text-[#F0D58A]"
-            >
-              Ofertas
-            </button>
-          </div>
-
-          <div className="text-sm text-gray-500">
-            © 2026 GMISH
-          </div>
-        </div>
-      </footer>
-    </>
-  );
+    </main>
+  )
 }
-
-export default StoreInfo;

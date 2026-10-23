@@ -48,23 +48,21 @@ function Cart() {
     setGuardandoPedido(true);
 
     try {
-      /*
-       * ---------------------------------------------------------
-       * 1. OBTENER LOS PRODUCTOS Y SABER QUIÉN ES EL PROPIETARIO
-       * ---------------------------------------------------------
-       */
-
       const productIds = [
         ...new Set(
-          cart.map((product) => product.productId || product.id)
+          cart.map(
+            (product) => product.productId || product.id
+          )
         ),
       ];
 
-      const { data: productosDB, error: errorProductos } =
-        await supabase
-          .from("products")
-          .select("id, owner_role")
-          .in("id", productIds);
+      const {
+        data: productosDB,
+        error: errorProductos,
+      } = await supabase
+        .from("products")
+        .select("id, owner_role")
+        .in("id", productIds);
 
       if (errorProductos) {
         throw new Error(
@@ -79,12 +77,6 @@ function Cart() {
         propietarios[producto.id] =
           producto.owner_role || "principal";
       });
-
-      /*
-       * ---------------------------------------------------------
-       * 2. SEPARAR CARRITO EN PRINCIPAL Y SECUNDARIO
-       * ---------------------------------------------------------
-       */
 
       const productosPrincipal = [];
       const productosSecundario = [];
@@ -112,13 +104,6 @@ function Cart() {
       const tieneSecundario =
         productosSecundario.length > 0;
 
-      /*
-       * ---------------------------------------------------------
-       * 3. SI HAY PRODUCTOS DEL PRINCIPAL,
-       *    PEDIMOS NOMBRE, DIRECCIÓN Y REFERENCIA
-       * ---------------------------------------------------------
-       */
-
       if (tienePrincipal) {
         if (!cliente.nombre.trim()) {
           setErrorPedido("Escribe tu nombre.");
@@ -135,20 +120,16 @@ function Cart() {
         }
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 4. OBTENER LOS WHATSAPP CONFIGURADOS
-       * ---------------------------------------------------------
-       */
-
-      const { data: configuracion, error: errorConfiguracion } =
-        await supabase
-          .from("store_settings")
-          .select(
-            "whatsapp_principal, whatsapp_secundario"
-          )
-          .limit(1)
-          .maybeSingle();
+      const {
+        data: configuracion,
+        error: errorConfiguracion,
+      } = await supabase
+        .from("store_settings")
+        .select(
+          "whatsapp_principal, whatsapp_secundario"
+        )
+        .limit(1)
+        .maybeSingle();
 
       if (errorConfiguracion) {
         throw new Error(
@@ -163,10 +144,7 @@ function Cart() {
       const whatsappSecundario =
         configuracion?.whatsapp_secundario || "";
 
-      if (
-        tienePrincipal &&
-        !whatsappPrincipal
-      ) {
+      if (tienePrincipal && !whatsappPrincipal) {
         throw new Error(
           "El WhatsApp principal todavía no está configurado."
         );
@@ -180,12 +158,6 @@ function Cart() {
           "El WhatsApp secundario todavía no está configurado."
         );
       }
-
-      /*
-       * ---------------------------------------------------------
-       * 5. CALCULAR SUBTOTALES
-       * ---------------------------------------------------------
-       */
 
       const subtotalPrincipal =
         productosPrincipal.reduce(
@@ -205,48 +177,43 @@ function Cart() {
           0
         );
 
-      /*
-       * ---------------------------------------------------------
-       * 6. CREAR PEDIDO EN SUPABASE
-       * ---------------------------------------------------------
-       */
+      const numeroPedido =
+        `GM-${Date.now().toString().slice(-8)}`;
 
-      const numeroPedido = `GM-${Date.now()
-        .toString()
-        .slice(-8)}`;
+      const {
+        data: pedido,
+        error: errorPedidoSupabase,
+      } = await supabase
+        .from("orders")
+        .insert({
+          customer_name: tienePrincipal
+            ? cliente.nombre.trim()
+            : null,
 
-      const { data: pedido, error: errorPedidoSupabase } =
-        await supabase
-          .from("orders")
-          .insert({
-            customer_name: tienePrincipal
-              ? cliente.nombre.trim()
+          customer_phone: null,
+
+          status: "pendiente",
+
+          total: total,
+
+          order_number: numeroPedido,
+
+          delivery_zone: null,
+
+          delivery_address: tienePrincipal
+            ? cliente.direccion.trim()
+            : null,
+
+          notes: null,
+
+          delivery_reference:
+            tienePrincipal &&
+            cliente.referencia.trim()
+              ? cliente.referencia.trim()
               : null,
-
-            customer_phone: null,
-
-            status: "pendiente",
-
-            total: total,
-
-            order_number: numeroPedido,
-
-            delivery_zone: null,
-
-            delivery_address: tienePrincipal
-              ? cliente.direccion.trim()
-              : null,
-
-            notes: null,
-
-            delivery_reference:
-              tienePrincipal &&
-              cliente.referencia.trim()
-                ? cliente.referencia.trim()
-                : null,
-          })
-          .select()
-          .single();
+        })
+        .select()
+        .single();
 
       if (errorPedidoSupabase) {
         console.error(
@@ -259,12 +226,6 @@ function Cart() {
             "No se pudo guardar el pedido."
         );
       }
-
-      /*
-       * ---------------------------------------------------------
-       * 7. GUARDAR PRODUCTOS DEL PEDIDO
-       * ---------------------------------------------------------
-       */
 
       const items = cart.map((product) => ({
         order_id: pedido.id,
@@ -309,12 +270,6 @@ function Cart() {
         );
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 8. CREAR LÍNEAS DE WHATSAPP
-       * ---------------------------------------------------------
-       */
-
       function crearLineas(productos) {
         return productos.map((product) => {
           const talla =
@@ -334,14 +289,12 @@ function Cart() {
         });
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 9. CREAR MENSAJE PRINCIPAL
-       * ---------------------------------------------------------
-       */
-
-      function crearMensaje(productos, subtotal) {
-        const lineas = crearLineas(productos);
+      function crearMensaje(
+        productos,
+        subtotal
+      ) {
+        const lineas =
+          crearLineas(productos);
 
         return [
           "Hola, me interesa este pedido:",
@@ -351,12 +304,6 @@ function Cart() {
           `Subtotal: S/${subtotal.toFixed(2)}`,
         ].join("\n");
       }
-
-      /*
-       * ---------------------------------------------------------
-       * 10. ABRIR WHATSAPP PRINCIPAL
-       * ---------------------------------------------------------
-       */
 
       if (tienePrincipal) {
         const mensajePrincipal =
@@ -378,12 +325,6 @@ function Cart() {
         );
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 11. ABRIR WHATSAPP SECUNDARIO
-       * ---------------------------------------------------------
-       */
-
       if (tieneSecundario) {
         const mensajeSecundario =
           crearMensaje(
@@ -404,14 +345,7 @@ function Cart() {
         );
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 12. LIMPIAR CARRITO
-       * ---------------------------------------------------------
-       */
-
       clearCart();
-
       setMostrarDatos(false);
 
       setCliente({
@@ -431,344 +365,1039 @@ function Cart() {
     }
   }
 
+  const tieneProductoPrincipal = cart.some(
+    (product) =>
+      product.owner_role === "principal" ||
+      product.ownerRole === "principal"
+  );
+
   return (
     <>
       {cartOpen && (
         <div
-          className="fixed inset-0 z-[250] bg-black/35 backdrop-blur-[2px]"
+          className="
+            fixed
+            inset-0
+            z-[250]
+            bg-black/40
+            backdrop-blur-[3px]
+          "
           onClick={closeCart}
         >
           <aside
             role="dialog"
             aria-modal="true"
             aria-label="Tu carrito de compras"
-            className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#e9e3d9] bg-[#fffefa] text-[#292821] shadow-2xl"
+            className="
+              absolute
+              right-0
+              top-0
+              flex
+              h-full
+              w-full
+              max-w-[760px]
+              flex-col
+              overflow-hidden
+              border-l
+              border-[#e6e0d5]
+              bg-[#fffefa]
+              text-[#292821]
+              shadow-[-20px_0_60px_rgba(0,0,0,0.10)]
+            "
             onClick={(event) =>
               event.stopPropagation()
             }
           >
-            <div className="flex items-center justify-between border-b border-[#e9e3d9] px-6 py-5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#8c8578]">
-                  GMISH COLLECTION
-                </p>
-
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                  Tu carrito
-
-                  <span className="ml-2 text-sm font-normal text-[#898274]">
-                    ({totalItems})
-                  </span>
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeCart}
-                aria-label="Cerrar carrito"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e9e3d9] text-xl text-[#49463f] transition hover:bg-[#f2eee6]"
+            <div
+              className="
+                mx-2
+                flex
+                h-full
+                min-h-0
+                flex-1
+                flex-col
+                py-3
+                sm:mx-3
+                sm:py-4
+                lg:mx-4
+                lg:py-5
+              "
+            >
+              <header
+                className="
+                  flex
+                  shrink-0
+                  items-center
+                  justify-between
+                  border-b
+                  border-[#e9e3d9]
+                  px-1
+                  py-4
+                  sm:py-5
+                "
               >
-                ×
-              </button>
-            </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3">
+                    <h2
+                      className="
+                        text-[28px]
+                        font-medium
+                        tracking-[-0.04em]
+                        text-[#292821]
+                        sm:text-[30px]
+                      "
+                    >
+                      Tu carrito
+                    </h2>
 
-            {cart.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f2eee6] text-2xl">
-                  ♡
+                    <span
+                      className="
+                        flex
+                        h-7
+                        min-w-7
+                        items-center
+                        justify-center
+                        rounded-full
+                        bg-[#292821]
+                        px-2
+                        text-[11px]
+                        font-semibold
+                        text-white
+                      "
+                    >
+                      {totalItems}
+                    </span>
+                  </div>
+
+                  <p
+                    className="
+                      mt-1.5
+                      text-[11px]
+                      tracking-[0.02em]
+                      text-[#8b8376]
+                    "
+                  >
+                    {totalItems === 1
+                      ? "1 producto seleccionado"
+                      : `${totalItems} productos seleccionados`}
+                  </p>
                 </div>
-
-                <h3 className="mt-5 text-lg font-medium">
-                  Tu carrito está vacío
-                </h3>
-
-                <p className="mt-2 max-w-xs text-sm leading-6 text-[#827b70]">
-                  Descubre nuestra colección y
-                  encuentra algo que vaya contigo.
-                </p>
 
                 <button
                   type="button"
                   onClick={closeCart}
-                  className="mt-6 rounded-full bg-[#292821] px-7 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-[#454238]"
+                  aria-label="Cerrar carrito"
+                  className="
+                    ml-5
+                    flex
+                    h-11
+                    w-11
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-full
+                    border
+                    border-[#ded7cb]
+                    bg-[#fffefa]
+                    text-[22px]
+                    font-light
+                    text-[#49463f]
+                    transition
+                    duration-200
+                    hover:border-[#292821]
+                    hover:bg-[#292821]
+                    hover:text-white
+                  "
                 >
-                  Seguir comprando
+                  ×
                 </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-                  {cart.map((product, index) => (
-                    <article
-                      key={`${product.productId || product.id}-${product.variantId}-${product.selectedSize}-${product.selectedColor}`}
-                      className="rounded-2xl border border-[#e9e3d9] bg-white p-4"
+              </header>
+
+              {cart.length === 0 ? (
+                <div
+                  className="
+                    flex
+                    flex-1
+                    flex-col
+                    items-center
+                    justify-center
+                    py-12
+                    text-center
+                  "
+                >
+                  <div
+                    className="
+                      flex
+                      h-20
+                      w-20
+                      items-center
+                      justify-center
+                      rounded-full
+                      border
+                      border-[#e7e0d5]
+                      bg-[#f7f3ec]
+                      text-[28px]
+                      text-[#555047]
+                    "
+                  >
+                    ♡
+                  </div>
+
+                  <h3
+                    className="
+                      mt-7
+                      text-[22px]
+                      font-medium
+                      tracking-[-0.025em]
+                    "
+                  >
+                    Tu carrito está vacío
+                  </h3>
+
+                  <p
+                    className="
+                      mt-3
+                      max-w-[290px]
+                      text-sm
+                      leading-6
+                      text-[#827b70]
+                    "
+                  >
+                    Explora nuestra colección
+                    y encuentra algo que
+                    realmente vaya contigo.
+                  </p>
+
+                  <div
+                    className="
+                      mt-9
+                      flex
+                      w-full
+                      justify-center
+                    "
+                  >
+                    <button
+                      type="button"
+                      onClick={closeCart}
+                      className="
+                        rounded-full
+                        border
+                        border-[#292821]
+                        bg-[#292821]
+                        px-10
+                        py-4
+                        text-[11px]
+                        font-semibold
+                        uppercase
+                        tracking-[0.16em]
+                        text-white
+                        shadow-sm
+                        transition
+                        duration-200
+                        hover:bg-[#454238]
+                        hover:shadow-lg
+                      "
                     >
-                      <div className="flex gap-4">
-                        {product.image ? (
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="h-28 w-20 shrink-0 rounded-xl bg-[#f5f1e9] object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f5f1e9] text-xs text-[#918979]">
-                            GMISH
+                      Seguir comprando
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="
+                      min-h-0
+                      flex-1
+                      overflow-y-auto
+                      px-1
+                      py-5
+                      sm:py-6
+                    "
+                  >
+                    <div className="space-y-8">
+                      {cart.map(
+                        (product, index) => (
+                          <article
+                            key={`
+                              ${
+                                product.productId ||
+                                product.id
+                              }-
+                              ${product.variantId}-
+                              ${product.selectedSize}-
+                              ${product.selectedColor}
+                            `}
+                            className="
+                              border-b
+                              border-[#e9e3d9]
+                              pb-8
+                              last:border-b-0
+                            "
+                          >
+                            <div
+                              className="
+                                flex
+                                gap-5
+                                sm:gap-6
+                              "
+                            >
+                              <div
+                                className="
+                                  h-[122px]
+                                  w-[91px]
+                                  shrink-0
+                                  overflow-hidden
+                                  rounded-2xl
+                                  bg-[#f4f0e8]
+                                  sm:h-[138px]
+                                  sm:w-[104px]
+                                "
+                              >
+                                {product.image ? (
+                                  <img
+                                    src={product.image}
+                                    alt={product.name}
+                                    className="
+                                      h-full
+                                      w-full
+                                      object-cover
+                                      transition
+                                      duration-500
+                                      hover:scale-[1.04]
+                                    "
+                                  />
+                                ) : (
+                                  <div
+                                    className="
+                                      flex
+                                      h-full
+                                      w-full
+                                      items-center
+                                      justify-center
+                                      text-[9px]
+                                      font-semibold
+                                      tracking-[0.18em]
+                                      text-[#918979]
+                                    "
+                                  >
+                                    GMISH
+                                  </div>
+                                )}
+                              </div>
+
+                              <div
+                                className="
+                                  min-w-0
+                                  flex-1
+                                "
+                              >
+                                <div
+                                  className="
+                                    flex
+                                    items-start
+                                    justify-between
+                                    gap-3
+                                  "
+                                >
+                                  <div className="min-w-0">
+                                    <h3
+                                      className="
+                                        truncate
+                                        text-[15px]
+                                        font-semibold
+                                        leading-6
+                                        tracking-[-0.01em]
+                                      "
+                                    >
+                                      {product.name}
+                                    </h3>
+
+                                    <p
+                                      className="
+                                        mt-1
+                                        text-xs
+                                        text-[#8a8275]
+                                      "
+                                    >
+                                      S/{" "}
+                                      {Number(
+                                        product.price
+                                      ).toFixed(2)}{" "}
+                                      por unidad
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeFromCart(
+                                        index
+                                      )
+                                    }
+                                    aria-label={`Eliminar ${product.name}`}
+                                    className="
+                                      shrink-0
+                                      text-[10px]
+                                      uppercase
+                                      tracking-[0.12em]
+                                      text-[#91897d]
+                                      underline
+                                      underline-offset-4
+                                      transition
+                                      hover:text-red-600
+                                    "
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+
+                                <div
+                                  className="
+                                    mt-5
+                                    flex
+                                    flex-wrap
+                                    items-center
+                                    gap-x-5
+                                    gap-y-2
+                                  "
+                                >
+                                  <div
+                                    className="
+                                      flex
+                                      items-center
+                                      gap-2
+                                    "
+                                  >
+                                    <span
+                                      className="
+                                        text-[10px]
+                                        uppercase
+                                        tracking-[0.12em]
+                                        text-[#9a9285]
+                                      "
+                                    >
+                                      Talla
+                                    </span>
+
+                                    <span
+                                      className="
+                                        text-xs
+                                        font-medium
+                                        text-[#49463f]
+                                      "
+                                    >
+                                      {product.selectedSize ||
+                                        "No seleccionada"}
+                                    </span>
+                                  </div>
+
+                                  <div
+                                    className="
+                                      flex
+                                      items-center
+                                      gap-2
+                                    "
+                                  >
+                                    <span
+                                      className="
+                                        text-[10px]
+                                        uppercase
+                                        tracking-[0.12em]
+                                        text-[#9a9285]
+                                      "
+                                    >
+                                      Color
+                                    </span>
+
+                                    {product.selectedColorHex && (
+                                      <span
+                                        className="
+                                          h-3.5
+                                          w-3.5
+                                          rounded-full
+                                          border
+                                          border-black/10
+                                        "
+                                        style={{
+                                          backgroundColor:
+                                            product.selectedColorHex,
+                                        }}
+                                      />
+                                    )}
+
+                                    <span
+                                      className="
+                                        text-xs
+                                        font-medium
+                                        text-[#49463f]
+                                      "
+                                    >
+                                      {product.selectedColor ||
+                                        "No seleccionado"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div
+                                  className="
+                                    mt-4
+                                    text-[17px]
+                                    font-semibold
+                                    tracking-[-0.02em]
+                                  "
+                                >
+                                  S/{" "}
+                                  {(
+                                    Number(
+                                      product.price
+                                    ) *
+                                    product.quantity
+                                  ).toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              className="
+                                mt-6
+                                flex
+                                items-center
+                                justify-between
+                              "
+                            >
+                              <div
+                                className="
+                                  flex
+                                  items-center
+                                  overflow-hidden
+                                  rounded-full
+                                  border
+                                  border-[#ded7cb]
+                                  bg-[#fffefa]
+                                "
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    decreaseQuantity(
+                                      index
+                                    )
+                                  }
+                                  aria-label="Disminuir cantidad"
+                                  className="
+                                    flex
+                                    h-10
+                                    w-12
+                                    shrink-0
+                                    items-center
+                                    justify-center
+                                    px-2
+                                    text-[18px]
+                                    text-[#49463f]
+                                    transition
+                                    hover:bg-[#f2eee6]
+                                  "
+                                >
+                                  −
+                                </button>
+
+                                <span
+                                  className="
+                                    flex
+                                    h-10
+                                    min-w-11
+                                    items-center
+                                    justify-center
+                                    border-x
+                                    border-[#ded7cb]
+                                    px-2
+                                    text-xs
+                                    font-semibold
+                                  "
+                                >
+                                  {product.quantity}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    increaseQuantity(
+                                      index
+                                    )
+                                  }
+                                  disabled={
+                                    Number(
+                                      product.availableStock ??
+                                        product.stock ??
+                                        0
+                                    ) > 0 &&
+                                    product.quantity >=
+                                      Number(
+                                        product.availableStock ??
+                                          product.stock
+                                      )
+                                  }
+                                  aria-label="Aumentar cantidad"
+                                  className="
+                                    flex
+                                    h-10
+                                    w-12
+                                    shrink-0
+                                    items-center
+                                    justify-center
+                                    px-2
+                                    text-[18px]
+                                    text-[#49463f]
+                                    transition
+                                    hover:bg-[#f2eee6]
+                                    disabled:cursor-not-allowed
+                                    disabled:opacity-30
+                                  "
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <span
+                                className="
+                                  text-[10px]
+                                  uppercase
+                                  tracking-[0.12em]
+                                  text-[#a0988c]
+                                "
+                              >
+                                Cantidad:{" "}
+                                {product.quantity}
+                              </span>
+                            </div>
+                          </article>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="
+                      shrink-0
+                      border-t
+                      border-[#e9e3d9]
+                      bg-[#fffefa]
+                      px-1
+                      py-5
+                      sm:py-6
+                    "
+                  >
+                    <div
+                      className="
+                        flex
+                        items-end
+                        justify-between
+                        gap-5
+                      "
+                    >
+                      <div>
+                        <p
+                          className="
+                            text-[10px]
+                            font-semibold
+                            uppercase
+                            tracking-[0.16em]
+                            text-[#91897d]
+                          "
+                        >
+                          Total del pedido
+                        </p>
+
+                        <p
+                          className="
+                            mt-1.5
+                            text-xs
+                            text-[#8a8275]
+                          "
+                        >
+                          {totalItems}{" "}
+                          {totalItems === 1
+                            ? "producto"
+                            : "productos"}
+                        </p>
+                      </div>
+
+                      <span
+                        className="
+                          text-[26px]
+                          font-semibold
+                          tracking-[-0.04em]
+                          text-[#292821]
+                          sm:text-[29px]
+                        "
+                      >
+                        S/ {total.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {!mostrarDatos ? (
+                      <>
+                        <p
+                          className="
+                            mt-4
+                            max-w-[470px]
+                            text-xs
+                            leading-5
+                            text-[#8a8275]
+                          "
+                        >
+                          {tieneProductoPrincipal
+                            ? "Completa tus datos de entrega para registrar tu pedido."
+                            : "Continúa para enviar los detalles de tu pedido por WhatsApp."}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setErrorPedido("");
+                            setMostrarDatos(true);
+                          }}
+                          className="
+                            mt-6
+                            flex
+                            min-h-12
+                            w-full
+                            items-center
+                            justify-between
+                            rounded-full
+                            bg-[#292821]
+                            px-7
+                            py-4
+                            text-[11px]
+                            font-semibold
+                            uppercase
+                            tracking-[0.14em]
+                            text-white
+                            shadow-sm
+                            transition
+                            duration-200
+                            hover:bg-[#454238]
+                            hover:shadow-lg
+                            active:scale-[0.99]
+                          "
+                        >
+                          <span className="flex-1 text-center">
+                            Continuar con el pedido
+                          </span>
+
+                          <span
+                            className="
+                              ml-5
+                              flex
+                              shrink-0
+                              items-center
+                              justify-center
+                              text-base
+                              font-normal
+                            "
+                          >
+                            ↗
+                          </span>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="mt-6">
+                        {tieneProductoPrincipal && (
+                          <div className="space-y-4">
+                            <div>
+                              <label
+                                className="
+                                  mb-2
+                                  block
+                                  text-[10px]
+                                  font-semibold
+                                  uppercase
+                                  tracking-[0.14em]
+                                  text-[#716a5f]
+                                "
+                              >
+                                Nombre
+                              </label>
+
+                              <input
+                                type="text"
+                                value={cliente.nombre}
+                                onChange={(event) =>
+                                  actualizarCliente(
+                                    "nombre",
+                                    event.target.value
+                                  )
+                                }
+                                placeholder="Tu nombre"
+                                className="
+                                  w-full
+                                  rounded-2xl
+                                  border
+                                  border-[#ddd6ca]
+                                  bg-white
+                                  px-4
+                                  py-3.5
+                                  text-sm
+                                  text-[#292821]
+                                  outline-none
+                                  placeholder:text-[#b0a89b]
+                                  transition
+                                  focus:border-[#292821]
+                                  focus:ring-2
+                                  focus:ring-[#292821]/5
+                                "
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                className="
+                                  mb-2
+                                  block
+                                  text-[10px]
+                                  font-semibold
+                                  uppercase
+                                  tracking-[0.14em]
+                                  text-[#716a5f]
+                                "
+                              >
+                                Dirección de entrega
+                              </label>
+
+                              <input
+                                type="text"
+                                value={cliente.direccion}
+                                onChange={(event) =>
+                                  actualizarCliente(
+                                    "direccion",
+                                    event.target.value
+                                  )
+                                }
+                                placeholder="Dirección de entrega"
+                                className="
+                                  w-full
+                                  rounded-2xl
+                                  border
+                                  border-[#ddd6ca]
+                                  bg-white
+                                  px-4
+                                  py-3.5
+                                  text-sm
+                                  text-[#292821]
+                                  outline-none
+                                  placeholder:text-[#b0a89b]
+                                  transition
+                                  focus:border-[#292821]
+                                  focus:ring-2
+                                  focus:ring-[#292821]/5
+                                "
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                className="
+                                  mb-2
+                                  block
+                                  text-[10px]
+                                  font-semibold
+                                  uppercase
+                                  tracking-[0.14em]
+                                  text-[#716a5f]
+                                "
+                              >
+                                Referencia
+                              </label>
+
+                              <input
+                                type="text"
+                                value={cliente.referencia}
+                                onChange={(event) =>
+                                  actualizarCliente(
+                                    "referencia",
+                                    event.target.value
+                                  )
+                                }
+                                placeholder="Referencia de ubicación"
+                                className="
+                                  w-full
+                                  rounded-2xl
+                                  border
+                                  border-[#ddd6ca]
+                                  bg-white
+                                  px-4
+                                  py-3.5
+                                  text-sm
+                                  text-[#292821]
+                                  outline-none
+                                  placeholder:text-[#b0a89b]
+                                  transition
+                                  focus:border-[#292821]
+                                  focus:ring-2
+                                  focus:ring-[#292821]/5
+                                "
+                              />
+                            </div>
                           </div>
                         )}
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-sm font-semibold leading-5">
-                              {product.name}
-                            </h3>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeFromCart(index)
-                              }
-                              aria-label={`Eliminar ${product.name}`}
-                              className="text-xs text-[#8b8376] underline underline-offset-4 transition hover:text-red-600"
-                            >
-                              Eliminar
-                            </button>
+                        {errorPedido && (
+                          <div
+                            className="
+                              mt-4
+                              rounded-2xl
+                              border
+                              border-red-200
+                              bg-red-50
+                              px-4
+                              py-3.5
+                              text-xs
+                              leading-5
+                              text-red-700
+                            "
+                          >
+                            {errorPedido}
                           </div>
+                        )}
 
-                          <p className="mt-2 text-xs text-[#777064]">
-                            Talla:{" "}
-                            {product.selectedSize ||
-                              "No seleccionada"}
-                          </p>
+                        <button
+                          type="button"
+                          onClick={enviarPedido}
+                          disabled={guardandoPedido}
+                          className="
+                            mt-5
+                            flex
+                            min-h-12
+                            w-full
+                            items-center
+                            justify-between
+                            rounded-full
+                            bg-[#292821]
+                            px-7
+                            py-4
+                            text-[11px]
+                            font-semibold
+                            uppercase
+                            tracking-[0.13em]
+                            text-white
+                            shadow-sm
+                            transition
+                            duration-200
+                            hover:bg-[#454238]
+                            hover:shadow-lg
+                            disabled:cursor-not-allowed
+                            disabled:opacity-50
+                          "
+                        >
+                          {guardandoPedido ? (
+                            <>
+                              <span className="flex-1 text-center">
+                                <span
+                                  className="
+                                    mr-3
+                                    inline-block
+                                    h-4
+                                    w-4
+                                    animate-spin
+                                    rounded-full
+                                    border-2
+                                    border-white/30
+                                    border-t-white
+                                    align-middle
+                                  "
+                                />
 
-                          <div className="mt-1 flex items-center gap-2 text-xs text-[#777064]">
-                            <span>Color:</span>
+                                Registrando pedido...
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-center">
+                                Confirmar y continuar por WhatsApp
+                              </span>
 
-                            {product.selectedColorHex && (
                               <span
-                                className="h-3 w-3 rounded-full border border-black/10"
-                                style={{
-                                  backgroundColor:
-                                    product.selectedColorHex,
-                                }}
-                              />
-                            )}
+                                className="
+                                  ml-5
+                                  flex
+                                  shrink-0
+                                  items-center
+                                  justify-center
+                                  text-base
+                                  font-normal
+                                "
+                              >
+                                ↗
+                              </span>
+                            </>
+                          )}
+                        </button>
 
-                            <span>
-                              {product.selectedColor ||
-                                "No seleccionado"}
-                            </span>
-                          </div>
-
-                          <p className="mt-3 font-semibold text-[#292821]">
-                            S/{" "}
-                            {(
-                              Number(product.price) *
-                              product.quantity
-                            ).toFixed(2)}
-                          </p>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMostrarDatos(false);
+                            setErrorPedido("");
+                          }}
+                          disabled={guardandoPedido}
+                          className="
+                            mt-3
+                            flex
+                            w-full
+                            items-center
+                            justify-center
+                            py-2
+                            text-[10px]
+                            font-medium
+                            uppercase
+                            tracking-[0.12em]
+                            text-[#8a8275]
+                            transition
+                            hover:text-[#292821]
+                            disabled:opacity-40
+                          "
+                        >
+                          ← Volver al carrito
+                        </button>
                       </div>
+                    )}
 
-                      <div className="mt-4 flex items-center justify-between border-t border-[#eee9e0] pt-3">
-                        <div className="flex items-center overflow-hidden rounded-full border border-[#e4ded3]">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              decreaseQuantity(index)
-                            }
-                            aria-label="Disminuir cantidad"
-                            className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-[#f2eee6]"
-                          >
-                            −
-                          </button>
-
-                          <span className="min-w-9 text-center text-sm">
-                            {product.quantity}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              increaseQuantity(index)
-                            }
-                            aria-label="Aumentar cantidad"
-                            disabled={
-                              Number(
-                                product.availableStock ??
-                                  product.stock ??
-                                  0
-                              ) > 0 &&
-                              product.quantity >=
-                                Number(
-                                  product.availableStock ??
-                                    product.stock
-                                )
-                            }
-                            className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-[#f2eee6] disabled:cursor-not-allowed disabled:opacity-30"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <span className="text-xs text-[#827b70]">
-                          S/{" "}
-                          {Number(
-                            product.price
-                          ).toFixed(2)}{" "}
-                          c/u
-                        </span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-
-                <div className="border-t border-[#e9e3d9] bg-[#fffefa] px-6 py-5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-[#777064]">
-                      Total del pedido
-                    </span>
-
-                    <span className="text-2xl font-semibold tracking-tight">
-                      S/ {total.toFixed(2)}
-                    </span>
-                  </div>
-
-                  {!mostrarDatos ? (
-                    <>
-                      <p className="mt-2 text-xs leading-5 text-[#898274]">
-                        {cart.some(
-                          (product) =>
-                            product.owner_role ===
-                              "principal" ||
-                            product.ownerRole ===
-                              "principal"
-                        )
-                          ? "Completa tus datos para registrar el pedido."
-                          : "Continúa para enviar tu pedido por WhatsApp."}
-                      </p>
-
+                    <div
+                      className="
+                        mt-5
+                        flex
+                        justify-center
+                        border-t
+                        border-[#eee9e0]
+                        pt-5
+                      "
+                    >
                       <button
                         type="button"
-                        onClick={() => {
-                          setErrorPedido("");
-                          setMostrarDatos(true);
-                        }}
-                        className="mt-5 w-full rounded-full bg-[#292821] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#454238] active:scale-[0.99]"
-                      >
-                        Continuar con el pedido ↗
-                      </button>
-                    </>
-                  ) : (
-                    <div className="mt-5 space-y-3">
-                      {cart.some(
-                        (product) =>
-                          product.owner_role ===
-                            "principal" ||
-                          product.ownerRole ===
-                            "principal"
-                      ) && (
-                        <>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                              Nombre
-                            </label>
-
-                            <input
-                              type="text"
-                              value={cliente.nombre}
-                              onChange={(event) =>
-                                actualizarCliente(
-                                  "nombre",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Tu nombre"
-                              className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                              Dirección de entrega
-                            </label>
-
-                            <input
-                              type="text"
-                              value={cliente.direccion}
-                              onChange={(event) =>
-                                actualizarCliente(
-                                  "direccion",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Dirección de entrega"
-                              className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-medium text-[#625d53]">
-                              Referencia
-                            </label>
-
-                            <input
-                              type="text"
-                              value={cliente.referencia}
-                              onChange={(event) =>
-                                actualizarCliente(
-                                  "referencia",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Referencia de ubicación"
-                              className="w-full rounded-xl border border-[#ddd6ca] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#292821]"
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      {errorPedido && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">
-                          {errorPedido}
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={enviarPedido}
+                        onClick={clearCart}
                         disabled={guardandoPedido}
-                        className="w-full rounded-full bg-[#292821] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#454238] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="
+                          px-5
+                          py-2
+                          text-[10px]
+                          font-medium
+                          uppercase
+                          tracking-[0.14em]
+                          text-[#928a7e]
+                          underline
+                          underline-offset-4
+                          transition
+                          hover:text-red-600
+                          disabled:opacity-40
+                        "
                       >
-                        {guardandoPedido
-                          ? "Registrando pedido..."
-                          : "Confirmar y continuar por WhatsApp ↗"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMostrarDatos(false);
-                          setErrorPedido("");
-                        }}
-                        disabled={guardandoPedido}
-                        className="w-full py-2 text-xs text-[#827b70] underline underline-offset-4 transition hover:text-[#292821]"
-                      >
-                        Volver al carrito
+                        Vaciar carrito
                       </button>
                     </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={clearCart}
-                    disabled={guardandoPedido}
-                    className="mt-3 w-full py-2 text-xs text-[#827b70] underline underline-offset-4 transition hover:text-red-600 disabled:opacity-40"
-                  >
-                    Vaciar carrito
-                  </button>
-                </div>
-              </>
-            )}
+                  </div>
+                </>
+              )}
+            </div>
           </aside>
         </div>
       )}

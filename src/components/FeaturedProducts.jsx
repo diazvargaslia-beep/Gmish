@@ -266,9 +266,9 @@ function FeaturedProducts({
           >
             <option value="price-asc">Precio: menor a mayor</option>
             <option value="price-desc">Precio: mayor a menor</option>
-            <option value="offers">Ofertas</option>
+            <option value="offers">Mejores ofertas</option>
             <option value="best-sellers">Más vendidos</option>
-            <option value="new-in">New In</option>
+            <option value="new-in">Más recientes</option>
           </select>
         </div>
       )}

@@ -4,13 +4,15 @@ import { supabase } from "./lib/supabase";
 import { CartProvider, useCart } from "./CartContext";
 import FeaturedProducts from "./components/FeaturedProducts";
 import CategorySection from "./components/CategorySection";
+import StoreInfo from "./components/StoreInfo";
 import Cart from "./components/Cart";
 import Admin from "./admin/Admin";
 
 function Tienda() {
   const [pagina, setPagina] = useState("inicio");
   const [panelAbierto, setPanelAbierto] = useState(null);
-  const [categoriaMenuAbierta, setCategoriaMenuAbierta] = useState(null);
+  const [categoriaMenuAbierta, setCategoriaMenuAbierta] =
+    useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -412,6 +414,7 @@ function Tienda() {
 
   function buscar(evento) {
     evento.preventDefault();
+
     navegar(
       "buscar",
       subcategoriasSeleccionadas
@@ -453,7 +456,6 @@ function Tienda() {
   }
 
   // ADMIN
-  // Se quitó el botón "VOLVER A LA TIENDA" que aparecía encima del administrador.
   if (esAdmin) {
     return <Admin />;
   }
@@ -488,6 +490,7 @@ function Tienda() {
                 cy="10.8"
                 r="6.8"
               />
+
               <path d="m16 16 5 5" />
             </svg>
           </button>
@@ -508,11 +511,13 @@ function Tienda() {
               aria-hidden="true"
             >
               <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.9a2 2 0 0 0 1.9-1.5L22 8H6" />
+
               <circle
                 cx="10"
                 cy="20"
                 r="1"
               />
+
               <circle
                 cx="18"
                 cy="20"
@@ -724,7 +729,7 @@ function Tienda() {
               irA("nuevos")
             }
           >
-            New In
+            Nuevos ingresos
           </button>
 
           <hr className="menu-separador" />
@@ -799,7 +804,7 @@ function Tienda() {
               </h2>
 
               <p className="sub-heading">
-                OUTFITS QUE SE ADAPTAN A TU ESTILO
+                OUTFITS QUE SE ADAPTAN A TÍ
               </p>
 
               <div className="buttons-wrapper">
@@ -995,13 +1000,13 @@ function Tienda() {
         {pagina === "nuevos" && (
           <section className="seccion-interior">
             <p className="seccion-etiqueta">
-              LATEST ARRIVALS
+              Agregados por tí
             </p>
 
-            <h1>New In</h1>
+            <h1>Últimas novedades</h1>
 
             <p className="intro-coleccion">
-              Descubre las últimas prendas añadidas a GMISH.
+              Descubre las últimas prendas que llegaron a GMISH
             </p>
 
             {cargando ? (
@@ -1070,28 +1075,9 @@ function Tienda() {
         )}
 
         {pagina === "visitanos" && (
-          <section className="seccion-interior pagina-vacia">
-            <p className="seccion-etiqueta">
-              ESTAMOS PARA TI
-            </p>
-
-            <h1>
-              Visítanos
-            </h1>
-
-            <p>
-              Próximamente encontrarás aquí nuestra dirección y horarios.
-            </p>
-
-            <button
-              className="boton-interior"
-              onClick={() =>
-                irA("inicio")
-              }
-            >
-              VOLVER AL INICIO
-            </button>
-          </section>
+          <StoreInfo
+            onSelectCategory={irA}
+          />
         )}
 
         {pagina === "contacto" && (
@@ -1126,7 +1112,7 @@ function Tienda() {
         </span>
 
         <p>
-          Tu estilo, nuestra inspiración.
+          Tu estilo, tu personalidad
         </p>
 
         <span>
