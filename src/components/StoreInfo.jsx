@@ -45,34 +45,26 @@ export default function StoreInfo() {
         .maybeSingle()
 
       if (error) {
-        console.error(
-          "Error cargando datos de la tienda:",
-          error
-        )
+        console.error("Error cargando datos de la tienda:", error)
         return
       }
 
       if (data) {
         setTienda({
           nombre:
-            data.tienda_nombre ||
-            DATOS_INICIALES.nombre,
+            data.tienda_nombre || DATOS_INICIALES.nombre,
 
           direccion:
-            data.tienda_direccion ||
-            DATOS_INICIALES.direccion,
+            data.tienda_direccion || DATOS_INICIALES.direccion,
 
           horario:
-            data.tienda_horario ||
-            DATOS_INICIALES.horario,
+            data.tienda_horario || DATOS_INICIALES.horario,
 
           mapsUrl:
-            data.tienda_maps_url ||
-            MAPS_DEFAULT,
+            data.tienda_maps_url || MAPS_DEFAULT,
 
           imagenUrl:
-            data.tienda_imagen_url ||
-            "",
+            data.tienda_imagen_url || "",
 
           descripcion:
             data.tienda_descripcion ||
@@ -103,225 +95,560 @@ export default function StoreInfo() {
 
   if (cargando) {
     return (
-      <main className="flex min-h-[60vh] w-full items-center justify-center bg-[#f8f7f3]">
-        <div className="h-8 w-8 animate-spin rounded-full border border-black/20 border-t-black" />
+      <main
+        style={{
+          minHeight: "60vh",
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f8f7f3",
+        }}
+      >
+        <div
+          style={{
+            width: "32px",
+            height: "32px",
+            border: "1px solid rgba(0,0,0,.2)",
+            borderTop: "1px solid #111",
+            borderRadius: "50%",
+            animation: "gmish-spin 1s linear infinite",
+          }}
+        />
+
+        <style>
+          {`
+            @keyframes gmish-spin {
+              from {
+                transform: rotate(0deg);
+              }
+
+              to {
+                transform: rotate(360deg);
+              }
+            }
+          `}
+        </style>
       </main>
     )
   }
 
   return (
-    <main className="w-full bg-[#f8f7f3] text-[#111]">
-
+    <main
+      style={{
+        width: "100%",
+        background: "#f8f7f3",
+        color: "#111",
+      }}
+    >
       <div
         style={{
           width: "100%",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          margin: 0,
-          padding: "50px 2.5vw",
           boxSizing: "border-box",
+          padding: "70px 2.5vw 110px",
         }}
       >
+        {/* =========================
+            ENCABEZADO
+        ========================== */}
 
-        {/* ENCABEZADO */}
-
-        <header className="w-full text-center">
-
-          <p className="text-[10px] tracking-[0.4em] text-black/40">
+        <header
+          style={{
+            width: "100%",
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: "10px",
+              letterSpacing: "0.4em",
+              color: "rgba(0,0,0,.4)",
+            }}
+          >
             GMISH
           </p>
 
-          <h1 className="mt-3 font-serif text-[34px] sm:text-[42px]">
+          <h1
+            style={{
+              margin: "14px 0 0",
+              fontFamily: "Georgia, serif",
+              fontSize: "clamp(34px, 5vw, 42px)",
+              fontWeight: 400,
+              lineHeight: 1.1,
+            }}
+          >
             VISÍTANOS
           </h1>
 
-          <p className="mt-4 text-[16px] text-black/65">
+          <p
+            style={{
+              margin: "20px 0 0",
+              fontSize: "16px",
+              color: "rgba(0,0,0,.65)",
+            }}
+          >
             Tu estilo también tiene un lugar
           </p>
 
-          <div className="mt-5 flex justify-center">
-
+          <div
+            style={{
+              marginTop: "24px",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
             <span
-              className={`inline-flex items-center gap-2 border px-4 py-2 text-[10px] tracking-[0.2em] ${
-                tienda.abierta
-                  ? "border-black/15 bg-white"
-                  : "border-black/10 bg-black/[0.03] text-black/45"
-              }`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                border: "1px solid rgba(0,0,0,.15)",
+                background: tienda.abierta
+                  ? "#fff"
+                  : "rgba(0,0,0,.03)",
+                padding: "8px 16px",
+                fontSize: "10px",
+                letterSpacing: "0.2em",
+                color: tienda.abierta
+                  ? "#111"
+                  : "rgba(0,0,0,.45)",
+              }}
             >
-
               <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  tienda.abierta
-                    ? "bg-[#4b7a50]"
-                    : "bg-black/30"
-                }`}
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: tienda.abierta
+                    ? "#4b7a50"
+                    : "rgba(0,0,0,.3)",
+                }}
               />
 
-              {tienda.abierta
-                ? "ABIERTO"
-                : "CERRADO"}
-
+              {tienda.abierta ? "ABIERTO" : "CERRADO"}
             </span>
-
           </div>
-
         </header>
 
+        {/* Espacio debajo de ABIERTO */}
+        <div
+          style={{
+            height: "24px",
+            width: "100%",
+          }}
+        />
 
-        {/* IMAGEN DEL LOCAL */}
+        {/* =========================
+            IMAGEN DE LA TIENDA
+        ========================== */}
 
-        <div className="mt-12 w-full aspect-[4/3] overflow-hidden bg-[#e9e7e1] sm:aspect-[16/10]">
-
+        <div
+          style={{
+            width: "92%",
+            height: "1190px",
+            maxWidth: "1500px",
+            overflow: "hidden",
+            background: "#e9e7e1",
+          }}
+        >
           {tienda.imagenUrl ? (
             <img
               src={tienda.imagenUrl}
               alt="Tienda GMISH"
-              className="h-full w-full object-cover"
+              style={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
             />
           ) : (
-            <div className="flex h-full items-center justify-center">
-              <span className="font-serif text-4xl text-black/20">
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "Georgia, serif",
+                  fontSize: "36px",
+                  color: "rgba(0,0,0,.2)",
+                }}
+              >
                 GMISH
               </span>
             </div>
           )}
-
         </div>
 
+        {/* Línea debajo de la imagen */}
+        <div
+          style={{
+            width: "92%",
+            maxWidth: "1500px",
+            height: "1px",
+            background: "rgba(0,0,0,.16)",
+            marginTop: "41px",
+          }}
+        />
 
-        {/* INFORMACIÓN DE LA TIENDA */}
+        {/* =========================
+            ENCUÉNTRANOS
+        ========================== */}
 
-        <section className="mt-12 w-full">
-
-          <div className="mb-8 text-center">
-
-            <p className="text-[10px] tracking-[0.3em] text-black/40">
+        <section
+          style={{
+            width: "100%",
+            marginTop: "41px",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              textAlign: "center",
+              marginBottom: "29px",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "10px",
+                letterSpacing: "0.3em",
+                color: "rgba(0,0,0,.4)",
+              }}
+            >
               ENCUÉNTRANOS
             </p>
 
-            <h2 className="mt-3 font-serif text-[27px]">
+            <h2
+              style={{
+                margin: "22px 0 0",
+                fontFamily: "Georgia, serif",
+                fontSize: "27px",
+                fontWeight: 400,
+                lineHeight: 1.2,
+              }}
+            >
               Encuéntranos en:
             </h2>
-
           </div>
 
-
-          <div className="grid w-full grid-cols-1 border border-black/10 md:grid-cols-2">
-
+          <div
+            style={{
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(2, minmax(0, 1fr))",
+              border: "1px solid rgba(0,0,0,.1)",
+            }}
+          >
             {/* DIRECCIÓN */}
+            <div
+              style={{
+                padding: "21px 35px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "11px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "10px",
+                    letterSpacing: "0.25em",
+                    color: "rgba(0,0,0,.4)",
+                  }}
+                >
+                  DIRECCIÓN
+                </p>
 
-            <div className="px-8 py-8 text-center">
-
-              <p className="text-[10px] tracking-[0.25em] text-black/40">
-                DIRECCIÓN
-              </p>
-
-              <p className="mt-4 text-[14px] leading-7 text-black/70">
-                {tienda.direccion}
-              </p>
-
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    lineHeight: 1.8,
+                    color: "rgba(0,0,0,.7)",
+                  }}
+                >
+                  {tienda.direccion}
+                </p>
+              </div>
             </div>
-
 
             {/* HORARIO */}
-
-            <div className="border-t border-black/10 px-8 py-8 text-center md:border-l md:border-t-0">
-
-              <p className="text-[10px] tracking-[0.25em] text-black/40">
-                HORARIO DE ATENCIÓN
-              </p>
-
-              <p className="mt-4 text-[14px] text-black/70">
-                LUNES — DOMINGO
-              </p>
-
-              <p className="mt-2 text-[14px] text-black/70">
-                {tienda.horario}
-              </p>
-
-              <p
-                className={`mt-4 text-[10px] tracking-[0.15em] ${
-                  tienda.abierta
-                    ? "text-[#4b7a50]"
-                    : "text-black/40"
-                }`}
+            <div
+              style={{
+                padding: "21px 35px",
+                textAlign: "center",
+                borderLeft:
+                  "1px solid rgba(0,0,0,.1)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "9px",
+                }}
               >
-                {tienda.abierta
-                  ? "ACTUALMENTE ABIERTO"
-                  : "ACTUALMENTE CERRADO"}
-              </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "10px",
+                    letterSpacing: "0.25em",
+                    color: "rgba(0,0,0,.4)",
+                  }}
+                >
+                  HORARIO DE ATENCIÓN
+                </p>
 
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    color: "rgba(0,0,0,.7)",
+                  }}
+                >
+                  LUNES — DOMINGO
+                </p>
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    lineHeight: 1.8,
+                    color: "rgba(0,0,0,.7)",
+                  }}
+                >
+                  {tienda.horario}
+                </p>
+
+                <p
+                  style={{
+                    margin: "1px 0 0",
+                    fontSize: "10px",
+                    letterSpacing: "0.15em",
+                    color: tienda.abierta
+                      ? "#4b7a50"
+                      : "rgba(0,0,0,.4)",
+                  }}
+                >
+                  {tienda.abierta
+                    ? "ACTUALMENTE ABIERTO"
+                    : "ACTUALMENTE CERRADO"}
+                </p>
+              </div>
             </div>
-
           </div>
 
+          {/* Línea debajo de información */}
+          <div
+            style={{
+              width: "100%",
+              height: "1px",
+              background: "rgba(0,0,0,.16)",
+              marginTop: "41px",
+            }}
+          />
         </section>
 
+        {/* =========================
+            CÓMO LLEGAR
+        ========================== */}
 
-        {/* MAPA */}
-
-        <section className="mt-12 w-full">
-
-          <div className="mb-8 text-center">
-
-            <p className="text-[10px] tracking-[0.3em] text-black/40">
+        <section
+          style={{
+            width: "100%",
+            marginTop: "41px",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              marginBottom: "34px",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "10px",
+                letterSpacing: "0.3em",
+                color: "rgba(0,0,0,.4)",
+              }}
+            >
               CÓMO LLEGAR
             </p>
 
-            <h2 className="mt-3 font-serif text-[27px]">
+            <h2
+              style={{
+                margin: "22px 0 0",
+                fontFamily: "Georgia, serif",
+                fontSize: "27px",
+                fontWeight: 400,
+                lineHeight: 1.2,
+                textAlign: "center",
+              }}
+            >
               Estamos más cerca de ti
             </h2>
 
-            <p className="mx-auto mt-4 max-w-[500px] text-[14px] leading-7 text-black/55">
+            <p
+              style={{
+                width: "100%",
+                maxWidth: "500px",
+                margin: "21px auto 0",
+                padding: "0 15px",
+                boxSizing: "border-box",
+                fontSize: "14px",
+                lineHeight: 2,
+                color: "rgba(0,0,0,.55)",
+                textAlign: "center",
+              }}
+            >
               Consulta nuestra ubicación y encuentra la mejor ruta para llegar a GMISH.
             </p>
-
           </div>
 
+          {/* =========================
+              MAPA
+          ========================== */}
 
-          <div className="w-full overflow-hidden border border-black/10">
-
+          <div
+            style={{
+              width: "88%",
+              maxWidth: "988px",
+              minWidth: "0",
+              margin: "0 auto",
+              overflow: "hidden",
+              border: "1px solid rgba(0,0,0,.13)",
+              background: "#fff",
+              boxSizing: "border-box",
+            }}
+          >
             <iframe
               title="Ubicación de GMISH"
               src={mapaUrl}
-              className="block h-[400px] w-full border-0 sm:h-[480px]"
+              style={{
+                display: "block",
+                width: "100%",
+                height: "430px",
+                border: 0,
+              }}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
             />
-
           </div>
 
-
-          <div className="mt-7 flex justify-center">
-
+          {/* Botón Google Maps */}
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",
+              marginTop: "34px",
+            }}
+          >
             <a
-              href={
-                tienda.mapsUrl ||
-                MAPS_DEFAULT
-              }
+              href={tienda.mapsUrl || MAPS_DEFAULT}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-[46px] items-center justify-center bg-black px-8 text-[10px] font-medium tracking-[0.2em] text-white transition hover:bg-black/80"
+              style={{
+                minHeight: "46px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 32px",
+                background: "#111",
+                color: "#fff",
+                textDecoration: "none",
+                fontSize: "10px",
+                fontWeight: 500,
+                letterSpacing: "0.2em",
+              }}
             >
-
-              <span className="text-white">
+              <span style={{ color: "#fff" }}>
                 ABRIR EN GOOGLE MAPS
               </span>
 
-              <span className="ml-3 text-sm text-white">
+              <span
+                style={{
+                  marginLeft: "12px",
+                  fontSize: "14px",
+                  color: "#fff",
+                }}
+              >
                 ↗
               </span>
-
             </a>
-
           </div>
-
         </section>
-
       </div>
 
+      {/* =========================
+          RESPONSIVE
+      ========================== */}
+
+      <style>
+        {`
+          @media (max-width: 767px) {
+            main div[style*="height: 1190px"] {
+              width: 94% !important;
+              height: 784px !important;
+            }
+
+            main section > div[style*="grid-template-columns"] {
+              grid-template-columns: 1fr !important;
+            }
+
+            main section > div[style*="grid-template-columns"] > div {
+              padding: 19px 22px !important;
+            }
+
+            main section > div[style*="grid-template-columns"] > div + div {
+              border-left: 0 !important;
+              border-top: 1px solid rgba(0,0,0,.1);
+            }
+
+            main div[style*="max-width: 988px"] {
+              width: 100% !important;
+            }
+
+            main div[style*="max-width: 988px"] iframe {
+              height: 330px !important;
+            }
+          }
+
+          @media (min-width: 768px) and (max-width: 1024px) {
+            main div[style*="height: 1190px"] {
+              height: 980px !important;
+            }
+
+            main div[style*="max-width: 988px"] {
+              width: 94% !important;
+            }
+          }
+        `}
+      </style>
     </main>
   )
 }
