@@ -80,10 +80,51 @@ export default function ConfiguracionAdmin() {
     }));
   }
 
+  function normalizarWhatsApp(numero) {
+    return numero.replace(/[^\d]/g, "");
+  }
+
   async function guardarConfiguracion() {
     setGuardando(true);
     setMensaje("");
     setError("");
+
+    const whatsapp1Normalizado = normalizarWhatsApp(
+      config.whatsapp_1.trim()
+    );
+
+    const whatsapp2Normalizado = normalizarWhatsApp(
+      config.whatsapp_2.trim()
+    );
+
+    if (
+      whatsapp1Normalizado &&
+      whatsapp1Normalizado.length < 9
+    ) {
+      setError("El WhatsApp 1 no parece ser un número válido.");
+      setGuardando(false);
+      return;
+    }
+
+    if (
+      whatsapp2Normalizado &&
+      whatsapp2Normalizado.length < 9
+    ) {
+      setError("El WhatsApp 2 no parece ser un número válido.");
+      setGuardando(false);
+      return;
+    }
+
+    if (
+      !whatsapp1Normalizado &&
+      !whatsapp2Normalizado
+    ) {
+      setError(
+        "Debes configurar al menos un número de WhatsApp."
+      );
+      setGuardando(false);
+      return;
+    }
 
     const datos = {
       tienda_nombre: config.tienda_nombre.trim(),
@@ -92,8 +133,8 @@ export default function ConfiguracionAdmin() {
       tienda_maps_url: config.tienda_maps_url.trim(),
       tienda_imagen_url: config.tienda_imagen_url.trim(),
       tienda_descripcion: config.tienda_descripcion.trim(),
-      whatsapp_1: config.whatsapp_1.trim(),
-      whatsapp_2: config.whatsapp_2.trim(),
+      whatsapp_1: whatsapp1Normalizado,
+      whatsapp_2: whatsapp2Normalizado,
       tiktok_url: config.tiktok_url.trim(),
     };
 
@@ -116,7 +157,11 @@ export default function ConfiguracionAdmin() {
 
     if (resultado.error) {
       console.error(resultado.error);
-      setError("No se pudo guardar la configuración.");
+
+      setError(
+        "No se pudo guardar la configuración. Verifica que las columnas whatsapp_1 y whatsapp_2 existan en Supabase."
+      );
+
       setGuardando(false);
       return;
     }
@@ -124,6 +169,8 @@ export default function ConfiguracionAdmin() {
     setConfig((prev) => ({
       ...prev,
       id: resultado.data.id,
+      whatsapp_1: resultado.data.whatsapp_1 ?? "",
+      whatsapp_2: resultado.data.whatsapp_2 ?? "",
     }));
 
     setMensaje("Configuración guardada correctamente.");
@@ -384,7 +431,10 @@ export default function ConfiguracionAdmin() {
               <textarea
                 value={config.tienda_descripcion}
                 onChange={(e) =>
-                  cambiarCampo("tienda_descripcion", e.target.value)
+                  cambiarCampo(
+                    "tienda_descripcion",
+                    e.target.value
+                  )
                 }
                 placeholder="Cuéntales a tus clientes sobre tu tienda..."
                 rows={5}
@@ -538,7 +588,7 @@ export default function ConfiguracionAdmin() {
               }}
             >
               <Campo
-                label="WhatsApp 1"
+                label="WhatsApp 1 · Principal"
                 value={config.whatsapp_1}
                 onChange={(value) =>
                   cambiarCampo("whatsapp_1", value)
@@ -547,7 +597,7 @@ export default function ConfiguracionAdmin() {
               />
 
               <Campo
-                label="WhatsApp 2"
+                label="WhatsApp 2 · Respaldo"
                 value={config.whatsapp_2}
                 onChange={(value) =>
                   cambiarCampo("whatsapp_2", value)
@@ -565,6 +615,22 @@ export default function ConfiguracionAdmin() {
                 fullWidth
               />
             </div>
+
+            <p
+              style={{
+                margin: "15px 0 0",
+                textAlign: "center",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "12px",
+                lineHeight: 1.6,
+                color: "#888",
+              }}
+            >
+              El WhatsApp 1 será el contacto principal para
+              recibir pedidos. El WhatsApp 2 quedará como
+              contacto de respaldo por si el primero no está
+              disponible.
+            </p>
           </div>
         </section>
 

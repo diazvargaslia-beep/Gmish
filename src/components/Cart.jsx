@@ -41,6 +41,84 @@ function Cart() {
     }));
   }
 
+  /*
+   * Agrupa las variantes que pertenecen al mismo producto.
+   *
+   * Resultado:
+   *
+   * • Polo Boxi Fit
+   *    S · Gris
+   *    S · Hueso
+   *    M · Hueso
+   *
+   * • Polo Oversize
+   *    S · Negro
+   */
+  function crearLineas(productos) {
+    const grupos = {};
+
+    productos.forEach((product) => {
+      const nombre =
+        product.name || "Producto";
+
+      const talla =
+        product.selectedSize || "Sin talla";
+
+      const color =
+        product.selectedColor || "Sin color";
+
+      const cantidad =
+        Number(product.quantity) > 1
+          ? ` · ${product.quantity}`
+          : "";
+
+      if (!grupos[nombre]) {
+        grupos[nombre] = [];
+      }
+
+      grupos[nombre].push(
+        `   ${talla} · ${color}${cantidad}`
+      );
+    });
+
+    const lineas = [];
+
+    Object.entries(grupos).forEach(
+      ([nombre, variantes]) => {
+        lineas.push(`• ${nombre}`);
+        lineas.push(...variantes);
+        lineas.push("");
+      }
+    );
+
+    return lineas;
+  }
+
+  /*
+   * Crea el mensaje final de WhatsApp.
+   */
+  function crearMensaje(productos) {
+    const lineas =
+      crearLineas(productos);
+
+    return [
+      "Hola, me interesa este pedido:",
+      "",
+      ...lineas,
+      `Total · S/${total.toFixed(2)}`,
+      "",
+      `Cliente · ${cliente.nombre.trim()}`,
+      `Entrega · ${cliente.direccion.trim()}`,
+      cliente.referencia.trim()
+        ? `Referencia · ${cliente.referencia.trim()}`
+        : "",
+    ]
+      .filter(
+        (linea) => linea !== ""
+      )
+      .join("\n");
+  }
+
   async function enviarPedido() {
     if (cart.length === 0) return;
 
@@ -48,166 +126,106 @@ function Cart() {
     setGuardandoPedido(true);
 
     try {
-      const productIds = [
-        ...new Set(
-          cart.map(
-            (product) => product.productId || product.id
-          )
-        ),
-      ];
-
-      const {
-        data: productosDB,
-        error: errorProductos,
-      } = await supabase
-        .from("products")
-        .select("id, owner_role")
-        .in("id", productIds);
-
-      if (errorProductos) {
-        throw new Error(
-          errorProductos.message ||
-            "No se pudieron verificar los productos."
+      if (!cliente.nombre.trim()) {
+        setErrorPedido(
+          "Escribe tu nombre."
         );
+
+        setGuardandoPedido(false);
+        return;
       }
 
-      const propietarios = {};
+      if (!cliente.direccion.trim()) {
+        setErrorPedido(
+          "Escribe tu dirección."
+        );
 
-      (productosDB || []).forEach((producto) => {
-        propietarios[producto.id] =
-          producto.owner_role || "principal";
-      });
-
-      const productosPrincipal = [];
-      const productosSecundario = [];
-
-      cart.forEach((product) => {
-        const productId =
-          product.productId || product.id;
-
-        const ownerRole =
-          product.owner_role ||
-          product.ownerRole ||
-          propietarios[productId] ||
-          "principal";
-
-        if (ownerRole === "secundario") {
-          productosSecundario.push(product);
-        } else {
-          productosPrincipal.push(product);
-        }
-      });
-
-      const tienePrincipal =
-        productosPrincipal.length > 0;
-
-      const tieneSecundario =
-        productosSecundario.length > 0;
-
-      if (tienePrincipal) {
-        if (!cliente.nombre.trim()) {
-          setErrorPedido("Escribe tu nombre.");
-          setGuardandoPedido(false);
-          return;
-        }
-
-        if (!cliente.direccion.trim()) {
-          setErrorPedido(
-            "Escribe tu dirección de entrega."
-          );
-          setGuardandoPedido(false);
-          return;
-        }
+        setGuardandoPedido(false);
+        return;
       }
 
+      /*
+       * WhatsApp principal y de respaldo.
+       */
       const {
         data: configuracion,
         error: errorConfiguracion,
       } = await supabase
         .from("store_settings")
         .select(
-          "whatsapp_principal, whatsapp_secundario"
+          "whatsapp_1, whatsapp_2"
         )
         .limit(1)
         .maybeSingle();
 
       if (errorConfiguracion) {
+        console.error(
+          "Error obteniendo configuración:",
+          errorConfiguracion
+        );
+
         throw new Error(
           errorConfiguracion.message ||
             "No se pudo obtener la configuración de WhatsApp."
         );
       }
 
-      const whatsappPrincipal =
-        configuracion?.whatsapp_principal || "";
+      const whatsapp1 =
+        configuracion?.whatsapp_1 ||
+        "";
 
-      const whatsappSecundario =
-        configuracion?.whatsapp_secundario || "";
+      const whatsapp2 =
+        configuracion?.whatsapp_2 ||
+        "";
 
-      if (tienePrincipal && !whatsappPrincipal) {
+      /*
+       * Primero utiliza whatsapp_1.
+       * Si está vacío, utiliza whatsapp_2.
+       */
+      const whatsappTienda =
+        whatsapp1 || whatsapp2;
+
+      if (!whatsappTienda) {
         throw new Error(
-          "El WhatsApp principal todavía no está configurado."
+          "Los WhatsApp de la tienda todavía no están configurados."
         );
       }
 
-      if (
-        tieneSecundario &&
-        !whatsappSecundario
-      ) {
-        throw new Error(
-          "El WhatsApp secundario todavía no está configurado."
-        );
-      }
-
-      const subtotalPrincipal =
-        productosPrincipal.reduce(
-          (sum, product) =>
-            sum +
-            Number(product.price) *
-              product.quantity,
-          0
-        );
-
-      const subtotalSecundario =
-        productosSecundario.reduce(
-          (sum, product) =>
-            sum +
-            Number(product.price) *
-              product.quantity,
-          0
-        );
-
-      const numeroPedido =
-        `GM-${Date.now().toString().slice(-8)}`;
-
+      /*
+       * Guardamos el pedido.
+       *
+       * IMPORTANTE:
+       * NO enviamos order_number.
+       * La base de datos lo genera automáticamente.
+       */
       const {
         data: pedido,
         error: errorPedidoSupabase,
       } = await supabase
         .from("orders")
         .insert({
-          customer_name: tienePrincipal
-            ? cliente.nombre.trim()
-            : null,
+          customer_name:
+            cliente.nombre.trim(),
 
-          customer_phone: null,
+          customer_phone:
+            null,
 
-          status: "pendiente",
+          status:
+            "Pendiente",
 
-          total: total,
+          total:
+            total,
 
-          order_number: numeroPedido,
+          delivery_zone:
+            null,
 
-          delivery_zone: null,
+          delivery_address:
+            cliente.direccion.trim(),
 
-          delivery_address: tienePrincipal
-            ? cliente.direccion.trim()
-            : null,
-
-          notes: null,
+          notes:
+            null,
 
           delivery_reference:
-            tienePrincipal &&
             cliente.referencia.trim()
               ? cliente.referencia.trim()
               : null,
@@ -227,31 +245,47 @@ function Cart() {
         );
       }
 
-      const items = cart.map((product) => ({
-        order_id: pedido.id,
+      /*
+       * Guardamos los productos
+       * asociados al pedido.
+       */
+      const items = cart.map(
+        (product) => ({
+          order_id:
+            pedido.id,
 
-        product_id:
-          product.productId || product.id,
+          product_id:
+            product.productId ||
+            product.id,
 
-        quantity: product.quantity,
+          product_name:
+            product.name,
 
-        unit_price: Number(product.price),
+          quantity:
+            product.quantity,
 
-        size:
-          product.selectedSize || null,
+          unit_price:
+            Number(product.price),
 
-        color:
-          product.selectedColor || null,
+          size:
+            product.selectedSize ||
+            null,
 
-        subtotal:
-          Number(product.price) *
-          product.quantity,
-      }));
+          color:
+            product.selectedColor ||
+            null,
 
-      const { error: errorItems } =
-        await supabase
-          .from("order_items")
-          .insert(items);
+          subtotal:
+            Number(product.price) *
+            product.quantity,
+        })
+      );
+
+      const {
+        error: errorItems,
+      } = await supabase
+        .from("order_items")
+        .insert(items);
 
       if (errorItems) {
         console.error(
@@ -259,6 +293,11 @@ function Cart() {
           errorItems
         );
 
+        /*
+         * Si los productos no se guardaron,
+         * eliminamos el pedido para no dejar
+         * un pedido incompleto.
+         */
         await supabase
           .from("orders")
           .delete()
@@ -270,82 +309,32 @@ function Cart() {
         );
       }
 
-      function crearLineas(productos) {
-        return productos.map((product) => {
-          const talla =
-            product.selectedSize ||
-            "Sin talla";
+      /*
+       * Generamos el mensaje minimalista.
+       */
+      const mensaje =
+        crearMensaje(cart);
 
-          const color =
-            product.selectedColor ||
-            "Sin color";
+      const urlWhatsApp =
+        `https://wa.me/${whatsappTienda}` +
+        `?text=${encodeURIComponent(
+          mensaje
+        )}`;
 
-          const cantidad =
-            Number(product.quantity) > 1
-              ? ` · ${product.quantity}`
-              : "";
+      /*
+       * Abrimos WhatsApp.
+       */
+      window.open(
+        urlWhatsApp,
+        "_blank",
+        "noopener,noreferrer"
+      );
 
-          return `• ${talla} / ${color}${cantidad}`;
-        });
-      }
-
-      function crearMensaje(
-        productos,
-        subtotal
-      ) {
-        const lineas =
-          crearLineas(productos);
-
-        return [
-          "Hola, me interesa este pedido:",
-          "",
-          ...lineas,
-          "",
-          `Subtotal: S/${subtotal.toFixed(2)}`,
-        ].join("\n");
-      }
-
-      if (tienePrincipal) {
-        const mensajePrincipal =
-          crearMensaje(
-            productosPrincipal,
-            subtotalPrincipal
-          );
-
-        const urlPrincipal =
-          `https://wa.me/${whatsappPrincipal}` +
-          `?text=${encodeURIComponent(
-            mensajePrincipal
-          )}`;
-
-        window.open(
-          urlPrincipal,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      }
-
-      if (tieneSecundario) {
-        const mensajeSecundario =
-          crearMensaje(
-            productosSecundario,
-            subtotalSecundario
-          );
-
-        const urlSecundario =
-          `https://wa.me/${whatsappSecundario}` +
-          `?text=${encodeURIComponent(
-            mensajeSecundario
-          )}`;
-
-        window.open(
-          urlSecundario,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      }
-
+      /*
+       * Limpiamos el carrito.
+       */
       clearCart();
+
       setMostrarDatos(false);
 
       setCliente({
@@ -364,12 +353,6 @@ function Cart() {
       setGuardandoPedido(false);
     }
   }
-
-  const tieneProductoPrincipal = cart.some(
-    (product) =>
-      product.owner_role === "principal" ||
-      product.ownerRole === "principal"
-  );
 
   return (
     <>
@@ -423,6 +406,7 @@ function Cart() {
                 lg:py-5
               "
             >
+              {/* HEADER */}
               <header
                 className="
                   flex
@@ -513,6 +497,7 @@ function Cart() {
                 </button>
               </header>
 
+              {/* CARRITO VACÍO */}
               {cart.length === 0 ? (
                 <div
                   className="
@@ -604,6 +589,7 @@ function Cart() {
                 </div>
               ) : (
                 <>
+                  {/* LISTA DE PRODUCTOS */}
                   <div
                     className="
                       min-h-0
@@ -641,6 +627,7 @@ function Cart() {
                                 sm:gap-6
                               "
                             >
+                              {/* IMAGEN */}
                               <div
                                 className="
                                   h-[122px]
@@ -655,8 +642,12 @@ function Cart() {
                               >
                                 {product.image ? (
                                   <img
-                                    src={product.image}
-                                    alt={product.name}
+                                    src={
+                                      product.image
+                                    }
+                                    alt={
+                                      product.name
+                                    }
                                     className="
                                       h-full
                                       w-full
@@ -685,6 +676,7 @@ function Cart() {
                                 )}
                               </div>
 
+                              {/* INFORMACIÓN */}
                               <div
                                 className="
                                   min-w-0
@@ -751,6 +743,7 @@ function Cart() {
                                   </button>
                                 </div>
 
+                                {/* TALLA Y COLOR */}
                                 <div
                                   className="
                                     mt-5
@@ -838,6 +831,7 @@ function Cart() {
                                   </div>
                                 </div>
 
+                                {/* SUBTOTAL */}
                                 <div
                                   className="
                                     mt-4
@@ -857,6 +851,7 @@ function Cart() {
                               </div>
                             </div>
 
+                            {/* CANTIDAD */}
                             <div
                               className="
                                 mt-6
@@ -925,18 +920,6 @@ function Cart() {
                                       index
                                     )
                                   }
-                                  disabled={
-                                    Number(
-                                      product.availableStock ??
-                                        product.stock ??
-                                        0
-                                    ) > 0 &&
-                                    product.quantity >=
-                                      Number(
-                                        product.availableStock ??
-                                          product.stock
-                                      )
-                                  }
                                   aria-label="Aumentar cantidad"
                                   className="
                                     flex
@@ -976,6 +959,7 @@ function Cart() {
                     </div>
                   </div>
 
+                  {/* RESUMEN */}
                   <div
                     className="
                       shrink-0
@@ -1035,7 +1019,8 @@ function Cart() {
                       </span>
                     </div>
 
-                    {!mostrarDatos ? (
+                    {/* CONTINUAR */}
+                    {!mostrarDatos && (
                       <>
                         <p
                           className="
@@ -1046,9 +1031,10 @@ function Cart() {
                             text-[#8a8275]
                           "
                         >
-                          {tieneProductoPrincipal
-                            ? "Completa tus datos de entrega para registrar tu pedido."
-                            : "Continúa para enviar los detalles de tu pedido por WhatsApp."}
+                          Completa tus datos de
+                          entrega para registrar tu
+                          pedido y continuar por
+                          WhatsApp.
                         </p>
 
                         <button
@@ -1058,13 +1044,12 @@ function Cart() {
                             setMostrarDatos(true);
                           }}
                           className="
-                            mt-6
+                            mt-5
                             flex
                             min-h-12
                             w-full
                             items-center
-                            justify-between
-                            rounded-full
+                            justify-center
                             bg-[#292821]
                             px-7
                             py-4
@@ -1081,197 +1066,229 @@ function Cart() {
                             active:scale-[0.99]
                           "
                         >
-                          <span className="flex-1 text-center">
-                            Continuar con el pedido
-                          </span>
-
-                          <span
-                            className="
-                              ml-5
-                              flex
-                              shrink-0
-                              items-center
-                              justify-center
-                              text-base
-                              font-normal
-                            "
-                          >
-                            ↗
-                          </span>
+                          Continuar con el pedido
                         </button>
                       </>
-                    ) : (
-                      <div className="mt-6">
-                        {tieneProductoPrincipal && (
-                          <div className="space-y-4">
-                            <div>
-                              <label
-                                className="
-                                  mb-2
-                                  block
-                                  text-[10px]
-                                  font-semibold
-                                  uppercase
-                                  tracking-[0.14em]
-                                  text-[#716a5f]
-                                "
-                              >
-                                Nombre
-                              </label>
+                    )}
 
-                              <input
-                                type="text"
-                                value={cliente.nombre}
-                                onChange={(event) =>
-                                  actualizarCliente(
-                                    "nombre",
-                                    event.target.value
-                                  )
-                                }
-                                placeholder="Tu nombre"
-                                className="
-                                  w-full
-                                  rounded-2xl
-                                  border
-                                  border-[#ddd6ca]
-                                  bg-white
-                                  px-4
-                                  py-3.5
-                                  text-sm
-                                  text-[#292821]
-                                  outline-none
-                                  placeholder:text-[#b0a89b]
-                                  transition
-                                  focus:border-[#292821]
-                                  focus:ring-2
-                                  focus:ring-[#292821]/5
-                                "
-                              />
-                            </div>
-
-                            <div>
-                              <label
-                                className="
-                                  mb-2
-                                  block
-                                  text-[10px]
-                                  font-semibold
-                                  uppercase
-                                  tracking-[0.14em]
-                                  text-[#716a5f]
-                                "
-                              >
-                                Dirección de entrega
-                              </label>
-
-                              <input
-                                type="text"
-                                value={cliente.direccion}
-                                onChange={(event) =>
-                                  actualizarCliente(
-                                    "direccion",
-                                    event.target.value
-                                  )
-                                }
-                                placeholder="Dirección de entrega"
-                                className="
-                                  w-full
-                                  rounded-2xl
-                                  border
-                                  border-[#ddd6ca]
-                                  bg-white
-                                  px-4
-                                  py-3.5
-                                  text-sm
-                                  text-[#292821]
-                                  outline-none
-                                  placeholder:text-[#b0a89b]
-                                  transition
-                                  focus:border-[#292821]
-                                  focus:ring-2
-                                  focus:ring-[#292821]/5
-                                "
-                              />
-                            </div>
-
-                            <div>
-                              <label
-                                className="
-                                  mb-2
-                                  block
-                                  text-[10px]
-                                  font-semibold
-                                  uppercase
-                                  tracking-[0.14em]
-                                  text-[#716a5f]
-                                "
-                              >
-                                Referencia
-                              </label>
-
-                              <input
-                                type="text"
-                                value={cliente.referencia}
-                                onChange={(event) =>
-                                  actualizarCliente(
-                                    "referencia",
-                                    event.target.value
-                                  )
-                                }
-                                placeholder="Referencia de ubicación"
-                                className="
-                                  w-full
-                                  rounded-2xl
-                                  border
-                                  border-[#ddd6ca]
-                                  bg-white
-                                  px-4
-                                  py-3.5
-                                  text-sm
-                                  text-[#292821]
-                                  outline-none
-                                  placeholder:text-[#b0a89b]
-                                  transition
-                                  focus:border-[#292821]
-                                  focus:ring-2
-                                  focus:ring-[#292821]/5
-                                "
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {errorPedido && (
-                          <div
+                    {/* DATOS */}
+                    {mostrarDatos && (
+                      <div className="mt-5">
+                        <div
+                          className="
+                            border-b
+                            border-[#e9e3d9]
+                            pb-5
+                          "
+                        >
+                          <p
                             className="
-                              mt-4
-                              rounded-2xl
-                              border
-                              border-red-200
-                              bg-red-50
-                              px-4
-                              py-3.5
-                              text-xs
-                              leading-5
-                              text-red-700
+                              text-[10px]
+                              font-semibold
+                              uppercase
+                              tracking-[0.16em]
+                              text-[#91897d]
                             "
                           >
-                            {errorPedido}
-                          </div>
-                        )}
+                            Datos de entrega
+                          </p>
 
+                          <p
+                            className="
+                              mt-2
+                              text-xs
+                              leading-5
+                              text-[#8a8275]
+                            "
+                          >
+                            Necesitamos estos datos
+                            para registrar correctamente
+                            tu pedido y coordinar la
+                            entrega.
+                          </p>
+                        </div>
+
+                        <div
+                          className="
+                            mt-5
+                            space-y-4
+                          "
+                        >
+                          {/* NOMBRE */}
+                          <div>
+                            <label
+                              htmlFor="nombre-cliente"
+                              className="
+                                mb-2
+                                block
+                                text-[10px]
+                                font-semibold
+                                uppercase
+                                tracking-[0.13em]
+                                text-[#6f685d]
+                              "
+                            >
+                              Nombre
+                            </label>
+
+                            <input
+                              id="nombre-cliente"
+                              type="text"
+                              value={
+                                cliente.nombre
+                              }
+                              onChange={(event) =>
+                                actualizarCliente(
+                                  "nombre",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="Tu nombre completo"
+                              disabled={
+                                guardandoPedido
+                              }
+                              className="
+                                h-12
+                                w-full
+                                border
+                                border-[#ded7cb]
+                                bg-[#fffefa]
+                                px-4
+                                text-sm
+                                text-[#292821]
+                                outline-none
+                                transition
+                                placeholder:text-[#aaa296]
+                                focus:border-[#292821]
+                              "
+                            />
+                          </div>
+
+                          {/* DIRECCIÓN */}
+                          <div>
+                            <label
+                              htmlFor="direccion-cliente"
+                              className="
+                                mb-2
+                                block
+                                text-[10px]
+                                font-semibold
+                                uppercase
+                                tracking-[0.13em]
+                                text-[#6f685d]
+                              "
+                            >
+                              Dirección de entrega
+                            </label>
+
+                            <input
+                              id="direccion-cliente"
+                              type="text"
+                              value={
+                                cliente.direccion
+                              }
+                              onChange={(event) =>
+                                actualizarCliente(
+                                  "direccion",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="Ej. Av. Circunvalación 123"
+                              disabled={
+                                guardandoPedido
+                              }
+                              className="
+                                h-12
+                                w-full
+                                border
+                                border-[#ded7cb]
+                                bg-[#fffefa]
+                                px-4
+                                text-sm
+                                text-[#292821]
+                                outline-none
+                                transition
+                                placeholder:text-[#aaa296]
+                                focus:border-[#292821]
+                              "
+                            />
+                          </div>
+
+                          {/* REFERENCIA */}
+                          <div>
+                            <label
+                              htmlFor="referencia-cliente"
+                              className="
+                                mb-2
+                                block
+                                text-[10px]
+                                font-semibold
+                                uppercase
+                                tracking-[0.13em]
+                                text-[#6f685d]
+                              "
+                            >
+                              Referencia
+                              <span
+                                className="
+                                  ml-1
+                                  normal-case
+                                  tracking-normal
+                                  text-[#aaa296]
+                                "
+                              >
+                                (opcional)
+                              </span>
+                            </label>
+
+                            <input
+                              id="referencia-cliente"
+                              type="text"
+                              value={
+                                cliente.referencia
+                              }
+                              onChange={(event) =>
+                                actualizarCliente(
+                                  "referencia",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="Ej. Cerca del parque"
+                              disabled={
+                                guardandoPedido
+                              }
+                              className="
+                                h-12
+                                w-full
+                                border
+                                border-[#ded7cb]
+                                bg-[#fffefa]
+                                px-4
+                                text-sm
+                                text-[#292821]
+                                outline-none
+                                transition
+                                placeholder:text-[#aaa296]
+                                focus:border-[#292821]
+                              "
+                            />
+                          </div>
+                        </div>
+
+                        {/* CONFIRMAR */}
                         <button
                           type="button"
                           onClick={enviarPedido}
-                          disabled={guardandoPedido}
+                          disabled={
+                            guardandoPedido
+                          }
                           className="
                             mt-5
                             flex
                             min-h-12
                             w-full
                             items-center
-                            justify-between
-                            rounded-full
+                            justify-center
                             bg-[#292821]
                             px-7
                             py-4
@@ -1291,55 +1308,43 @@ function Cart() {
                         >
                           {guardandoPedido ? (
                             <>
-                              <span className="flex-1 text-center">
-                                <span
-                                  className="
-                                    mr-3
-                                    inline-block
-                                    h-4
-                                    w-4
-                                    animate-spin
-                                    rounded-full
-                                    border-2
-                                    border-white/30
-                                    border-t-white
-                                    align-middle
-                                  "
-                                />
+                              <span
+                                className="
+                                  mr-3
+                                  inline-block
+                                  h-4
+                                  w-4
+                                  animate-spin
+                                  rounded-full
+                                  border-2
+                                  border-white/30
+                                  border-t-white
+                                "
+                              />
 
-                                Registrando pedido...
-                              </span>
+                              Registrando pedido...
                             </>
                           ) : (
                             <>
-                              <span className="flex-1 text-center">
-                                Confirmar y continuar por WhatsApp
-                              </span>
+                              Confirmar y continuar por WhatsApp
 
-                              <span
-                                className="
-                                  ml-5
-                                  flex
-                                  shrink-0
-                                  items-center
-                                  justify-center
-                                  text-base
-                                  font-normal
-                                "
-                              >
-                                ↗
+                              <span className="ml-3 text-base">
+                                →
                               </span>
                             </>
                           )}
                         </button>
 
+                        {/* VOLVER */}
                         <button
                           type="button"
                           onClick={() => {
                             setMostrarDatos(false);
                             setErrorPedido("");
                           }}
-                          disabled={guardandoPedido}
+                          disabled={
+                            guardandoPedido
+                          }
                           className="
                             mt-3
                             flex
@@ -1362,6 +1367,26 @@ function Cart() {
                       </div>
                     )}
 
+                    {/* ERROR */}
+                    {errorPedido && (
+                      <div
+                        className="
+                          mt-4
+                          border
+                          border-red-200
+                          bg-red-50
+                          px-4
+                          py-3
+                          text-xs
+                          leading-5
+                          text-red-700
+                        "
+                      >
+                        {errorPedido}
+                      </div>
+                    )}
+
+                    {/* VACIAR */}
                     <div
                       className="
                         mt-5
@@ -1375,7 +1400,9 @@ function Cart() {
                       <button
                         type="button"
                         onClick={clearCart}
-                        disabled={guardandoPedido}
+                        disabled={
+                          guardandoPedido
+                        }
                         className="
                           px-5
                           py-2
