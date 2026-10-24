@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { supabase } from "./lib/supabase";
+import { getProducts } from "./services/products";
 import { CartProvider, useCart } from "./CartContext";
 import FeaturedProducts from "./components/FeaturedProducts";
 import CategorySection from "./components/CategorySection";
@@ -43,7 +44,9 @@ function Tienda() {
     0
   );
 
-  // Restaurar la página al usar las flechas del navegador.
+  // ============================================================
+  // RESTAURAR LA PÁGINA AL USAR LAS FLECHAS DEL NAVEGADOR
+  // ============================================================
   useEffect(() => {
     const rutaInicial = window.location.pathname.replace(/\/+$/, "");
     const estadoActual = window.history.state;
@@ -189,7 +192,7 @@ function Tienda() {
   }, [esAdmin]);
 
   // ============================================================
-  // CARGAR PRODUCTOS ACTIVOS DESDE SUPABASE
+  // CARGAR PRODUCTOS DESDE EL SERVICIO
   // ============================================================
   useEffect(() => {
     let cancelado = false;
@@ -198,30 +201,20 @@ function Tienda() {
       setCargando(true);
       setErrorProductos("");
 
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          *,
-          product_variants (
-            id,
-            size,
-            color,
-            color_hex,
-            color_image_url,
-            stock,
-            product_variant_images (
-              id,
-              image_url,
-              position
-            )
-          )
-        `)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
+      try {
+        const data = await getProducts();
 
-      if (cancelado) return;
+        if (cancelado) return;
 
-      if (error) {
+        console.log(
+          "Productos recibidos por la tienda:",
+          data
+        );
+
+        setProductos(data || []);
+      } catch (error) {
+        if (cancelado) return;
+
         console.error(
           "Error al cargar productos:",
           error
@@ -232,11 +225,11 @@ function Tienda() {
         );
 
         setProductos([]);
-      } else {
-        setProductos(data || []);
+      } finally {
+        if (!cancelado) {
+          setCargando(false);
+        }
       }
-
-      setCargando(false);
     }
 
     if (!esAdmin) {
@@ -248,7 +241,9 @@ function Tienda() {
     };
   }, [esAdmin]);
 
-  // Obtener las subcategorías existentes en los productos.
+  // ============================================================
+  // OBTENER SUBCATEGORÍAS EXISTENTES
+  // ============================================================
   function obtenerSubcategorias(categoria) {
     const subcategoriasUnicas = new Map();
 
@@ -284,7 +279,9 @@ function Tienda() {
       }));
   }
 
-  // Navegar entre páginas y conservar el historial.
+  // ============================================================
+  // NAVEGAR ENTRE PÁGINAS
+  // ============================================================
   function navegar(
     destino,
     siguientesSubcategorias
@@ -339,7 +336,9 @@ function Tienda() {
     );
   }
 
-  // Elegir una subcategoría desde el menú.
+  // ============================================================
+  // ELEGIR SUBCATEGORÍA DESDE EL MENÚ
+  // ============================================================
   function irASubcategoria(
     categoria,
     subcategoria
@@ -359,7 +358,9 @@ function Tienda() {
     );
   }
 
-  // Abrir una subcategoría desde "Ver todos".
+  // ============================================================
+  // SELECCIONAR SUBCATEGORÍA DESDE "VER TODOS"
+  // ============================================================
   function seleccionarSubcategoria(
     categoria,
     subcategoria
@@ -411,6 +412,9 @@ function Tienda() {
     });
   }
 
+  // ============================================================
+  // ALTERNAR PANEL
+  // ============================================================
   function alternarPanel(nombre) {
     setPanelAbierto((actual) => {
       const siguiente =
@@ -424,6 +428,9 @@ function Tienda() {
     });
   }
 
+  // ============================================================
+  // BUSCAR
+  // ============================================================
   function buscar(evento) {
     evento.preventDefault();
 
@@ -433,6 +440,9 @@ function Tienda() {
     );
   }
 
+  // ============================================================
+  // VOLVER A TIENDA
+  // ============================================================
   function volverATienda() {
     const subcategoriasIniciales = {
       hombre: "todos",
@@ -481,7 +491,6 @@ function Tienda() {
       .toLowerCase()
       .replace(/\/+$/, "");
 
-    // Permite usar tanto nombres internos como rutas.
     if (
       destinoNormalizado === "inicio" ||
       destinoNormalizado === "/"
@@ -546,7 +555,7 @@ function Tienda() {
       return;
     }
 
-    // Si se coloca una URL externa en el administrador.
+    // URL externa.
     if (
       /^https?:\/\//i.test(valor)
     ) {
@@ -555,7 +564,7 @@ function Tienda() {
   }
 
   // ============================================================
-  // OBTENER LA PORTADA CORRESPONDIENTE A LA PÁGINA
+  // OBTENER PORTADA CORRESPONDIENTE
   // ============================================================
   function obtenerPortadaActual() {
     if (pagina === "inicio") {
@@ -573,7 +582,9 @@ function Tienda() {
     return null;
   }
 
+  // ============================================================
   // ADMIN
+  // ============================================================
   if (esAdmin) {
     return <Admin />;
   }
@@ -680,7 +691,9 @@ function Tienda() {
         </button>
       </header>
 
-      {/* MENÚ PRINCIPAL */}
+      {/* ========================================================
+          MENÚ PRINCIPAL
+      ======================================================== */}
       {panelAbierto === "menu" && (
         <nav
           className="menu-desplegable"
@@ -875,7 +888,9 @@ function Tienda() {
         </nav>
       )}
 
-      {/* BUSCADOR */}
+      {/* ========================================================
+          BUSCADOR
+      ======================================================== */}
       {panelAbierto === "buscador" && (
         <form
           className="buscador-panel"
@@ -1058,40 +1073,52 @@ function Tienda() {
         )}
 
         {/* ====================================================
-            HOMBRE / MUJER
-        ==================================================== */}
-        {(pagina === "hombre" ||
-          pagina === "mujer") && (
-          <section className="seccion-interior">
-            <h1>
-              {pagina === "hombre"
-                ? "Hombre"
-                : "Mujer"}
-            </h1>
+    HOMBRE / MUJER
+    ==================================================== */}
+{(pagina === "hombre" ||
+  pagina === "mujer") && (
+  <section className="seccion-interior">
+    <p className="seccion-etiqueta">
+      G’MISH COLLECTION
+    </p>
 
-            <p className="intro-coleccion">
-              Encuentra las prendas para tu estilo.
-            </p>
+    <h1>
+      {pagina === "hombre"
+        ? "Hombre"
+        : "Mujer"}
+    </h1>
 
-            <p
-              style={{
-                fontSize: "1.5rem",
-                margin: "2rem 0 1rem",
-              }}
-              aria-label="Buscar"
-            >
-              ⌕
-            </p>
+    <p className="intro-coleccion">
+      Encuentra las prendas para tu estilo.
+    </p>
 
-            <h2>
-              Próximamente
-            </h2>
-
-            <p className="intro-coleccion">
-              Estamos preparando nuevas prendas para esta colección.
-            </p>
-          </section>
-        )}
+    {cargando ? (
+      <p>
+        Cargando prendas...
+      </p>
+    ) : errorProductos ? (
+      <p role="alert">
+        {errorProductos}
+      </p>
+    ) : (
+      <CategorySection
+        category={pagina}
+        products={productos}
+        selectedSubcategory={
+          subcategoriasSeleccionadas[pagina]
+        }
+        onSelectSubcategory={(
+          subcategoria
+        ) =>
+          seleccionarSubcategoria(
+            pagina,
+            subcategoria
+          )
+        }
+      />
+    )}
+  </section>
+)}
 
         {/* ====================================================
             OFERTAS

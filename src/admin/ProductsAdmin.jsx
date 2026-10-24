@@ -63,7 +63,9 @@ function normalizeSubcategory(value) {
     otro: "Otros",
   }
 
-  if (aliases[normalized]) return aliases[normalized]
+  if (aliases[normalized]) {
+    return aliases[normalized]
+  }
 
   return (
     normalized
@@ -129,11 +131,12 @@ export default function ProductsAdmin() {
 
     window.addEventListener("popstate", handlePopState)
 
-    return () =>
+    return () => {
       window.removeEventListener(
         "popstate",
         handlePopState
       )
+    }
   }, [])
 
   const navigate = (
@@ -165,14 +168,48 @@ export default function ProductsAdmin() {
     })
   }
 
+  /*
+   * CARGA DE PRODUCTOS
+   *
+   * Separamos las consultas para evitar depender de que
+   * Supabase resuelva correctamente toda la relación anidada
+   * products -> product_variants -> product_variant_images.
+   */
   async function loadProducts() {
     setLoading(true)
 
-    const { data, error } = await supabase
-      .from("products")
-      .select(`
-        *,
-        product_variants (
+    try {
+      // 1. Productos
+      const {
+        data: productsData,
+        error: productsError,
+      } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", {
+          ascending: false,
+        })
+
+      if (productsError) {
+        throw productsError
+      }
+
+      if (!productsData?.length) {
+        setProducts([])
+        return
+      }
+
+      // 2. Variantes
+      const productIds = productsData.map(
+        (product) => product.id
+      )
+
+      const {
+        data: variantsData,
+        error: variantsError,
+      } = await supabase
+        .from("product_variants")
+        .select(`
           id,
           product_id,
           size,
@@ -180,31 +217,90 @@ export default function ProductsAdmin() {
           color_hex,
           color_image_url,
           stock,
-          sku,
-          product_variant_images (
+          sku
+        `)
+        .in("product_id", productIds)
+
+      if (variantsError) {
+        throw variantsError
+      }
+
+      // 3. Imágenes
+      const variantIds = (variantsData || []).map(
+        (variant) => variant.id
+      )
+
+      let imagesData = []
+
+      if (variantIds.length) {
+        const {
+          data,
+          error: imagesError,
+        } = await supabase
+          .from("product_variant_images")
+          .select(`
             id,
             variant_id,
             image_url,
             position
-          )
-        )
-      `)
-      .order("created_at", {
-        ascending: false,
-      })
+          `)
+          .in("variant_id", variantIds)
+          .order("position", {
+            ascending: true,
+          })
 
-    if (error) {
+        if (imagesError) {
+          throw imagesError
+        }
+
+        imagesData = data || []
+      }
+
+      // 4. Volvemos a construir la estructura
+      // que utiliza el resto del componente.
+      const variantsWithImages =
+        (variantsData || []).map(
+          (variant) => ({
+            ...variant,
+            product_variant_images:
+              imagesData.filter(
+                (image) =>
+                  image.variant_id ===
+                  variant.id
+              ),
+          })
+        )
+
+      const finalProducts =
+        productsData.map(
+          (product) => ({
+            ...product,
+            product_variants:
+              variantsWithImages.filter(
+                (variant) =>
+                  variant.product_id ===
+                  product.id
+              ),
+          })
+        )
+
+      setProducts(finalProducts)
+    } catch (error) {
       console.error(
         "Error cargando productos:",
         error
       )
 
-      alert(error.message)
-    } else {
-      setProducts(data || [])
-    }
+      alert(
+        `No se pudieron cargar los productos: ${
+          error.message || "Error desconocido"
+        }`
+      )
 
-    setLoading(false)
+      setProducts([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const generateSlug = (value) =>
@@ -696,6 +792,10 @@ export default function ProductsAdmin() {
     variants
   ) => {
     for (const variant of variants) {
+      if (!variant.id) {
+        continue
+      }
+
       const colorData =
         colors.find(
           (color) =>
@@ -786,6 +886,7 @@ export default function ProductsAdmin() {
         is_best_seller:
           isBestSeller,
         is_active: true,
+        owner_role: "principal",
         description:
           description.trim() ||
           null,
@@ -1054,7 +1155,9 @@ export default function ProductsAdmin() {
         continue
       }
 
-      await supabase
+      const {
+        error: deleteImagesError,
+      } = await supabase
         .from(
           "product_variant_images"
         )
@@ -1063,6 +1166,10 @@ export default function ProductsAdmin() {
           "variant_id",
           variantId
         )
+
+      if (deleteImagesError) {
+        throw deleteImagesError
+      }
 
       const {
         error,
@@ -1227,6 +1334,38 @@ export default function ProductsAdmin() {
           alert(
             "No puedes eliminar este producto porque tiene ventas registradas. Puedes ocultarlo de la tienda."
           )
+          return
+        }
+
+        const {
+          error: imagesError,
+        } = await supabase
+          .from(
+            "product_variant_images"
+          )
+          .delete()
+          .in(
+            "variant_id",
+            variantIds
+          )
+
+        if (imagesError) {
+          alert(imagesError.message)
+          return
+        }
+
+        const {
+          error: variantsError,
+        } = await supabase
+          .from("product_variants")
+          .delete()
+          .in(
+            "id",
+            variantIds
+          )
+
+        if (variantsError) {
+          alert(variantsError.message)
           return
         }
       }
@@ -1442,18 +1581,11 @@ export default function ProductsAdmin() {
 
   return (
     <div className="w-full bg-white px-5 py-12 text-neutral-900 sm:px-8 sm:py-16 lg:px-10">
-      {/* IMPORTANTE:
-          Este contenedor ya no tiene max-w-[1250px].
-          Ahora ocupa todo el ancho disponible que
-          le entrega Admin.jsx. */}
       <div className="flex w-full flex-col items-center gap-16">
 
-        {/* =========================
-            SELECCIÓN DE CATEGORÍA
-        ========================== */}
         {view === "list" && (
           <div className="flex w-full flex-col items-center justify-center gap-12">
-            
+
             <div className="flex w-full flex-col items-center justify-center text-center">
               <div className="mb-8 h-px w-16 bg-neutral-200" />
 
@@ -1464,13 +1596,10 @@ export default function ProductsAdmin() {
               <div className="mt-4 h-px w-10 bg-neutral-200" />
             </div>
 
-            {/* ESTE CONTENEDOR OCUPA TODO EL ANCHO DISPONIBLE */}
             <div className="flex w-full items-center justify-center">
-              
-              {/* SOLO LAS TARJETAS TIENEN UN ANCHO MÁXIMO */}
+
               <div className="grid w-full max-w-[900px] grid-cols-1 gap-9 sm:grid-cols-2">
-                
-                {/* HOMBRE */}
+
                 <button
                   type="button"
                   onClick={() =>
@@ -1497,7 +1626,6 @@ export default function ProductsAdmin() {
                   </span>
                 </button>
 
-                {/* MUJER */}
                 <button
                   type="button"
                   onClick={() =>
@@ -1529,9 +1657,6 @@ export default function ProductsAdmin() {
           </div>
         )}
 
-        {/* =========================
-            CATEGORÍA
-        ========================== */}
         {view === "category" && (
           <div className="flex w-full flex-col items-center gap-16">
             <header className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center text-center">
@@ -1653,9 +1778,6 @@ export default function ProductsAdmin() {
           </div>
         )}
 
-        {/* =========================
-            SUBCATEGORÍA
-        ========================== */}
         {view === "subcategory" && (
           <div className="flex w-full flex-col items-center gap-16">
             <header className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center text-center">
@@ -1723,9 +1845,6 @@ export default function ProductsAdmin() {
           </div>
         )}
 
-        {/* =========================
-            EDITOR
-        ========================== */}
         {view === "editor" && (
           <div className="flex w-full flex-col items-center gap-16">
             <header className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center text-center">
@@ -1746,7 +1865,6 @@ export default function ProductsAdmin() {
               }
               className="mx-auto flex w-full max-w-[1100px] flex-col gap-12"
             >
-              {/* INFORMACIÓN GENERAL */}
               <section
                 className={`${cardClass} w-full p-8 sm:p-12`}
               >
@@ -1940,7 +2058,6 @@ export default function ProductsAdmin() {
                 </div>
               </section>
 
-              {/* COLORES, FOTOS Y STOCK */}
               <section
                 className={`${cardClass} w-full p-8 sm:p-12`}
               >
@@ -2087,7 +2204,6 @@ export default function ProductsAdmin() {
                           }
                         />
 
-                        {/* FOTOGRAFÍAS */}
                         <div className="mt-12 border-t border-neutral-200 pt-10">
                           <div className="mb-8 flex flex-col items-center gap-6 text-center">
                             <div>
@@ -2233,7 +2349,6 @@ export default function ProductsAdmin() {
                           )}
                         </div>
 
-                        {/* TALLAS Y STOCK */}
                         <div className="mt-12 border-t border-neutral-200 pt-10">
                           <div className="mb-8 text-center">
                             <h4 className="font-semibold text-neutral-900">
@@ -2323,7 +2438,6 @@ export default function ProductsAdmin() {
                 </div>
               </section>
 
-              {/* GUARDAR */}
               <div className="flex w-full justify-center border-t border-neutral-200 pt-10">
                 <button
                   type="submit"
