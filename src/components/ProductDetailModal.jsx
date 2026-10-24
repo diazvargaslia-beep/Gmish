@@ -480,7 +480,7 @@ function ProductDetailModal({ product, onClose }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto px-6 py-5 transition-all duration-300 sm:p-5 md:p-6 ${
+      className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto px-4 py-5 transition-all duration-300 sm:p-5 md:p-6 ${
         modalVisible
           ? "bg-black/50"
           : "bg-black/0"
@@ -627,7 +627,7 @@ function ProductDetailModal({ product, onClose }) {
         </div>
 
         {/* INFORMACIÓN DEL PRODUCTO */}
-        <div className="detalle-producto-info min-w-0 flex-1 overflow-visible px-6 pb-10 pt-12 sm:px-10 sm:pt-16 md:my-0 md:mr-0 md:ml-0 md:overflow-y-auto md:px-10 md:py-12 lg:px-14 lg:py-14">
+        <div className="detalle-producto-info min-w-0 flex-1 overflow-visible px-8 pb-10 pt-12 sm:px-10 sm:pt-16 md:my-0 md:mr-0 md:ml-0 md:overflow-y-auto md:px-10 md:py-12 lg:px-14 lg:py-14">
           <div className="detalle-producto-cabecera space-y-4">
             {product.subcategory && (
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-500">
