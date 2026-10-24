@@ -5,6 +5,7 @@ import { CartProvider, useCart } from "./CartContext";
 import FeaturedProducts from "./components/FeaturedProducts";
 import CategorySection from "./components/CategorySection";
 import StoreInfo from "./components/StoreInfo";
+import Contactanos from "./components/Contactanos";
 import Cart from "./components/Cart";
 import Admin from "./admin/Admin";
 
@@ -1081,29 +1082,10 @@ function Tienda() {
         )}
 
         {pagina === "contacto" && (
-          <section className="seccion-interior pagina-vacia">
-            <p className="seccion-etiqueta">
-              ESTAMOS PARA TI
-            </p>
-
-            <h1>
-              Contáctanos
-            </h1>
-
-            <p>
-              Pronto añadiremos aquí nuestros datos de contacto.
-            </p>
-
-            <button
-              className="boton-interior"
-              onClick={() =>
-                irA("inicio")
-              }
-            >
-              VOLVER AL INICIO
-            </button>
-          </section>
-        )}
+  <Contactanos
+    onSelectCategory={irA}
+  />
+)}
       </main>
 
       <footer className="footer">

@@ -1,30 +1,27 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const MAPS_DEFAULT =
-  "https://goo.gl/maps/PEaWNjMyDSjuxsi19?g_st=aw";
-
-const DATOS_INICIALES = {
-  tienda_nombre: "GMISH",
-  tienda_direccion: "",
-  tienda_horario: "Lunes a domingo · 9:00 a. m. – 9:00 p. m.",
-  tienda_maps_url: MAPS_DEFAULT,
-  tienda_imagen_url: "",
-  tienda_descripcion:
-    "Ven a conocer nuestras prendas y descubre GMISH de cerca.",
-};
-
-function ConfiguracionAdmin() {
-  const [formulario, setFormulario] =
-    useState(DATOS_INICIALES);
+export default function ConfiguracionAdmin() {
+  const [config, setConfig] = useState({
+    id: null,
+    tienda_nombre: "",
+    tienda_direccion: "",
+    tienda_horario: "",
+    tienda_maps_url: "",
+    tienda_imagen_url: "",
+    tienda_descripcion: "",
+    whatsapp_1: "",
+    whatsapp_2: "",
+    tiktok_url: "",
+  });
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [subiendoImagen, setSubiendoImagen] =
-    useState(false);
-
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
+
+  const inputImagenRef = useRef(null);
 
   useEffect(() => {
     cargarConfiguracion();
@@ -34,164 +31,53 @@ function ConfiguracionAdmin() {
     setCargando(true);
     setError("");
 
-    const { data, error: errorSupabase } =
-      await supabase
-        .from("store_settings")
-        .select(
-          `
-            id,
-            tienda_nombre,
-            tienda_direccion,
-            tienda_horario,
-            tienda_maps_url,
-            tienda_imagen_url,
-            tienda_descripcion
-          `
-        )
-        .limit(1)
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from("store_settings")
+      .select(`
+        id,
+        tienda_nombre,
+        tienda_direccion,
+        tienda_horario,
+        tienda_maps_url,
+        tienda_imagen_url,
+        tienda_descripcion,
+        whatsapp_1,
+        whatsapp_2,
+        tiktok_url
+      `)
+      .limit(1)
+      .maybeSingle();
 
-    if (errorSupabase) {
-      console.error(
-        "Error cargando configuración:",
-        errorSupabase
-      );
-
-      setError(
-        "No se pudo cargar la configuración de la tienda."
-      );
-
+    if (error) {
+      console.error(error);
+      setError("No se pudo cargar la configuración.");
       setCargando(false);
       return;
     }
 
     if (data) {
-      setFormulario({
-        tienda_nombre:
-          data.tienda_nombre ||
-          DATOS_INICIALES.tienda_nombre,
-
-        tienda_direccion:
-          data.tienda_direccion || "",
-
-        tienda_horario:
-          data.tienda_horario ||
-          DATOS_INICIALES.tienda_horario,
-
-        tienda_maps_url:
-          data.tienda_maps_url ||
-          DATOS_INICIALES.tienda_maps_url,
-
-        tienda_imagen_url:
-          data.tienda_imagen_url || "",
-
-        tienda_descripcion:
-          data.tienda_descripcion ||
-          DATOS_INICIALES.tienda_descripcion,
+      setConfig({
+        id: data.id ?? null,
+        tienda_nombre: data.tienda_nombre ?? "",
+        tienda_direccion: data.tienda_direccion ?? "",
+        tienda_horario: data.tienda_horario ?? "",
+        tienda_maps_url: data.tienda_maps_url ?? "",
+        tienda_imagen_url: data.tienda_imagen_url ?? "",
+        tienda_descripcion: data.tienda_descripcion ?? "",
+        whatsapp_1: data.whatsapp_1 ?? "",
+        whatsapp_2: data.whatsapp_2 ?? "",
+        tiktok_url: data.tiktok_url ?? "",
       });
     }
 
     setCargando(false);
   }
 
-  function actualizarCampo(campo, valor) {
-    setFormulario((actual) => ({
-      ...actual,
+  function cambiarCampo(campo, valor) {
+    setConfig((prev) => ({
+      ...prev,
       [campo]: valor,
     }));
-
-    setMensaje("");
-    setError("");
-  }
-
-  async function subirImagen(event) {
-    const archivo = event.target.files?.[0];
-
-    if (!archivo) {
-      return;
-    }
-
-    if (!archivo.type.startsWith("image/")) {
-      setError(
-        "Selecciona un archivo de imagen válido."
-      );
-      return;
-    }
-
-    const maximoMB = 8;
-    const maximoBytes =
-      maximoMB * 1024 * 1024;
-
-    if (archivo.size > maximoBytes) {
-      setError(
-        `La imagen no puede superar los ${maximoMB} MB.`
-      );
-      return;
-    }
-
-    setSubiendoImagen(true);
-    setMensaje("");
-    setError("");
-
-    try {
-      const extension =
-        archivo.name.split(".").pop()?.toLowerCase() ||
-        "jpg";
-
-      const nombreArchivo =
-        `store/visitanos-${Date.now()}.${extension}`;
-
-      const { error: errorUpload } =
-        await supabase.storage
-          .from("product-images")
-          .upload(nombreArchivo, archivo, {
-            cacheControl: "3600",
-            upsert: true,
-            contentType: archivo.type,
-          });
-
-      if (errorUpload) {
-        console.error(
-          "Error subiendo imagen:",
-          errorUpload
-        );
-
-        throw new Error(
-          errorUpload.message ||
-            "No se pudo subir la imagen."
-        );
-      }
-
-      const { data } =
-        supabase.storage
-          .from("product-images")
-          .getPublicUrl(nombreArchivo);
-
-      if (!data?.publicUrl) {
-        throw new Error(
-          "No se pudo obtener la URL pública de la imagen."
-        );
-      }
-
-      setFormulario((actual) => ({
-        ...actual,
-        tienda_imagen_url: data.publicUrl,
-      }));
-
-      setMensaje(
-        "Imagen cargada. Recuerda guardar los cambios."
-      );
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err?.message ||
-          "No se pudo subir la imagen."
-      );
-    } finally {
-      setSubiendoImagen(false);
-      event.target.value = "";
-    }
   }
 
   async function guardarConfiguracion() {
@@ -199,435 +85,621 @@ function ConfiguracionAdmin() {
     setMensaje("");
     setError("");
 
-    try {
-      const { data: existente, error: errorBusqueda } =
-        await supabase
-          .from("store_settings")
-          .select("id")
-          .limit(1)
-          .maybeSingle();
+    const datos = {
+      tienda_nombre: config.tienda_nombre.trim(),
+      tienda_direccion: config.tienda_direccion.trim(),
+      tienda_horario: config.tienda_horario.trim(),
+      tienda_maps_url: config.tienda_maps_url.trim(),
+      tienda_imagen_url: config.tienda_imagen_url.trim(),
+      tienda_descripcion: config.tienda_descripcion.trim(),
+      whatsapp_1: config.whatsapp_1.trim(),
+      whatsapp_2: config.whatsapp_2.trim(),
+      tiktok_url: config.tiktok_url.trim(),
+    };
 
-      if (errorBusqueda) {
-        throw new Error(
-          errorBusqueda.message ||
-            "No se pudo comprobar la configuración."
-        );
-      }
+    let resultado;
 
-      const datos = {
-        tienda_nombre:
-          formulario.tienda_nombre.trim(),
+    if (config.id) {
+      resultado = await supabase
+        .from("store_settings")
+        .update(datos)
+        .eq("id", config.id)
+        .select()
+        .single();
+    } else {
+      resultado = await supabase
+        .from("store_settings")
+        .insert([datos])
+        .select()
+        .single();
+    }
 
-        tienda_direccion:
-          formulario.tienda_direccion.trim(),
-
-        tienda_horario:
-          formulario.tienda_horario.trim(),
-
-        tienda_maps_url:
-          formulario.tienda_maps_url.trim(),
-
-        tienda_imagen_url:
-          formulario.tienda_imagen_url.trim(),
-
-        tienda_descripcion:
-          formulario.tienda_descripcion.trim(),
-      };
-
-      let resultado;
-
-      if (existente?.id) {
-        resultado = await supabase
-          .from("store_settings")
-          .update(datos)
-          .eq("id", existente.id);
-      } else {
-        resultado = await supabase
-          .from("store_settings")
-          .insert(datos);
-      }
-
-      if (resultado.error) {
-        throw new Error(
-          resultado.error.message ||
-            "No se pudieron guardar los cambios."
-        );
-      }
-
-      setMensaje(
-        "Configuración guardada correctamente."
-      );
-    } catch (err) {
-      console.error(
-        "Error guardando configuración:",
-        err
-      );
-
-      setError(
-        err?.message ||
-          "No se pudieron guardar los cambios."
-      );
-    } finally {
+    if (resultado.error) {
+      console.error(resultado.error);
+      setError("No se pudo guardar la configuración.");
       setGuardando(false);
+      return;
+    }
+
+    setConfig((prev) => ({
+      ...prev,
+      id: resultado.data.id,
+    }));
+
+    setMensaje("Configuración guardada correctamente.");
+    setGuardando(false);
+
+    setTimeout(() => {
+      setMensaje("");
+    }, 3000);
+  }
+
+  async function seleccionarImagen(event) {
+    const archivo = event.target.files?.[0];
+
+    if (!archivo) return;
+
+    setMensaje("");
+    setError("");
+
+    const tiposPermitidos = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!tiposPermitidos.includes(archivo.type)) {
+      setError("Solo puedes subir imágenes JPG, PNG o WEBP.");
+      event.target.value = "";
+      return;
+    }
+
+    if (archivo.size > 5 * 1024 * 1024) {
+      setError("La imagen no puede pesar más de 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setSubiendoImagen(true);
+
+      const extension =
+        archivo.name.split(".").pop()?.toLowerCase() || "jpg";
+
+      const nombreArchivo = `store/visitanos-${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(nombreArchivo, archivo, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: archivo.type,
+        });
+
+      if (uploadError) {
+        console.error(uploadError);
+        setError("No se pudo subir la imagen.");
+        return;
+      }
+
+      const { data } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(nombreArchivo);
+
+      if (!data?.publicUrl) {
+        setError("No se pudo obtener la URL de la imagen.");
+        return;
+      }
+
+      cambiarCampo("tienda_imagen_url", data.publicUrl);
+      setMensaje("Imagen seleccionada correctamente.");
+    } catch (err) {
+      console.error(err);
+      setError("Ocurrió un error al subir la imagen.");
+    } finally {
+      setSubiendoImagen(false);
+      event.target.value = "";
     }
   }
 
   if (cargando) {
     return (
-      <section className="flex w-full justify-center">
-        <div className="w-full max-w-5xl px-4 py-16 text-center">
-          <p className="text-sm text-neutral-500">
-            Cargando configuración...
-          </p>
-        </div>
-      </section>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minHeight: "60vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#f8f7f3",
+          color: "#171717",
+          boxSizing: "border-box",
+          overflowX: "hidden",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "14px",
+          }}
+        >
+          Cargando configuración...
+        </p>
+      </div>
     );
   }
 
   return (
-    <section className="flex w-full flex-col items-center">
-      <div className="w-full max-w-5xl">
-        {/* ENCABEZADO */}
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-neutral-200 bg-neutral-50">
-            <span className="text-xl">⚙</span>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        display: "flex",
+        justifyContent: "center",
+        background: "#f8f7f3",
+        color: "#171717",
+        boxSizing: "border-box",
+        padding: "40px 2.5vw 70px",
+        overflowX: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "1280px",
+          margin: "0 auto",
+          boxSizing: "border-box",
+          overflowX: "hidden",
+        }}
+      >
+        {/* INFORMACIÓN PÚBLICA */}
+        <section
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            background: "#fff",
+            border: "1px solid #deddd8",
+            boxSizing: "border-box",
+            padding: "clamp(25px, 4vw, 48px)",
+            margin: "0 auto 24px",
+          }}
+        >
+          <div
+            style={{
+              textAlign: "center",
+              marginBottom: "35px",
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontFamily: "Playfair Display, serif",
+                fontSize: "27px",
+                fontWeight: 500,
+              }}
+            >
+              Información pública
+            </h2>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
+                color: "#777",
+              }}
+            >
+              Esta información será visible para tus clientes.
+            </p>
           </div>
 
-          <h2 className="mt-6 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Configuración
-          </h2>
-
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-7 text-neutral-500">
-            Administra la información que los clientes
-            verán sobre el espacio físico de GMISH.
-          </p>
-        </div>
-
-        {/* TIENDA FÍSICA */}
-        <div className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-9">
-          <div className="border-b border-neutral-100 pb-7">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-              Información pública
-            </p>
-
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight">
+          {/* TIENDA FÍSICA */}
+          <div
+            style={{
+              width: "100%",
+              marginBottom: "45px",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 25px",
+                textAlign: "center",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+              }}
+            >
               Tienda física
             </h3>
 
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-500">
-              Esta información aparecerá en la sección
-              “Visítanos” de la tienda.
-            </p>
-          </div>
-
-          <div className="mt-8 grid grid-cols-1 gap-6">
-            {/* NOMBRE */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-800">
-                Nombre de la tienda
-              </label>
-
-              <input
-                type="text"
-                value={formulario.tienda_nombre}
-                onChange={(event) =>
-                  actualizarCampo(
-                    "tienda_nombre",
-                    event.target.value
-                  )
+            <div
+              style={{
+                width: "100%",
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                gap: "22px",
+                boxSizing: "border-box",
+              }}
+            >
+              <Campo
+                label="Nombre de la tienda"
+                value={config.tienda_nombre}
+                onChange={(value) =>
+                  cambiarCampo("tienda_nombre", value)
                 }
-                placeholder="GMISH"
-                className="
-                  w-full
-                  rounded-xl
-                  border
-                  border-neutral-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                  text-neutral-900
-                  outline-none
-                  transition
-                  focus:border-neutral-900
-                "
-              />
-            </div>
-
-            {/* DIRECCIÓN */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-800">
-                Dirección
-              </label>
-
-              <input
-                type="text"
-                value={formulario.tienda_direccion}
-                onChange={(event) =>
-                  actualizarCampo(
-                    "tienda_direccion",
-                    event.target.value
-                  )
-                }
-                placeholder="Ej. Jr. ... 123, La Merced"
-                className="
-                  w-full
-                  rounded-xl
-                  border
-                  border-neutral-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                  text-neutral-900
-                  outline-none
-                  transition
-                  focus:border-neutral-900
-                "
-              />
-            </div>
-
-            {/* HORARIO */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-800">
-                Horario
-              </label>
-
-              <input
-                type="text"
-                value={formulario.tienda_horario}
-                onChange={(event) =>
-                  actualizarCampo(
-                    "tienda_horario",
-                    event.target.value
-                  )
-                }
-                placeholder="Lunes a domingo · 9:00 a. m. – 9:00 p. m."
-                className="
-                  w-full
-                  rounded-xl
-                  border
-                  border-neutral-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                  text-neutral-900
-                  outline-none
-                  transition
-                  focus:border-neutral-900
-                "
-              />
-            </div>
-
-            {/* GOOGLE MAPS */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-800">
-                Enlace de Google Maps
-              </label>
-
-              <input
-                type="url"
-                value={formulario.tienda_maps_url}
-                onChange={(event) =>
-                  actualizarCampo(
-                    "tienda_maps_url",
-                    event.target.value
-                  )
-                }
-                placeholder="https://goo.gl/maps/..."
-                className="
-                  w-full
-                  rounded-xl
-                  border
-                  border-neutral-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                  text-neutral-900
-                  outline-none
-                  transition
-                  focus:border-neutral-900
-                "
+                placeholder="G’MISH"
               />
 
-              <p className="mt-2 text-xs leading-5 text-neutral-400">
-                Este enlace se utilizará para el botón
-                “Abrir en Google Maps”.
-              </p>
+              <Campo
+                label="Dirección"
+                value={config.tienda_direccion}
+                onChange={(value) =>
+                  cambiarCampo("tienda_direccion", value)
+                }
+                placeholder="Dirección de la tienda"
+              />
+
+              <Campo
+                label="Horario"
+                value={config.tienda_horario}
+                onChange={(value) =>
+                  cambiarCampo("tienda_horario", value)
+                }
+                placeholder="Lunes a sábado: 9:00 AM - 8:00 PM"
+              />
+
+              <Campo
+                label="Enlace de Google Maps"
+                value={config.tienda_maps_url}
+                onChange={(value) =>
+                  cambiarCampo("tienda_maps_url", value)
+                }
+                placeholder="https://maps.google.com/..."
+                fullWidth
+              />
             </div>
 
             {/* DESCRIPCIÓN */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-800">
+            <div style={{ marginTop: "22px", width: "100%" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "9px",
+                  textAlign: "center",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Descripción
               </label>
 
               <textarea
-                value={formulario.tienda_descripcion}
-                onChange={(event) =>
-                  actualizarCampo(
-                    "tienda_descripcion",
-                    event.target.value
-                  )
+                value={config.tienda_descripcion}
+                onChange={(e) =>
+                  cambiarCampo("tienda_descripcion", e.target.value)
                 }
-                rows={4}
-                placeholder="Ven a conocer nuestras prendas y descubre GMISH de cerca."
-                className="
-                  w-full
-                  resize-none
-                  rounded-xl
-                  border
-                  border-neutral-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                  leading-6
-                  text-neutral-900
-                  outline-none
-                  transition
-                  focus:border-neutral-900
-                "
+                placeholder="Cuéntales a tus clientes sobre tu tienda..."
+                rows={5}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
+                  border: "1px solid #d7d6d1",
+                  background: "#fafaf8",
+                  padding: "15px 17px",
+                  outline: "none",
+                  resize: "vertical",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "14px",
+                  lineHeight: 1.6,
+                  color: "#171717",
+                }}
+              />
+            </div>
+
+            {/* FOTO DEL LOCAL */}
+            <div
+              style={{
+                marginTop: "32px",
+                textAlign: "center",
+                width: "100%",
+              }}
+            >
+              <p
+                style={{
+                  margin: "0 0 15px",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Foto del local
+              </p>
+
+              {config.tienda_imagen_url ? (
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: "700px",
+                    margin: "0 auto 18px",
+                    border: "1px solid #deddd8",
+                    background: "#f4f3ef",
+                    padding: "8px",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <img
+                    src={config.tienda_imagen_url}
+                    alt="Foto del local"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      maxWidth: "100%",
+                      maxHeight: "420px",
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: "700px",
+                    height: "220px",
+                    margin: "0 auto 18px",
+                    border: "1px dashed #c8c7c1",
+                    background: "#fafaf8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#999",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: "13px",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  No hay una imagen seleccionada
+                </div>
+              )}
+
+              <input
+                ref={inputImagenRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                onChange={seleccionarImagen}
+                style={{ display: "none" }}
+              />
+
+              <button
+                type="button"
+                onClick={() => inputImagenRef.current?.click()}
+                disabled={subiendoImagen}
+                style={{
+                  border: "1px solid #171717",
+                  background: "#171717",
+                  color: "#fff",
+                  padding: "12px 25px",
+                  cursor: subiendoImagen ? "wait" : "pointer",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "12px",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  opacity: subiendoImagen ? 0.6 : 1,
+                }}
+              >
+                {subiendoImagen
+                  ? "SUBIENDO..."
+                  : "SELECCIONAR IMAGEN"}
+              </button>
+            </div>
+          </div>
+
+          {/* CONTACTO */}
+          <div
+            style={{
+              width: "100%",
+              borderTop: "1px solid #e2e1dc",
+              paddingTop: "40px",
+              boxSizing: "border-box",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 25px",
+                textAlign: "center",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+              }}
+            >
+              Contacto
+            </h3>
+
+            <div
+              style={{
+                width: "100%",
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                gap: "22px",
+                boxSizing: "border-box",
+              }}
+            >
+              <Campo
+                label="WhatsApp 1"
+                value={config.whatsapp_1}
+                onChange={(value) =>
+                  cambiarCampo("whatsapp_1", value)
+                }
+                placeholder="+51 999 999 999"
+              />
+
+              <Campo
+                label="WhatsApp 2"
+                value={config.whatsapp_2}
+                onChange={(value) =>
+                  cambiarCampo("whatsapp_2", value)
+                }
+                placeholder="+51 999 999 999"
+              />
+
+              <Campo
+                label="TikTok"
+                value={config.tiktok_url}
+                onChange={(value) =>
+                  cambiarCampo("tiktok_url", value)
+                }
+                placeholder="https://www.tiktok.com/@..."
+                fullWidth
               />
             </div>
           </div>
+        </section>
 
-          {/* FOTO */}
-          <div className="mt-8 border-t border-neutral-100 pt-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-neutral-800">
-                  Foto del local
-                </p>
-
-                <p className="mt-2 max-w-lg text-xs leading-5 text-neutral-400">
-                  Sube una fotografía del establecimiento.
-                  Recomendamos una imagen horizontal de
-                  buena resolución.
-                </p>
-              </div>
-
-              <label
-                className="
-                  inline-flex
-                  min-h-[44px]
-                  cursor-pointer
-                  items-center
-                  justify-center
-                  rounded-xl
-                  border
-                  border-neutral-300
-                  bg-white
-                  px-5
-                  text-sm
-                  font-medium
-                  text-neutral-900
-                  transition
-                  hover:border-neutral-900
-                  hover:bg-neutral-50
-                "
-              >
-                {subiendoImagen
-                  ? "Subiendo..."
-                  : "Seleccionar imagen"}
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={subirImagen}
-                  disabled={subiendoImagen}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {formulario.tienda_imagen_url ? (
-              <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100">
-                <img
-                  src={formulario.tienda_imagen_url}
-                  alt="Vista previa del local GMISH"
-                  className="h-[260px] w-full object-cover sm:h-[360px]"
-                />
-              </div>
-            ) : (
-              <div className="mt-6 flex h-[240px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 text-center sm:h-[300px]">
-                <div>
-                  <p className="text-3xl">▧</p>
-
-                  <p className="mt-3 text-sm font-medium text-neutral-600">
-                    Todavía no hay una foto
-                  </p>
-
-                  <p className="mt-1 text-xs text-neutral-400">
-                    La imagen aparecerá aquí después de
-                    seleccionarla.
-                  </p>
-                </div>
-              </div>
-            )}
+        {/* MENSAJES */}
+        {mensaje && (
+          <div
+            style={{
+              width: "100%",
+              textAlign: "center",
+              marginBottom: "18px",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "13px",
+              color: "#555",
+            }}
+          >
+            {mensaje}
           </div>
+        )}
 
-          {/* MENSAJES */}
-          {error && (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
-              {error}
-            </div>
-          )}
-
-          {mensaje && (
-            <div className="mt-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm leading-6 text-green-700">
-              {mensaje}
-            </div>
-          )}
-
-          {/* GUARDAR */}
-          <div className="mt-8 flex justify-end border-t border-neutral-100 pt-8">
-            <button
-              type="button"
-              onClick={guardarConfiguracion}
-              disabled={guardando || subiendoImagen}
-              className="
-                min-h-[50px]
-                min-w-[190px]
-                rounded-xl
-                bg-neutral-900
-                px-7
-                py-3
-                text-sm
-                font-medium
-                text-white
-                transition
-                hover:bg-neutral-700
-                disabled:cursor-not-allowed
-                disabled:opacity-50
-              "
-            >
-              {guardando
-                ? "Guardando..."
-                : "Guardar cambios"}
-            </button>
+        {error && (
+          <div
+            style={{
+              width: "100%",
+              textAlign: "center",
+              marginBottom: "18px",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "13px",
+              color: "#8a3333",
+            }}
+          >
+            {error}
           </div>
+        )}
+
+        {/* GUARDAR */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            width: "100%",
+            marginTop: "10px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={guardarConfiguracion}
+            disabled={guardando}
+            style={{
+              border: "none",
+              background: "#171717",
+              color: "#fff",
+              padding: "15px 42px",
+              cursor: guardando ? "wait" : "pointer",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "12px",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              opacity: guardando ? 0.6 : 1,
+            }}
+          >
+            {guardando
+              ? "GUARDANDO..."
+              : "GUARDAR CONFIGURACIÓN"}
+          </button>
         </div>
 
-        {/* VISTA RÁPIDA */}
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-            Así funcionará
-          </p>
-
-          <p className="mt-3 text-sm leading-6 text-neutral-600">
-            Cuando guardes los cambios, la información se
-            actualizará automáticamente en la tienda
-            pública. No tendrás que modificar el código
-            cada vez que cambie la dirección, el horario,
-            el mapa o la fotografía.
-          </p>
-        </div>
+        <p
+          style={{
+            margin: "18px auto 0",
+            maxWidth: "650px",
+            textAlign: "center",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "12px",
+            lineHeight: 1.6,
+            color: "#888",
+          }}
+        >
+          Los cambios se reflejarán en la información pública de G’MISH.
+        </p>
       </div>
-    </section>
+    </div>
   );
 }
 
-export default ConfiguracionAdmin;
+function Campo({
+  label,
+  value,
+  onChange,
+  placeholder,
+  fullWidth = false,
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        gridColumn: fullWidth ? "1 / -1" : undefined,
+        boxSizing: "border-box",
+      }}
+    >
+      <label
+        style={{
+          display: "block",
+          marginBottom: "9px",
+          textAlign: "center",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: "12px",
+          fontWeight: 600,
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
+      </label>
+
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          display: "block",
+          width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          border: "1px solid #d7d6d1",
+          background: "#fafaf8",
+          padding: "14px 16px",
+          outline: "none",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: "14px",
+          color: "#171717",
+          textAlign: "center",
+        }}
+      />
+    </div>
+  );
+}

@@ -119,7 +119,7 @@ export default function StoreInfo() {
           flexDirection: "column",
           alignItems: "center",
           margin: 0,
-          padding: "32px 2.5vw",
+          padding: "50px 2.5vw",
           boxSizing: "border-box",
         }}
       >
@@ -136,11 +136,12 @@ export default function StoreInfo() {
             VISÍTANOS
           </h1>
 
-          <p className="mt-3 text-[16px] text-black/65">
+          <p className="mt-4 text-[16px] text-black/65">
             Tu estilo también tiene un lugar
           </p>
 
-          <div className="mt-4 flex justify-center">
+          <div className="mt-5 flex justify-center">
+
             <span
               className={`inline-flex items-center gap-2 border px-4 py-2 text-[10px] tracking-[0.2em] ${
                 tienda.abierta
@@ -148,6 +149,7 @@ export default function StoreInfo() {
                   : "border-black/10 bg-black/[0.03] text-black/45"
               }`}
             >
+
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   tienda.abierta
@@ -159,7 +161,9 @@ export default function StoreInfo() {
               {tienda.abierta
                 ? "ABIERTO"
                 : "CERRADO"}
+
             </span>
+
           </div>
 
         </header>
@@ -167,7 +171,7 @@ export default function StoreInfo() {
 
         {/* IMAGEN */}
 
-        <div className="mt-8 w-full aspect-[16/8] overflow-hidden bg-[#e9e7e1]">
+        <div className="mt-12 w-full aspect-[16/8] overflow-hidden bg-[#e9e7e1]">
 
           {tienda.imagenUrl ? (
             <img
@@ -188,15 +192,15 @@ export default function StoreInfo() {
 
         {/* INFORMACIÓN DE LA TIENDA */}
 
-        <section className="mt-8 w-full">
+        <section className="mt-12 w-full">
 
-          <div className="mb-5 text-center">
+          <div className="mb-8 text-center">
 
             <p className="text-[10px] tracking-[0.3em] text-black/40">
               ENCUÉNTRANOS
             </p>
 
-            <h2 className="mt-2 font-serif text-[27px]">
+            <h2 className="mt-3 font-serif text-[27px]">
               Encuéntranos en:
             </h2>
 
@@ -207,13 +211,13 @@ export default function StoreInfo() {
 
             {/* DIRECCIÓN */}
 
-            <div className="px-8 py-7 text-center">
+            <div className="px-8 py-8 text-center">
 
               <p className="text-[10px] tracking-[0.25em] text-black/40">
                 DIRECCIÓN
               </p>
 
-              <p className="mt-3 text-[14px] leading-7 text-black/70">
+              <p className="mt-4 text-[14px] leading-7 text-black/70">
                 {tienda.direccion}
               </p>
 
@@ -222,22 +226,22 @@ export default function StoreInfo() {
 
             {/* HORARIO */}
 
-            <div className="border-t border-black/10 px-8 py-7 text-center md:border-l md:border-t-0">
+            <div className="border-t border-black/10 px-8 py-8 text-center md:border-l md:border-t-0">
 
               <p className="text-[10px] tracking-[0.25em] text-black/40">
                 HORARIO DE ATENCIÓN
               </p>
 
-              <p className="mt-3 text-[14px] text-black/70">
+              <p className="mt-4 text-[14px] text-black/70">
                 LUNES — DOMINGO
               </p>
 
-              <p className="mt-1 text-[14px] text-black/70">
+              <p className="mt-2 text-[14px] text-black/70">
                 {tienda.horario}
               </p>
 
               <p
-                className={`mt-3 text-[10px] tracking-[0.15em] ${
+                className={`mt-4 text-[10px] tracking-[0.15em] ${
                   tienda.abierta
                     ? "text-[#4b7a50]"
                     : "text-black/40"
@@ -257,19 +261,19 @@ export default function StoreInfo() {
 
         {/* MAPA */}
 
-        <section className="mt-8 w-full">
+        <section className="mt-12 w-full">
 
-          <div className="mb-5 text-center">
+          <div className="mb-8 text-center">
 
             <p className="text-[10px] tracking-[0.3em] text-black/40">
               CÓMO LLEGAR
             </p>
 
-            <h2 className="mt-2 font-serif text-[27px]">
+            <h2 className="mt-3 font-serif text-[27px]">
               Estamos más cerca de ti
             </h2>
 
-            <p className="mx-auto mt-3 max-w-[500px] text-[14px] leading-7 text-black/55">
+            <p className="mx-auto mt-4 max-w-[500px] text-[14px] leading-7 text-black/55">
               Consulta nuestra ubicación y encuentra la mejor ruta para llegar a GMISH.
             </p>
 
@@ -281,7 +285,7 @@ export default function StoreInfo() {
             <iframe
               title="Ubicación de GMISH"
               src={mapaUrl}
-              className="block h-[350px] w-full border-0 sm:h-[430px]"
+              className="block h-[400px] w-full border-0 sm:h-[480px]"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
@@ -290,7 +294,7 @@ export default function StoreInfo() {
           </div>
 
 
-          <div className="mt-5 flex justify-center">
+          <div className="mt-7 flex justify-center">
 
             <a
               href={
@@ -299,7 +303,7 @@ export default function StoreInfo() {
               }
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-[44px] items-center justify-center bg-black px-8 text-[10px] font-medium tracking-[0.2em] text-white transition hover:bg-black/80"
+              className="inline-flex min-h-[46px] items-center justify-center bg-black px-8 text-[10px] font-medium tracking-[0.2em] text-white transition hover:bg-black/80"
             >
 
               <span className="text-white">
