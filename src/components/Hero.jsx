@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 
 function Hero() {
   const [imagen, setImagen] = useState("");
+  const [imagenLista, setImagenLista] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
@@ -11,7 +12,9 @@ function Hero() {
   }, []);
 
   async function cargarPortada() {
-    console.log("Buscando portada_principal...");
+    setCargando(true);
+    setImagenLista(false);
+    setError("");
 
     const { data, error } = await supabase
       .from("store_settings")
@@ -19,20 +22,38 @@ function Hero() {
       .eq("setting_key", "portada_principal")
       .maybeSingle();
 
-    console.log("Datos recibidos:", data);
-    console.log("Error:", error);
-
     if (error) {
+      console.error("Error cargando portada:", error);
+
       setError(error.message);
       setCargando(false);
       return;
     }
 
-    if (data?.setting_value) {
-      setImagen(data.setting_value);
+    if (!data?.setting_value) {
+      setImagen("");
+      setCargando(false);
+      return;
     }
 
+    // Agregamos un parámetro para evitar que el navegador
+    // reutilice una versión antigua de la imagen.
+    const urlActualizada = `${data.setting_value}${
+      data.setting_value.includes("?") ? "&" : "?"
+    }v=${Date.now()}`;
+
+    setImagen(urlActualizada);
+  }
+
+  function imagenCargada() {
+    setImagenLista(true);
     setCargando(false);
+  }
+
+  function imagenConError() {
+    setImagenLista(false);
+    setCargando(false);
+    setError("No se pudo cargar la imagen de portada.");
   }
 
   return (
@@ -59,24 +80,35 @@ function Hero() {
           </a>
         </div>
 
-        <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[#1B1D1A]">
-          {imagen ? (
+        <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[#1B1D1A]">
+          
+          {cargando && (
+            <span className="absolute text-sm font-medium text-[#E7E1D2]">
+              Cargando imagen...
+            </span>
+          )}
+
+          {imagen && (
             <img
               src={imagen}
               alt="Nueva colección GMISH"
-              className="h-full w-full object-cover"
+              onLoad={imagenCargada}
+              onError={imagenConError}
+              className={`h-full w-full object-cover transition-opacity duration-300 ${
+                imagenLista ? "opacity-100" : "opacity-0"
+              }`}
             />
-          ) : cargando ? (
-            <span className="text-sm font-medium text-[#E7E1D2]">
-              Cargando imagen...
-            </span>
-          ) : error ? (
-            <div className="p-6 text-center text-sm text-red-400">
+          )}
+
+          {!cargando && error && (
+            <div className="absolute p-6 text-center text-sm text-red-400">
               Error al cargar la portada:
               <br />
               {error}
             </div>
-          ) : (
+          )}
+
+          {!cargando && !error && !imagen && (
             <span className="text-sm font-medium text-[#E7E1D2]">
               No hay portada configurada
             </span>

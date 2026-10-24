@@ -20,12 +20,13 @@ function Tienda() {
   const [cargando, setCargando] = useState(true);
   const [errorProductos, setErrorProductos] = useState("");
 
-  // Portadas administrables desde Supabase.
   const [portadas, setPortadas] = useState({
     inicio: null,
     hombre: null,
     mujer: null,
   });
+
+  const [sitioListo, setSitioListo] = useState(false);
 
   const [subcategoriasSeleccionadas, setSubcategoriasSeleccionadas] =
     useState({
@@ -44,9 +45,10 @@ function Tienda() {
     0
   );
 
-  // ============================================================
-  // RESTAURAR LA PÁGINA AL USAR LAS FLECHAS DEL NAVEGADOR
-  // ============================================================
+  /* =========================================
+     HISTORIAL Y NAVEGACIÓN
+     ========================================= */
+
   useEffect(() => {
     const rutaInicial = window.location.pathname.replace(/\/+$/, "");
     const estadoActual = window.history.state;
@@ -128,11 +130,41 @@ function Tienda() {
     };
   }, []);
 
-  // ============================================================
-  // CARGAR PORTADAS DESDE store_covers
-  // ============================================================
+  /* =========================================
+     PORTADAS
+     ========================================= */
+
   useEffect(() => {
     let cancelado = false;
+
+    function precargarImagen(url) {
+      if (!url) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        const imagen = new Image();
+
+        imagen.onload = () => {
+          resolve();
+        };
+
+        imagen.onerror = () => {
+          console.warn(
+            "No se pudo precargar la imagen de portada:",
+            url
+          );
+
+          resolve();
+        };
+
+        imagen.src = url;
+
+        if (imagen.complete) {
+          resolve();
+        }
+      });
+    }
 
     async function cargarPortadas() {
       const { data, error } = await supabase
@@ -155,6 +187,8 @@ function Tienda() {
           "Error al cargar las portadas:",
           error
         );
+
+        setSitioListo(true);
         return;
       }
 
@@ -174,16 +208,45 @@ function Tienda() {
         }
       });
 
-      console.log(
-        "Portadas cargadas:",
-        portadasGuardadas
+      /*
+       * Guardamos las tres portadas inmediatamente.
+       * No se elimina ninguna.
+       */
+      setPortadas(portadasGuardadas);
+
+      /*
+       * SOLO esperamos la imagen de Inicio.
+       * Esto evita que Hombre y Mujer retrasen
+       * la primera aparición de la página.
+       */
+      await precargarImagen(
+        portadasGuardadas.inicio?.imagen_url
       );
 
-      setPortadas(portadasGuardadas);
+      if (cancelado) return;
+
+      /*
+       * Ahora aparece toda la página de una vez.
+       */
+      setSitioListo(true);
+
+      /*
+       * Hombre y Mujer se precargan en segundo plano.
+       * No bloquean la página.
+       */
+      precargarImagen(
+        portadasGuardadas.hombre?.imagen_url
+      );
+
+      precargarImagen(
+        portadasGuardadas.mujer?.imagen_url
+      );
     }
 
     if (!esAdmin) {
       cargarPortadas();
+    } else {
+      setSitioListo(true);
     }
 
     return () => {
@@ -191,9 +254,10 @@ function Tienda() {
     };
   }, [esAdmin]);
 
-  // ============================================================
-  // CARGAR PRODUCTOS DESDE EL SERVICIO
-  // ============================================================
+  /* =========================================
+     PRODUCTOS
+     ========================================= */
+
   useEffect(() => {
     let cancelado = false;
 
@@ -205,11 +269,6 @@ function Tienda() {
         const data = await getProducts();
 
         if (cancelado) return;
-
-        console.log(
-          "Productos recibidos por la tienda:",
-          data
-        );
 
         setProductos(data || []);
       } catch (error) {
@@ -241,9 +300,10 @@ function Tienda() {
     };
   }, [esAdmin]);
 
-  // ============================================================
-  // OBTENER SUBCATEGORÍAS EXISTENTES
-  // ============================================================
+  /* =========================================
+     SUBCATEGORÍAS
+     ========================================= */
+
   function obtenerSubcategorias(categoria) {
     const subcategoriasUnicas = new Map();
 
@@ -279,9 +339,10 @@ function Tienda() {
       }));
   }
 
-  // ============================================================
-  // NAVEGAR ENTRE PÁGINAS
-  // ============================================================
+  /* =========================================
+     NAVEGACIÓN
+     ========================================= */
+
   function navegar(
     destino,
     siguientesSubcategorias
@@ -336,9 +397,6 @@ function Tienda() {
     );
   }
 
-  // ============================================================
-  // ELEGIR SUBCATEGORÍA DESDE EL MENÚ
-  // ============================================================
   function irASubcategoria(
     categoria,
     subcategoria
@@ -358,9 +416,6 @@ function Tienda() {
     );
   }
 
-  // ============================================================
-  // SELECCIONAR SUBCATEGORÍA DESDE "VER TODOS"
-  // ============================================================
   function seleccionarSubcategoria(
     categoria,
     subcategoria
@@ -412,9 +467,6 @@ function Tienda() {
     });
   }
 
-  // ============================================================
-  // ALTERNAR PANEL
-  // ============================================================
   function alternarPanel(nombre) {
     setPanelAbierto((actual) => {
       const siguiente =
@@ -428,9 +480,6 @@ function Tienda() {
     });
   }
 
-  // ============================================================
-  // BUSCAR
-  // ============================================================
   function buscar(evento) {
     evento.preventDefault();
 
@@ -440,46 +489,10 @@ function Tienda() {
     );
   }
 
-  // ============================================================
-  // VOLVER A TIENDA
-  // ============================================================
-  function volverATienda() {
-    const subcategoriasIniciales = {
-      hombre: "todos",
-      mujer: "todos",
-    };
+  /* =========================================
+     DESTINO DE PORTADA
+     ========================================= */
 
-    window.history.replaceState(
-      {
-        gmishPage: "inicio",
-        gmishScrollY: 0,
-        gmishSearch: "",
-        gmishSubcategories:
-          subcategoriasIniciales,
-        gmishProductModal: false,
-      },
-      "",
-      "/"
-    );
-
-    setEsAdmin(false);
-    setPagina("inicio");
-    setBusqueda("");
-    setSubcategoriasSeleccionadas(
-      subcategoriasIniciales
-    );
-    setPanelAbierto(null);
-    setCategoriaMenuAbierta(null);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "instant",
-    });
-  }
-
-  // ============================================================
-  // BOTÓN DE UNA PORTADA
-  // ============================================================
   function ejecutarDestinoPortada(destino) {
     const valor = String(
       destino || ""
@@ -555,17 +568,15 @@ function Tienda() {
       return;
     }
 
-    // URL externa.
-    if (
-      /^https?:\/\//i.test(valor)
-    ) {
+    if (/^https?:\/\//i.test(valor)) {
       window.location.href = valor;
     }
   }
 
-  // ============================================================
-  // OBTENER PORTADA CORRESPONDIENTE
-  // ============================================================
+  /* =========================================
+     PORTADA ACTUAL
+     ========================================= */
+
   function obtenerPortadaActual() {
     if (pagina === "inicio") {
       return portadas.inicio;
@@ -582,11 +593,22 @@ function Tienda() {
     return null;
   }
 
-  // ============================================================
-  // ADMIN
-  // ============================================================
+  /* =========================================
+     ADMIN
+     ========================================= */
+
   if (esAdmin) {
     return <Admin />;
+  }
+
+  /* =========================================
+     PANTALLA DE CARGA INICIAL
+     ========================================= */
+
+  if (!sitioListo) {
+    return (
+      <div className="pantalla-carga-inicial" />
+    );
   }
 
   const subcategoriasHombre =
@@ -598,17 +620,21 @@ function Tienda() {
   const portadaActual =
     obtenerPortadaActual();
 
+  const portadaTieneImagen =
+    Boolean(portadaActual?.imagen_url);
+
+  /* =========================================
+     TIENDA
+     ========================================= */
+
   return (
     <div className="hero">
       <header className="nav-bar">
         <div className="nav-right">
           <button
-            type="button"
             className="icon-link"
-            aria-label="Abrir buscador"
-            aria-expanded={
-              panelAbierto === "buscador"
-            }
+            type="button"
+            aria-label="Buscar"
             onClick={() =>
               alternarPanel("buscador")
             }
@@ -618,42 +644,34 @@ function Tienda() {
               aria-hidden="true"
             >
               <circle
-                cx="10.8"
-                cy="10.8"
-                r="6.8"
+                cx="11"
+                cy="11"
+                r="6.5"
               />
-
               <path d="m16 16 5 5" />
             </svg>
           </button>
 
           <button
-            type="button"
             className="icon-link"
-            aria-label={`Abrir carrito, ${cantidadCarrito} productos`}
-            aria-expanded={cartOpen}
-            onClick={() => {
-              setPanelAbierto(null);
-              setCategoriaMenuAbierta(null);
-              openCart();
-            }}
+            type="button"
+            aria-label="Carrito"
+            onClick={openCart}
           >
             <svg
               viewBox="0 0 24 24"
               aria-hidden="true"
             >
-              <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.9a2 2 0 0 0 1.9-1.5L22 8H6" />
-
+              <path d="M4 5h2l1.5 10h10L20 8H7" />
               <circle
-                cx="10"
-                cy="20"
-                r="1"
+                cx="9"
+                cy="19"
+                r="1.2"
               />
-
               <circle
-                cx="18"
-                cy="20"
-                r="1"
+                cx="17"
+                cy="19"
+                r="1.2"
               />
             </svg>
 
@@ -666,8 +684,8 @@ function Tienda() {
         </div>
 
         <button
-          type="button"
           className="logo-boton"
+          type="button"
           onClick={() => irA("inicio")}
           aria-label="Ir al inicio"
         >
@@ -675,48 +693,30 @@ function Tienda() {
         </button>
 
         <button
-          type="button"
           className="menu-icon"
+          type="button"
           aria-label="Abrir menú"
-          aria-expanded={
-            panelAbierto === "menu"
-          }
           onClick={() =>
             alternarPanel("menu")
           }
         >
           <span />
           <span />
-          <span />
         </button>
       </header>
 
-      {/* ========================================================
-          MENÚ PRINCIPAL
-      ======================================================== */}
       {panelAbierto === "menu" && (
-        <nav
-          className="menu-desplegable"
-          aria-label="Menú principal"
-        >
+        <div className="menu-desplegable">
           <button
             type="button"
-            onClick={() =>
-              irA("inicio")
-            }
+            onClick={() => irA("inicio")}
           >
             Inicio
           </button>
 
-          <hr className="menu-separador" />
-
           <button
             type="button"
             className="menu-boton-categoria"
-            aria-expanded={
-              categoriaMenuAbierta ===
-              "hombre"
-            }
             onClick={() =>
               setCategoriaMenuAbierta(
                 (actual) =>
@@ -726,17 +726,16 @@ function Tienda() {
               )
             }
           >
-            <span>Hombre</span>
+            Hombre
           </button>
 
-          {categoriaMenuAbierta ===
-            "hombre" && (
+          {categoriaMenuAbierta === "hombre" && (
             <div className="menu-subcategorias">
               <button
                 type="button"
                 className={
-                  subcategoriasSeleccionadas
-                    .hombre === "todos"
+                  subcategoriasSeleccionadas.hombre ===
+                  "todos"
                     ? "activo"
                     : ""
                 }
@@ -747,19 +746,16 @@ function Tienda() {
                   )
                 }
               >
-                Todo
+                Todos
               </button>
 
               {subcategoriasHombre.map(
                 (subcategoria) => (
                   <button
+                    key={subcategoria.value}
                     type="button"
-                    key={
-                      subcategoria.value
-                    }
                     className={
-                      subcategoriasSeleccionadas
-                        .hombre ===
+                      subcategoriasSeleccionadas.hombre ===
                       subcategoria.value
                         ? "activo"
                         : ""
@@ -781,10 +777,6 @@ function Tienda() {
           <button
             type="button"
             className="menu-boton-categoria"
-            aria-expanded={
-              categoriaMenuAbierta ===
-              "mujer"
-            }
             onClick={() =>
               setCategoriaMenuAbierta(
                 (actual) =>
@@ -794,17 +786,16 @@ function Tienda() {
               )
             }
           >
-            <span>Mujer</span>
+            Mujer
           </button>
 
-          {categoriaMenuAbierta ===
-            "mujer" && (
+          {categoriaMenuAbierta === "mujer" && (
             <div className="menu-subcategorias">
               <button
                 type="button"
                 className={
-                  subcategoriasSeleccionadas
-                    .mujer === "todos"
+                  subcategoriasSeleccionadas.mujer ===
+                  "todos"
                     ? "activo"
                     : ""
                 }
@@ -815,19 +806,16 @@ function Tienda() {
                   )
                 }
               >
-                Todo
+                Todos
               </button>
 
               {subcategoriasMujer.map(
                 (subcategoria) => (
                   <button
+                    key={subcategoria.value}
                     type="button"
-                    key={
-                      subcategoria.value
-                    }
                     className={
-                      subcategoriasSeleccionadas
-                        .mujer ===
+                      subcategoriasSeleccionadas.mujer ===
                       subcategoria.value
                         ? "activo"
                         : ""
@@ -846,51 +834,43 @@ function Tienda() {
             </div>
           )}
 
-          <hr className="menu-separador" />
+          <button
+            type="button"
+            onClick={() => irA("coleccion")}
+          >
+            Colección
+          </button>
 
           <button
             type="button"
-            onClick={() =>
-              irA("ofertas")
-            }
+            onClick={() => irA("ofertas")}
           >
             Ofertas
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              irA("nuevos")
-            }
+            onClick={() => irA("nuevos")}
           >
-            Nuevos ingresos
+            Nuevos
           </button>
-
-          <hr className="menu-separador" />
 
           <button
             type="button"
-            onClick={() =>
-              irA("visitanos")
-            }
+            onClick={() => irA("visitanos")}
           >
             Visítanos
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              irA("contacto")
-            }
+            onClick={() => irA("contacto")}
           >
             Contáctanos
           </button>
-        </nav>
+        </div>
       )}
 
-      {/* ========================================================
-          BUSCADOR
-      ======================================================== */}
       {panelAbierto === "buscador" && (
         <form
           className="buscador-panel"
@@ -898,14 +878,11 @@ function Tienda() {
         >
           <input
             type="search"
-            placeholder="¿Qué estás buscando?"
-            aria-label="Buscar productos"
             value={busqueda}
             onChange={(evento) =>
-              setBusqueda(
-                evento.target.value
-              )
+              setBusqueda(evento.target.value)
             }
+            placeholder="Buscar prendas..."
             autoFocus
           />
 
@@ -916,18 +893,22 @@ function Tienda() {
       )}
 
       <main className="contenido-tienda">
-
-        {/* ====================================================
+        {/* =====================================
             INICIO
-        ==================================================== */}
+            ===================================== */}
+
         {pagina === "inicio" && (
           <section
-            className="hero-content"
+            className="hero-content portada-lista"
             style={{
-              "--portada-inicio":
-                portadaActual?.imagen_url
-                  ? `url("${portadaActual.imagen_url}")`
-                  : "url('/gmish-bg.jpg')",
+              backgroundImage:
+                portadaTieneImagen
+                  ? `linear-gradient(
+                      rgba(18, 17, 15, 0.25),
+                      rgba(18, 17, 15, 0.48)
+                    ),
+                    url("${portadaActual.imagen_url}")`
+                  : undefined,
             }}
           >
             <div className="portada-texto">
@@ -946,12 +927,13 @@ function Tienda() {
 
               <p className="sub-heading">
                 {portadaActual?.descripcion ||
-                  "OUTFITS QUE SE ADAPTAN A TÍ"}
+                  "OUTFITS QUE SE ADAPTAN A TU ESTILO"}
               </p>
 
               <div className="buttons-wrapper">
                 <button
                   className="btn"
+                  type="button"
                   onClick={() => {
                     if (
                       portadaActual?.destino_boton
@@ -970,6 +952,7 @@ function Tienda() {
 
                 <button
                   className="btn"
+                  type="button"
                   onClick={() =>
                     irA("visitanos")
                   }
@@ -981,275 +964,221 @@ function Tienda() {
           </section>
         )}
 
-        {/* ====================================================
+        {/* =====================================
             COLECCIÓN
-        ==================================================== */}
-        {pagina === "coleccion" && (
-          <section className="seccion-interior pagina-coleccion">
-            <p className="seccion-etiqueta">
-              G’MISH COLLECTION
-            </p>
+            ===================================== */}
 
-            <h1>
-              Encuentra tu estilo
-            </h1>
+        {pagina === "coleccion" && (
+          <section className="pagina-coleccion">
+            <h1>COLECCIÓN</h1>
 
             <p className="intro-coleccion">
-              Explora nuestra selección para cada estilo.
+              Explora nuestras categorías y
+              encuentra tu estilo.
             </p>
 
             <div className="coleccion-categorias">
               <button
                 className="categoria-boton"
-                onClick={() =>
-                  irA("hombre")
-                }
+                type="button"
+                onClick={() => irA("hombre")}
               >
-                <img
-                  src={
-                    portadas.hombre?.imagen_url ||
-                    "/hombre.jpg"
-                  }
-                  alt="Colección de hombre"
-                  onError={(evento) => {
-                    evento.currentTarget.style.display =
-                      "none";
-                  }}
-                />
+                {portadas.hombre?.imagen_url && (
+                  <img
+                    src={portadas.hombre.imagen_url}
+                    alt="Colección Hombre"
+                  />
+                )}
 
-                <span className="categoria-overlay" />
+                <div className="categoria-overlay" />
 
-                <span className="categoria-contenido">
+                <div className="categoria-contenido">
                   <span className="categoria-subtitulo">
-                    DESCUBRE
+                    COLECCIÓN
                   </span>
 
                   <span className="categoria-nombre">
-                    Hombre
+                    HOMBRE
                   </span>
 
                   <span className="categoria-enlace">
-                    EXPLORAR ↗
+                    VER COLECCIÓN
                   </span>
-                </span>
+                </div>
               </button>
 
               <button
                 className="categoria-boton"
-                onClick={() =>
-                  irA("mujer")
-                }
+                type="button"
+                onClick={() => irA("mujer")}
               >
-                <img
-                  src={
-                    portadas.mujer?.imagen_url ||
-                    "/mujer.jpg"
-                  }
-                  alt="Colección de mujer"
-                  onError={(evento) => {
-                    evento.currentTarget.style.display =
-                      "none";
-                  }}
-                />
+                {portadas.mujer?.imagen_url && (
+                  <img
+                    src={portadas.mujer.imagen_url}
+                    alt="Colección Mujer"
+                  />
+                )}
 
-                <span className="categoria-overlay" />
+                <div className="categoria-overlay" />
 
-                <span className="categoria-contenido">
+                <div className="categoria-contenido">
                   <span className="categoria-subtitulo">
-                    DESCUBRE
+                    COLECCIÓN
                   </span>
 
                   <span className="categoria-nombre">
-                    Mujer
+                    MUJER
                   </span>
 
                   <span className="categoria-enlace">
-                    EXPLORAR ↗
+                    VER COLECCIÓN
                   </span>
-                </span>
+                </div>
               </button>
             </div>
           </section>
         )}
 
-        {/* ====================================================
-    HOMBRE / MUJER
-    ==================================================== */}
-{(pagina === "hombre" ||
-  pagina === "mujer") && (
-  <section className="seccion-interior">
-    <p className="seccion-etiqueta">
-      G’MISH COLLECTION
-    </p>
+        {/* =====================================
+            HOMBRE / MUJER
+            ===================================== */}
 
-    <h1>
-      {pagina === "hombre"
-        ? "Hombre"
-        : "Mujer"}
-    </h1>
-
-    <p className="intro-coleccion">
-      Encuentra las prendas para tu estilo.
-    </p>
-
-    {cargando ? (
-      <p>
-        Cargando prendas...
-      </p>
-    ) : errorProductos ? (
-      <p role="alert">
-        {errorProductos}
-      </p>
-    ) : (
-      <CategorySection
-        category={pagina}
-        products={productos}
-        selectedSubcategory={
-          subcategoriasSeleccionadas[pagina]
-        }
-        onSelectSubcategory={(
-          subcategoria
-        ) =>
-          seleccionarSubcategoria(
-            pagina,
-            subcategoria
-          )
-        }
-      />
-    )}
-  </section>
-)}
-
-        {/* ====================================================
-            OFERTAS
-        ==================================================== */}
-        {pagina === "ofertas" && (
+        {(pagina === "hombre" ||
+          pagina === "mujer") && (
           <section className="seccion-interior">
-            <p className="seccion-etiqueta">
-              OPORTUNIDADES GMISH
-            </p>
-
-            <h1>Ofertas</h1>
-
-            <p className="intro-coleccion">
-              Tus prendas favoritas a precios especiales.
-            </p>
-
-            {cargando ? (
-              <p>
-                Cargando ofertas...
-              </p>
-            ) : errorProductos ? (
-              <p role="alert">
-                {errorProductos}
-              </p>
-            ) : (
-              <FeaturedProducts
-                category="ofertas"
-                search=""
-                newOnly={false}
-                products={productos}
-                showSort={true}
-              />
-            )}
-          </section>
-        )}
-
-        {/* ====================================================
-            NUEVOS
-        ==================================================== */}
-        {pagina === "nuevos" && (
-          <section className="seccion-interior">
-            <p className="seccion-etiqueta">
-              Agregados por tí
-            </p>
-
-            <h1>Últimas novedades</h1>
-
-            <p className="intro-coleccion">
-              Descubre las últimas prendas que llegaron a GMISH
-            </p>
-
-            {cargando ? (
-              <p>
-                Cargando novedades...
-              </p>
-            ) : errorProductos ? (
-              <p role="alert">
-                {errorProductos}
-              </p>
-            ) : (
-              <FeaturedProducts
-                category="todos"
-                search=""
-                newOnly={false}
-                products={productos}
-                showSort={true}
-              />
-            )}
-          </section>
-        )}
-
-        {/* ====================================================
-            BUSCAR
-        ==================================================== */}
-        {pagina === "buscar" && (
-          <section className="seccion-interior">
-            <p className="seccion-etiqueta">
-              G’MISH COLLECTION
-            </p>
-
             <h1>
-              Resultados de búsqueda
+              {pagina === "hombre"
+                ? "HOMBRE"
+                : "MUJER"}
             </h1>
 
-            <p className="texto-busqueda">
-              {busqueda.trim()
-                ? `Buscaste: “${busqueda.trim()}”`
-                : "Explora nuestra colección."}
+            <p>
+              Explora nuestra selección.
             </p>
 
-            {cargando ? (
-              <p>
-                Buscando prendas...
-              </p>
-            ) : errorProductos ? (
-              <p role="alert">
-                {errorProductos}
-              </p>
-            ) : (
-              <FeaturedProducts
-                category="todos"
-                search={busqueda.trim()}
-                newOnly={false}
-                products={productos}
-                showSort={true}
-              />
-            )}
-
-            <button
-              className="boton-interior"
-              onClick={() =>
-                irA("coleccion")
-              }
-            >
-              VER CATEGORÍAS
-            </button>
+            <CategorySection
+  category={pagina}
+  products={productos}
+  selectedSubcategory={
+    subcategoriasSeleccionadas[pagina]
+  }
+  onSelectSubcategory={(subcategoria) =>
+    seleccionarSubcategoria(
+      pagina,
+      subcategoria
+    )
+  }
+/>
           </section>
         )}
 
-        {/* ====================================================
+        {/* =====================================
+            OFERTAS
+            ===================================== */}
+
+        {pagina === "ofertas" && (
+          <section className="seccion-interior">
+            <h1>OFERTAS</h1>
+
+            <p>
+              Descubre nuestras prendas en
+              oferta.
+            </p>
+
+            <FeaturedProducts
+              productos={productos.filter(
+                (producto) =>
+                  Number(
+                    producto.discount || 0
+                  ) > 0
+              )}
+              cargando={cargando}
+              error={errorProductos}
+            />
+          </section>
+        )}
+
+        {/* =====================================
+            NUEVOS
+            ===================================== */}
+
+        {pagina === "nuevos" && (
+          <section className="seccion-interior">
+            <h1>NUEVOS</h1>
+
+            <p>
+              Conoce las novedades de G’MISH.
+            </p>
+
+            <FeaturedProducts
+              productos={productos.filter(
+                (producto) =>
+                  producto.is_new === true
+              )}
+              cargando={cargando}
+              error={errorProductos}
+            />
+          </section>
+        )}
+
+        {/* =====================================
+            BUSCAR
+            ===================================== */}
+
+        {pagina === "buscar" && (
+          <section className="seccion-interior">
+            <h1>BUSCAR</h1>
+
+            <p className="texto-busqueda">
+              Resultados para:{" "}
+              <strong>
+                {busqueda || "todos los productos"}
+              </strong>
+            </p>
+
+            <FeaturedProducts
+              productos={productos.filter(
+                (producto) => {
+                  const termino =
+                    busqueda
+                      .trim()
+                      .toLocaleLowerCase("es");
+
+                  if (!termino) return true;
+
+                  const texto = [
+                    producto.name,
+                    producto.category,
+                    producto.subcategory,
+                    producto.description,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .toLocaleLowerCase("es");
+
+                  return texto.includes(termino);
+                }
+              )}
+              cargando={cargando}
+              error={errorProductos}
+            />
+          </section>
+        )}
+
+        {/* =====================================
             VISÍTANOS
-        ==================================================== */}
+            ===================================== */}
+
         {pagina === "visitanos" && (
           <StoreInfo
             onSelectCategory={irA}
           />
         )}
 
-        {/* ====================================================
+        {/* =====================================
             CONTACTO
-        ==================================================== */}
+            ===================================== */}
+
         {pagina === "contacto" && (
           <Contactanos
             onSelectCategory={irA}
@@ -1258,20 +1187,22 @@ function Tienda() {
       </main>
 
       <footer className="footer">
-        <span className="footer-logo">
+        <div className="footer-logo">
           G’MISH
-        </span>
+        </div>
 
         <p>
-          Tu estilo, tu personalidad
+          ESTILO QUE NOS UNE · OUTFITS QUE SE
+          ADAPTAN A TU ESTILO
         </p>
 
-        <span>
-          © 2026 G’MISH. Todos los derechos reservados.
-        </span>
+        <p>
+          © {new Date().getFullYear()} G’MISH.
+          Todos los derechos reservados.
+        </p>
       </footer>
 
-      <Cart />
+      {cartOpen && <Cart />}
     </div>
   );
 }
