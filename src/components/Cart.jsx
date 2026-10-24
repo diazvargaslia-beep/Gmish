@@ -25,12 +25,12 @@ function Cart() {
 
   const total = cart.reduce(
     (sum, product) =>
-      sum + Number(product.price) * product.quantity,
+      sum + Number(product.price) * Number(product.quantity),
     0
   );
 
   const totalItems = cart.reduce(
-    (sum, product) => sum + product.quantity,
+    (sum, product) => sum + Number(product.quantity),
     0
   );
 
@@ -39,33 +39,19 @@ function Cart() {
       ...actual,
       [campo]: valor,
     }));
+
+    if (errorPedido) {
+      setErrorPedido("");
+    }
   }
 
-  /*
-   * Agrupa las variantes que pertenecen al mismo producto.
-   *
-   * Resultado:
-   *
-   * • Polo Boxi Fit
-   *    S · Gris
-   *    S · Hueso
-   *    M · Hueso
-   *
-   * • Polo Oversize
-   *    S · Negro
-   */
   function crearLineas(productos) {
     const grupos = {};
 
     productos.forEach((product) => {
-      const nombre =
-        product.name || "Producto";
-
-      const talla =
-        product.selectedSize || "Sin talla";
-
-      const color =
-        product.selectedColor || "Sin color";
+      const nombre = product.name || "Producto";
+      const talla = product.selectedSize || "Sin talla";
+      const color = product.selectedColor || "Sin color";
 
       const cantidad =
         Number(product.quantity) > 1
@@ -83,23 +69,17 @@ function Cart() {
 
     const lineas = [];
 
-    Object.entries(grupos).forEach(
-      ([nombre, variantes]) => {
-        lineas.push(`• ${nombre}`);
-        lineas.push(...variantes);
-        lineas.push("");
-      }
-    );
+    Object.entries(grupos).forEach(([nombre, variantes]) => {
+      lineas.push(`• ${nombre}`);
+      lineas.push(...variantes);
+      lineas.push("");
+    });
 
     return lineas;
   }
 
-  /*
-   * Crea el mensaje final de WhatsApp.
-   */
   function crearMensaje(productos) {
-    const lineas =
-      crearLineas(productos);
+    const lineas = crearLineas(productos);
 
     return [
       "Hola, me interesa este pedido:",
@@ -113,48 +93,49 @@ function Cart() {
         ? `Referencia · ${cliente.referencia.trim()}`
         : "",
     ]
-      .filter(
-        (linea) => linea !== ""
-      )
-      .join("\n");
+      .join("\n")
+      .trim();
+  }
+
+  function continuarConPedido() {
+    setErrorPedido("");
+    setMostrarDatos(true);
+  }
+
+  function volverAlCarrito() {
+    if (guardandoPedido) return;
+
+    setErrorPedido("");
+    setMostrarDatos(false);
   }
 
   async function enviarPedido() {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || guardandoPedido) return;
 
     setErrorPedido("");
+
+    if (!cliente.nombre.trim()) {
+      setErrorPedido("Escribe tu nombre.");
+      return;
+    }
+
+    if (!cliente.direccion.trim()) {
+      setErrorPedido("Escribe tu dirección de entrega.");
+      return;
+    }
+
     setGuardandoPedido(true);
 
     try {
-      if (!cliente.nombre.trim()) {
-        setErrorPedido(
-          "Escribe tu nombre."
-        );
-
-        setGuardandoPedido(false);
-        return;
-      }
-
-      if (!cliente.direccion.trim()) {
-        setErrorPedido(
-          "Escribe tu dirección."
-        );
-
-        setGuardandoPedido(false);
-        return;
-      }
-
       /*
-       * WhatsApp principal y de respaldo.
+       * 1. OBTENER WHATSAPP
        */
       const {
         data: configuracion,
         error: errorConfiguracion,
       } = await supabase
         .from("store_settings")
-        .select(
-          "whatsapp_1, whatsapp_2"
-        )
+        .select("whatsapp_1, whatsapp_2")
         .limit(1)
         .maybeSingle();
 
@@ -165,23 +146,16 @@ function Cart() {
         );
 
         throw new Error(
-          errorConfiguracion.message ||
-            "No se pudo obtener la configuración de WhatsApp."
+          "No se pudo obtener la configuración de WhatsApp."
         );
       }
 
       const whatsapp1 =
-        configuracion?.whatsapp_1 ||
-        "";
+        configuracion?.whatsapp_1?.trim() || "";
 
       const whatsapp2 =
-        configuracion?.whatsapp_2 ||
-        "";
+        configuracion?.whatsapp_2?.trim() || "";
 
-      /*
-       * Primero utiliza whatsapp_1.
-       * Si está vacío, utiliza whatsapp_2.
-       */
       const whatsappTienda =
         whatsapp1 || whatsapp2;
 
@@ -192,11 +166,10 @@ function Cart() {
       }
 
       /*
-       * Guardamos el pedido.
+       * 2. CREAR PEDIDO
        *
-       * IMPORTANTE:
-       * NO enviamos order_number.
-       * La base de datos lo genera automáticamente.
+       * order_number NO se envía.
+       * Supabase lo genera automáticamente.
        */
       const {
         data: pedido,
@@ -204,33 +177,17 @@ function Cart() {
       } = await supabase
         .from("orders")
         .insert({
-          customer_name:
-            cliente.nombre.trim(),
-
-          customer_phone:
-            null,
-
-          status:
-            "Pendiente",
-
-          total:
-            total,
-
-          delivery_zone:
-            null,
-
-          delivery_address:
-            cliente.direccion.trim(),
-
-          notes:
-            null,
-
+          customer_name: cliente.nombre.trim(),
+          customer_phone: null,
+          status: "Pendiente",
+          total: total,
+          delivery_zone: null,
+          delivery_address: cliente.direccion.trim(),
+          notes: null,
           delivery_reference:
-            cliente.referencia.trim()
-              ? cliente.referencia.trim()
-              : null,
+            cliente.referencia.trim() || null,
         })
-        .select()
+        .select("id")
         .single();
 
       if (errorPedidoSupabase) {
@@ -241,49 +198,40 @@ function Cart() {
 
         throw new Error(
           errorPedidoSupabase.message ||
-            "No se pudo guardar el pedido."
+            "No se pudo registrar el pedido."
         );
       }
 
       /*
-       * Guardamos los productos
-       * asociados al pedido.
+       * 3. CREAR ITEMS
        */
-      const items = cart.map(
-        (product) => ({
-          order_id:
-            pedido.id,
+      const items = cart.map((product) => ({
+        order_id: pedido.id,
 
-          product_id:
-            product.productId ||
-            product.id,
+        product_id:
+          product.productId || product.id,
 
-          product_name:
-            product.name,
+        product_name:
+          product.name || "Producto",
 
-          quantity:
-            product.quantity,
+        quantity:
+          Number(product.quantity),
 
-          unit_price:
-            Number(product.price),
+        unit_price:
+          Number(product.price),
 
-          size:
-            product.selectedSize ||
-            null,
+        size:
+          product.selectedSize || null,
 
-          color:
-            product.selectedColor ||
-            null,
+        color:
+          product.selectedColor || null,
 
-          subtotal:
-            Number(product.price) *
-            product.quantity,
-        })
-      );
+        subtotal:
+          Number(product.price) *
+          Number(product.quantity),
+      }));
 
-      const {
-        error: errorItems,
-      } = await supabase
+      const { error: errorItems } = await supabase
         .from("order_items")
         .insert(items);
 
@@ -294,59 +242,60 @@ function Cart() {
         );
 
         /*
-         * Si los productos no se guardaron,
-         * eliminamos el pedido para no dejar
-         * un pedido incompleto.
+         * Intentamos eliminar el pedido incompleto.
          */
-        await supabase
+        const { error: errorEliminar } = await supabase
           .from("orders")
           .delete()
           .eq("id", pedido.id);
 
+        if (errorEliminar) {
+          console.error(
+            "No se pudo eliminar el pedido incompleto:",
+            errorEliminar
+          );
+        }
+
         throw new Error(
           errorItems.message ||
-            "No se pudieron guardar los productos."
+            "No se pudieron guardar los productos del pedido."
         );
       }
 
       /*
-       * Generamos el mensaje minimalista.
+       * 4. PREPARAR WHATSAPP
        */
-      const mensaje =
-        crearMensaje(cart);
+      const mensaje = crearMensaje(cart);
+
+      const numeroWhatsApp =
+        whatsappTienda.replace(/\D/g, "");
 
       const urlWhatsApp =
-        `https://wa.me/${whatsappTienda}` +
-        `?text=${encodeURIComponent(
-          mensaje
-        )}`;
+        `https://wa.me/${numeroWhatsApp}` +
+        `?text=${encodeURIComponent(mensaje)}`;
 
       /*
-       * Abrimos WhatsApp.
-       */
-      window.open(
-        urlWhatsApp,
-        "_blank",
-        "noopener,noreferrer"
-      );
-
-      /*
-       * Limpiamos el carrito.
+       * 5. ABRIR WHATSAPP
+       *
+       * location.href funciona mejor en móviles
+       * que depender exclusivamente de window.open.
        */
       clearCart();
-
-      setMostrarDatos(false);
 
       setCliente({
         nombre: "",
         direccion: "",
         referencia: "",
       });
+
+      setMostrarDatos(false);
+
+      window.location.href = urlWhatsApp;
     } catch (error) {
-      console.error(error);
+      console.error("Error registrando pedido:", error);
 
       setErrorPedido(
-        error.message ||
+        error?.message ||
           "No se pudo registrar el pedido. Inténtalo nuevamente."
       );
     } finally {
@@ -359,11 +308,9 @@ function Cart() {
       {cartOpen && (
         <div
           className="
-            fixed
-            inset-0
-            z-[250]
+            fixed inset-0 z-[250]
             bg-black/40
-            backdrop-blur-[3px]
+            backdrop-blur-[2px]
           "
           onClick={closeCart}
         >
@@ -371,78 +318,73 @@ function Cart() {
             role="dialog"
             aria-modal="true"
             aria-label="Tu carrito de compras"
+            onClick={(event) => event.stopPropagation()}
             className="
-              absolute
-              right-0
-              top-0
-              flex
-              h-full
-              w-full
-              max-w-[760px]
+              absolute right-0 top-0
+              flex h-full w-full
+              max-w-[680px]
               flex-col
               overflow-hidden
-              border-l
-              border-[#e6e0d5]
+              border-l border-[#e9e5dd]
               bg-[#fffefa]
-              text-[#292821]
-              shadow-[-20px_0_60px_rgba(0,0,0,0.10)]
+              text-[#24231f]
+              shadow-[-24px_0_70px_rgba(0,0,0,0.12)]
             "
-            onClick={(event) =>
-              event.stopPropagation()
-            }
           >
-            <div
+            {/* HEADER */}
+            <header
               className="
-                mx-2
-                flex
-                h-full
-                min-h-0
-                flex-1
-                flex-col
-                py-3
-                sm:mx-3
-                sm:py-4
-                lg:mx-4
-                lg:py-5
+                flex shrink-0
+                items-center justify-between
+                border-b border-[#ebe7df]
+                px-5 py-5
+                sm:px-8 sm:py-6
               "
             >
-              {/* HEADER */}
-              <header
-                className="
-                  flex
-                  shrink-0
-                  items-center
-                  justify-between
-                  border-b
-                  border-[#e9e3d9]
-                  px-1
-                  py-4
-                  sm:py-5
-                "
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <h2
+              <div>
+                <div className="flex items-center gap-3">
+                  {mostrarDatos && cart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={volverAlCarrito}
+                      disabled={guardandoPedido}
+                      aria-label="Volver al carrito"
                       className="
-                        text-[28px]
-                        font-medium
-                        tracking-[-0.04em]
-                        text-[#292821]
-                        sm:text-[30px]
+                        mr-1
+                        flex h-9 w-9
+                        items-center justify-center
+                        rounded-full
+                        border border-[#ded9d0]
+                        text-[18px]
+                        transition
+                        hover:border-[#24231f]
+                        disabled:opacity-40
                       "
                     >
-                      Tu carrito
-                    </h2>
+                      ←
+                    </button>
+                  )}
 
+                  <h2
+                    className="
+                      text-[26px]
+                      font-medium
+                      tracking-[-0.04em]
+                      sm:text-[30px]
+                    "
+                  >
+                    {mostrarDatos && cart.length > 0
+                      ? "Finalizar pedido"
+                      : "Tu carrito"}
+                  </h2>
+
+                  {!mostrarDatos && cart.length > 0 && (
                     <span
                       className="
-                        flex
-                        h-7
-                        min-w-7
-                        items-center
-                        justify-center
+                        flex h-7 min-w-7
+                        items-center justify-center
                         rounded-full
-                        bg-[#292821]
+                        bg-[#24231f]
                         px-2
                         text-[11px]
                         font-semibold
@@ -451,980 +393,882 @@ function Cart() {
                     >
                       {totalItems}
                     </span>
-                  </div>
+                  )}
+                </div>
 
+                {cart.length > 0 && (
                   <p
                     className="
-                      mt-1.5
+                      mt-2
                       text-[11px]
-                      tracking-[0.02em]
-                      text-[#8b8376]
+                      leading-5
+                      text-[#898276]
                     "
                   >
-                    {totalItems === 1
+                    {mostrarDatos
+                      ? "Completa tus datos para coordinar la entrega."
+                      : totalItems === 1
                       ? "1 producto seleccionado"
                       : `${totalItems} productos seleccionados`}
                   </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={closeCart}
+                aria-label="Cerrar carrito"
+                className="
+                  ml-5
+                  flex h-11 w-11
+                  shrink-0
+                  items-center justify-center
+                  rounded-full
+                  border border-[#ded9d0]
+                  bg-transparent
+                  text-[22px]
+                  font-light
+                  transition
+                  hover:border-[#24231f]
+                  hover:bg-[#24231f]
+                  hover:text-white
+                "
+              >
+                ×
+              </button>
+            </header>
+
+            {/* CARRITO VACÍO */}
+            {cart.length === 0 ? (
+              <div
+                className="
+                  flex flex-1
+                  flex-col
+                  items-center justify-center
+                  px-6 py-14
+                  text-center
+                "
+              >
+                <div
+                  className="
+                    flex h-20 w-20
+                    items-center justify-center
+                    rounded-full
+                    border border-[#e6e1d8]
+                    bg-[#f7f4ee]
+                    text-[27px]
+                  "
+                >
+                  ♡
                 </div>
+
+                <h3
+                  className="
+                    mt-7
+                    text-[22px]
+                    font-medium
+                    tracking-[-0.03em]
+                  "
+                >
+                  Tu carrito está vacío
+                </h3>
+
+                <p
+                  className="
+                    mt-3
+                    max-w-[300px]
+                    text-sm
+                    leading-6
+                    text-[#888175]
+                  "
+                >
+                  Explora nuestra colección y encuentra
+                  algo que vaya contigo.
+                </p>
 
                 <button
                   type="button"
                   onClick={closeCart}
-                  aria-label="Cerrar carrito"
                   className="
-                    ml-5
-                    flex
-                    h-11
-                    w-11
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-full
-                    border
-                    border-[#ded7cb]
-                    bg-[#fffefa]
-                    text-[22px]
-                    font-light
-                    text-[#49463f]
+                    mt-8
+                    bg-[#24231f]
+                    px-9 py-4
+                    text-[11px]
+                    font-semibold
+                    uppercase
+                    tracking-[0.15em]
+                    text-white
                     transition
-                    duration-200
-                    hover:border-[#292821]
-                    hover:bg-[#292821]
-                    hover:text-white
+                    hover:bg-[#3d3b35]
                   "
                 >
-                  ×
+                  Seguir comprando
                 </button>
-              </header>
-
-              {/* CARRITO VACÍO */}
-              {cart.length === 0 ? (
+              </div>
+            ) : !mostrarDatos ? (
+              /*
+               * =====================================
+               * PANTALLA 1 — PRODUCTOS
+               * =====================================
+               */
+              <>
                 <div
                   className="
-                    flex
-                    flex-1
-                    flex-col
-                    items-center
-                    justify-center
-                    py-12
-                    text-center
+                    min-h-0 flex-1
+                    overflow-y-auto
+                    px-5
+                    sm:px-8
                   "
                 >
-                  <div
-                    className="
-                      flex
-                      h-20
-                      w-20
-                      items-center
-                      justify-center
-                      rounded-full
-                      border
-                      border-[#e7e0d5]
-                      bg-[#f7f3ec]
-                      text-[28px]
-                      text-[#555047]
-                    "
-                  >
-                    ♡
-                  </div>
-
-                  <h3
-                    className="
-                      mt-7
-                      text-[22px]
-                      font-medium
-                      tracking-[-0.025em]
-                    "
-                  >
-                    Tu carrito está vacío
-                  </h3>
-
-                  <p
-                    className="
-                      mt-3
-                      max-w-[290px]
-                      text-sm
-                      leading-6
-                      text-[#827b70]
-                    "
-                  >
-                    Explora nuestra colección
-                    y encuentra algo que
-                    realmente vaya contigo.
-                  </p>
-
-                  <div
-                    className="
-                      mt-9
-                      flex
-                      w-full
-                      justify-center
-                    "
-                  >
-                    <button
-                      type="button"
-                      onClick={closeCart}
-                      className="
-                        rounded-full
-                        border
-                        border-[#292821]
-                        bg-[#292821]
-                        px-10
-                        py-4
-                        text-[11px]
-                        font-semibold
-                        uppercase
-                        tracking-[0.16em]
-                        text-white
-                        shadow-sm
-                        transition
-                        duration-200
-                        hover:bg-[#454238]
-                        hover:shadow-lg
-                      "
-                    >
-                      Seguir comprando
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* LISTA DE PRODUCTOS */}
-                  <div
-                    className="
-                      min-h-0
-                      flex-1
-                      overflow-y-auto
-                      px-1
-                      py-5
-                      sm:py-6
-                    "
-                  >
-                    <div className="space-y-8">
-                      {cart.map(
-                        (product, index) => (
-                          <article
-                            key={`
-                              ${
-                                product.productId ||
-                                product.id
-                              }-
-                              ${product.variantId}-
-                              ${product.selectedSize}-
-                              ${product.selectedColor}
-                            `}
+                  <div>
+                    {cart.map((product, index) => (
+                      <article
+                        key={`${product.productId || product.id}-${
+                          product.variantId || ""
+                        }-${product.selectedSize || ""}-${
+                          product.selectedColor || ""
+                        }-${index}`}
+                        className="
+                          border-b border-[#ebe7df]
+                          py-8
+                          sm:py-9
+                        "
+                      >
+                        <div
+                          className="
+                            flex
+                            items-start
+                            gap-5
+                            sm:gap-7
+                          "
+                        >
+                          {/* IMAGEN */}
+                          <div
                             className="
-                              border-b
-                              border-[#e9e3d9]
-                              pb-8
-                              last:border-b-0
+                              h-[132px] w-[100px]
+                              shrink-0
+                              overflow-hidden
+                              rounded-[18px]
+                              bg-[#f3efe8]
+                              sm:h-[150px]
+                              sm:w-[114px]
                             "
                           >
+                            {product.image ? (
+                              <img
+                                src={product.image}
+                                alt={product.name}
+                                className="
+                                  h-full w-full
+                                  object-cover
+                                "
+                              />
+                            ) : (
+                              <div
+                                className="
+                                  flex h-full w-full
+                                  items-center justify-center
+                                  text-[9px]
+                                  font-semibold
+                                  tracking-[0.2em]
+                                  text-[#999184]
+                                "
+                              >
+                                GMISH
+                              </div>
+                            )}
+                          </div>
+
+                          {/* INFORMACIÓN */}
+                          <div className="min-w-0 flex-1">
                             <div
                               className="
                                 flex
-                                gap-5
-                                sm:gap-6
+                                items-start
+                                justify-between
+                                gap-4
                               "
                             >
-                              {/* IMAGEN */}
-                              <div
-                                className="
-                                  h-[122px]
-                                  w-[91px]
-                                  shrink-0
-                                  overflow-hidden
-                                  rounded-2xl
-                                  bg-[#f4f0e8]
-                                  sm:h-[138px]
-                                  sm:w-[104px]
-                                "
-                              >
-                                {product.image ? (
-                                  <img
-                                    src={
-                                      product.image
-                                    }
-                                    alt={
-                                      product.name
-                                    }
-                                    className="
-                                      h-full
-                                      w-full
-                                      object-cover
-                                      transition
-                                      duration-500
-                                      hover:scale-[1.04]
-                                    "
-                                  />
-                                ) : (
-                                  <div
-                                    className="
-                                      flex
-                                      h-full
-                                      w-full
-                                      items-center
-                                      justify-center
-                                      text-[9px]
-                                      font-semibold
-                                      tracking-[0.18em]
-                                      text-[#918979]
-                                    "
-                                  >
-                                    GMISH
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* INFORMACIÓN */}
-                              <div
-                                className="
-                                  min-w-0
-                                  flex-1
-                                "
-                              >
-                                <div
+                              <div className="min-w-0">
+                                <h3
                                   className="
-                                    flex
-                                    items-start
-                                    justify-between
-                                    gap-3
-                                  "
-                                >
-                                  <div className="min-w-0">
-                                    <h3
-                                      className="
-                                        truncate
-                                        text-[15px]
-                                        font-semibold
-                                        leading-6
-                                        tracking-[-0.01em]
-                                      "
-                                    >
-                                      {product.name}
-                                    </h3>
-
-                                    <p
-                                      className="
-                                        mt-1
-                                        text-xs
-                                        text-[#8a8275]
-                                      "
-                                    >
-                                      S/{" "}
-                                      {Number(
-                                        product.price
-                                      ).toFixed(2)}{" "}
-                                      por unidad
-                                    </p>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      removeFromCart(
-                                        index
-                                      )
-                                    }
-                                    aria-label={`Eliminar ${product.name}`}
-                                    className="
-                                      shrink-0
-                                      text-[10px]
-                                      uppercase
-                                      tracking-[0.12em]
-                                      text-[#91897d]
-                                      underline
-                                      underline-offset-4
-                                      transition
-                                      hover:text-red-600
-                                    "
-                                  >
-                                    Eliminar
-                                  </button>
-                                </div>
-
-                                {/* TALLA Y COLOR */}
-                                <div
-                                  className="
-                                    mt-5
-                                    flex
-                                    flex-wrap
-                                    items-center
-                                    gap-x-5
-                                    gap-y-2
-                                  "
-                                >
-                                  <div
-                                    className="
-                                      flex
-                                      items-center
-                                      gap-2
-                                    "
-                                  >
-                                    <span
-                                      className="
-                                        text-[10px]
-                                        uppercase
-                                        tracking-[0.12em]
-                                        text-[#9a9285]
-                                      "
-                                    >
-                                      Talla
-                                    </span>
-
-                                    <span
-                                      className="
-                                        text-xs
-                                        font-medium
-                                        text-[#49463f]
-                                      "
-                                    >
-                                      {product.selectedSize ||
-                                        "No seleccionada"}
-                                    </span>
-                                  </div>
-
-                                  <div
-                                    className="
-                                      flex
-                                      items-center
-                                      gap-2
-                                    "
-                                  >
-                                    <span
-                                      className="
-                                        text-[10px]
-                                        uppercase
-                                        tracking-[0.12em]
-                                        text-[#9a9285]
-                                      "
-                                    >
-                                      Color
-                                    </span>
-
-                                    {product.selectedColorHex && (
-                                      <span
-                                        className="
-                                          h-3.5
-                                          w-3.5
-                                          rounded-full
-                                          border
-                                          border-black/10
-                                        "
-                                        style={{
-                                          backgroundColor:
-                                            product.selectedColorHex,
-                                        }}
-                                      />
-                                    )}
-
-                                    <span
-                                      className="
-                                        text-xs
-                                        font-medium
-                                        text-[#49463f]
-                                      "
-                                    >
-                                      {product.selectedColor ||
-                                        "No seleccionado"}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* SUBTOTAL */}
-                                <div
-                                  className="
-                                    mt-4
-                                    text-[17px]
+                                    text-[16px]
                                     font-semibold
-                                    tracking-[-0.02em]
+                                    leading-6
+                                    tracking-[-0.015em]
+                                  "
+                                >
+                                  {product.name}
+                                </h3>
+
+                                <p
+                                  className="
+                                    mt-2
+                                    text-[12px]
+                                    leading-5
+                                    text-[#918a7e]
                                   "
                                 >
                                   S/{" "}
-                                  {(
-                                    Number(
-                                      product.price
-                                    ) *
-                                    product.quantity
-                                  ).toFixed(2)}
-                                </div>
+                                  {Number(
+                                    product.price
+                                  ).toFixed(2)}{" "}
+                                  por unidad
+                                </p>
                               </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeFromCart(index)
+                                }
+                                aria-label={`Eliminar ${product.name}`}
+                                className="
+                                  shrink-0
+                                  text-[10px]
+                                  font-medium
+                                  uppercase
+                                  tracking-[0.11em]
+                                  text-[#8f887c]
+                                  transition
+                                  hover:text-red-600
+                                "
+                              >
+                                Eliminar
+                              </button>
                             </div>
 
-                            {/* CANTIDAD */}
+                            {/* VARIANTE */}
                             <div
                               className="
                                 mt-6
                                 flex
-                                items-center
-                                justify-between
+                                flex-col
+                                gap-3
                               "
                             >
                               <div
                                 className="
                                   flex
                                   items-center
-                                  overflow-hidden
-                                  rounded-full
-                                  border
-                                  border-[#ded7cb]
-                                  bg-[#fffefa]
+                                  gap-3
                                 "
                               >
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    decreaseQuantity(
-                                      index
-                                    )
-                                  }
-                                  aria-label="Disminuir cantidad"
+                                <span
                                   className="
-                                    flex
-                                    h-10
-                                    w-12
-                                    shrink-0
-                                    items-center
-                                    justify-center
-                                    px-2
-                                    text-[18px]
-                                    text-[#49463f]
-                                    transition
-                                    hover:bg-[#f2eee6]
+                                    w-[42px]
+                                    text-[9px]
+                                    font-semibold
+                                    uppercase
+                                    tracking-[0.14em]
+                                    text-[#9c9589]
                                   "
                                 >
-                                  −
-                                </button>
+                                  Talla
+                                </span>
 
                                 <span
                                   className="
-                                    flex
-                                    h-10
-                                    min-w-11
-                                    items-center
-                                    justify-center
-                                    border-x
-                                    border-[#ded7cb]
-                                    px-2
-                                    text-xs
-                                    font-semibold
+                                    text-[13px]
+                                    font-medium
                                   "
                                 >
-                                  {product.quantity}
+                                  {product.selectedSize ||
+                                    "No seleccionada"}
                                 </span>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    increaseQuantity(
-                                      index
-                                    )
-                                  }
-                                  aria-label="Aumentar cantidad"
-                                  className="
-                                    flex
-                                    h-10
-                                    w-12
-                                    shrink-0
-                                    items-center
-                                    justify-center
-                                    px-2
-                                    text-[18px]
-                                    text-[#49463f]
-                                    transition
-                                    hover:bg-[#f2eee6]
-                                    disabled:cursor-not-allowed
-                                    disabled:opacity-30
-                                  "
-                                >
-                                  +
-                                </button>
                               </div>
 
-                              <span
+                              <div
                                 className="
-                                  text-[10px]
-                                  uppercase
-                                  tracking-[0.12em]
-                                  text-[#a0988c]
+                                  flex
+                                  items-center
+                                  gap-3
                                 "
                               >
-                                Cantidad:{" "}
-                                {product.quantity}
-                              </span>
-                            </div>
-                          </article>
-                        )
-                      )}
-                    </div>
-                  </div>
+                                <span
+                                  className="
+                                    w-[42px]
+                                    text-[9px]
+                                    font-semibold
+                                    uppercase
+                                    tracking-[0.14em]
+                                    text-[#9c9589]
+                                  "
+                                >
+                                  Color
+                                </span>
 
-                  {/* RESUMEN */}
+                                {product.selectedColorHex && (
+                                  <span
+                                    className="
+                                      h-3.5 w-3.5
+                                      rounded-full
+                                      border border-black/10
+                                    "
+                                    style={{
+                                      backgroundColor:
+                                        product.selectedColorHex,
+                                    }}
+                                  />
+                                )}
+
+                                <span
+                                  className="
+                                    text-[13px]
+                                    font-medium
+                                  "
+                                >
+                                  {product.selectedColor ||
+                                    "No seleccionado"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CANTIDAD + SUBTOTAL */}
+                        <div
+                          className="
+                            mt-7
+                            flex
+                            items-center
+                            justify-between
+                            gap-5
+                          "
+                        >
+                          <div
+                            className="
+                              flex
+                              items-center
+                              overflow-hidden
+                              rounded-full
+                              border border-[#ddd7cd]
+                            "
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                decreaseQuantity(index)
+                              }
+                              aria-label="Disminuir cantidad"
+                              className="
+                                flex h-10 w-12
+                                items-center justify-center
+                                text-[18px]
+                                transition
+                                hover:bg-[#f3efe8]
+                              "
+                            >
+                              −
+                            </button>
+
+                            <span
+                              className="
+                                flex h-10 min-w-[44px]
+                                items-center justify-center
+                                border-x border-[#ddd7cd]
+                                px-2
+                                text-[12px]
+                                font-semibold
+                              "
+                            >
+                              {product.quantity}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                increaseQuantity(index)
+                              }
+                              aria-label="Aumentar cantidad"
+                              className="
+                                flex h-10 w-12
+                                items-center justify-center
+                                text-[18px]
+                                transition
+                                hover:bg-[#f3efe8]
+                              "
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <div className="text-right">
+                            <p
+                              className="
+                                text-[9px]
+                                font-semibold
+                                uppercase
+                                tracking-[0.13em]
+                                text-[#999184]
+                              "
+                            >
+                              Subtotal
+                            </p>
+
+                            <p
+                              className="
+                                mt-1.5
+                                text-[18px]
+                                font-semibold
+                                tracking-[-0.025em]
+                              "
+                            >
+                              S/{" "}
+                              {(
+                                Number(product.price) *
+                                Number(product.quantity)
+                              ).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                {/* FOOTER CARRITO */}
+                <div
+                  className="
+                    shrink-0
+                    border-t border-[#e9e5dd]
+                    bg-[#fffefa]
+                    px-5
+                    py-6
+                    sm:px-8
+                    sm:py-7
+                  "
+                >
                   <div
                     className="
-                      shrink-0
-                      border-t
-                      border-[#e9e3d9]
-                      bg-[#fffefa]
-                      px-1
-                      py-5
-                      sm:py-6
+                      flex
+                      items-end
+                      justify-between
+                      gap-6
                     "
                   >
-                    <div
+                    <div>
+                      <p
+                        className="
+                          text-[9px]
+                          font-semibold
+                          uppercase
+                          tracking-[0.16em]
+                          text-[#928b80]
+                        "
+                      >
+                        Total
+                      </p>
+
+                      <p
+                        className="
+                          mt-2
+                          text-[11px]
+                          text-[#928b80]
+                        "
+                      >
+                        {totalItems}{" "}
+                        {totalItems === 1
+                          ? "producto"
+                          : "productos"}
+                      </p>
+                    </div>
+
+                    <p
                       className="
-                        flex
-                        items-end
-                        justify-between
-                        gap-5
+                        text-[28px]
+                        font-semibold
+                        tracking-[-0.045em]
                       "
                     >
+                      S/ {total.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={continuarConPedido}
+                    className="
+                      mt-6
+                      flex min-h-[54px] w-full
+                      items-center justify-center
+                      bg-[#24231f]
+                      px-6 py-4
+                      text-[10px]
+                      font-semibold
+                      uppercase
+                      tracking-[0.15em]
+                      text-white
+                      transition
+                      hover:bg-[#3d3b35]
+                      active:scale-[0.995]
+                    "
+                  >
+                    Continuar con el pedido
+                    <span className="ml-3 text-[16px]">
+                      →
+                    </span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              /*
+               * =====================================
+               * PANTALLA 2 — DATOS
+               *
+               * AQUÍ YA NO APARECEN LOS PRODUCTOS.
+               * =====================================
+               */
+              <>
+                <div
+                  className="
+                    min-h-0 flex-1
+                    overflow-y-auto
+                    px-5
+                    py-7
+                    sm:px-8
+                    sm:py-9
+                  "
+                >
+                  <div className="mx-auto max-w-[560px]">
+                    <div
+                      className="
+                        border-b border-[#ebe7df]
+                        pb-7
+                      "
+                    >
+                      <p
+                        className="
+                          text-[9px]
+                          font-semibold
+                          uppercase
+                          tracking-[0.18em]
+                          text-[#918a7e]
+                        "
+                      >
+                        Datos de entrega
+                      </p>
+
+                      <h3
+                        className="
+                          mt-3
+                          text-[22px]
+                          font-medium
+                          tracking-[-0.03em]
+                        "
+                      >
+                        ¿Dónde entregamos tu pedido?
+                      </h3>
+
+                      <p
+                        className="
+                          mt-3
+                          max-w-[430px]
+                          text-[12px]
+                          leading-6
+                          text-[#8b8479]
+                        "
+                      >
+                        Completa la información para
+                        registrar el pedido. Luego
+                        continuarás por WhatsApp para
+                        coordinar la entrega y el pago.
+                      </p>
+                    </div>
+
+                    {/* FORMULARIO */}
+                    <div className="mt-9">
+                      {/* NOMBRE */}
                       <div>
-                        <p
+                        <label
+                          htmlFor="nombre-cliente"
                           className="
+                            mb-3
+                            block
                             text-[10px]
                             font-semibold
                             uppercase
-                            tracking-[0.16em]
-                            text-[#91897d]
+                            tracking-[0.14em]
+                            text-[#686258]
                           "
                         >
-                          Total del pedido
-                        </p>
+                          Nombre completo
+                        </label>
 
-                        <p
+                        <input
+                          id="nombre-cliente"
+                          type="text"
+                          autoComplete="name"
+                          value={cliente.nombre}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "nombre",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Escribe tu nombre"
+                          disabled={guardandoPedido}
                           className="
-                            mt-1.5
-                            text-xs
-                            text-[#8a8275]
+                            h-[56px] w-full
+                            rounded-[2px]
+                            border border-[#ddd8cf]
+                            bg-transparent
+                            px-5
+                            text-[14px]
+                            outline-none
+                            transition
+                            placeholder:text-[#aaa398]
+                            focus:border-[#24231f]
+                            disabled:opacity-50
                           "
-                        >
-                          {totalItems}{" "}
-                          {totalItems === 1
-                            ? "producto"
-                            : "productos"}
-                        </p>
+                        />
                       </div>
 
-                      <span
-                        className="
-                          text-[26px]
-                          font-semibold
-                          tracking-[-0.04em]
-                          text-[#292821]
-                          sm:text-[29px]
-                        "
-                      >
-                        S/ {total.toFixed(2)}
-                      </span>
-                    </div>
-
-                    {/* CONTINUAR */}
-                    {!mostrarDatos && (
-                      <>
-                        <p
+                      {/* DIRECCIÓN */}
+                      <div className="mt-8">
+                        <label
+                          htmlFor="direccion-cliente"
                           className="
-                            mt-4
-                            max-w-[470px]
-                            text-xs
-                            leading-5
-                            text-[#8a8275]
-                          "
-                        >
-                          Completa tus datos de
-                          entrega para registrar tu
-                          pedido y continuar por
-                          WhatsApp.
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setErrorPedido("");
-                            setMostrarDatos(true);
-                          }}
-                          className="
-                            mt-5
-                            flex
-                            min-h-12
-                            w-full
-                            items-center
-                            justify-center
-                            bg-[#292821]
-                            px-7
-                            py-4
-                            text-[11px]
+                            mb-3
+                            block
+                            text-[10px]
                             font-semibold
                             uppercase
                             tracking-[0.14em]
-                            text-white
-                            shadow-sm
-                            transition
-                            duration-200
-                            hover:bg-[#454238]
-                            hover:shadow-lg
-                            active:scale-[0.99]
+                            text-[#686258]
                           "
                         >
-                          Continuar con el pedido
-                        </button>
-                      </>
-                    )}
+                          Dirección de entrega
+                        </label>
 
-                    {/* DATOS */}
-                    {mostrarDatos && (
-                      <div className="mt-5">
+                        <input
+                          id="direccion-cliente"
+                          type="text"
+                          autoComplete="street-address"
+                          value={cliente.direccion}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "direccion",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Av., calle, jirón, número..."
+                          disabled={guardandoPedido}
+                          className="
+                            h-[56px] w-full
+                            rounded-[2px]
+                            border border-[#ddd8cf]
+                            bg-transparent
+                            px-5
+                            text-[14px]
+                            outline-none
+                            transition
+                            placeholder:text-[#aaa398]
+                            focus:border-[#24231f]
+                            disabled:opacity-50
+                          "
+                        />
+                      </div>
+
+                      {/* REFERENCIA */}
+                      <div className="mt-8">
                         <div
                           className="
-                            border-b
-                            border-[#e9e3d9]
-                            pb-5
+                            mb-3
+                            flex
+                            items-center
+                            justify-between
+                            gap-4
                           "
                         >
-                          <p
+                          <label
+                            htmlFor="referencia-cliente"
                             className="
                               text-[10px]
                               font-semibold
                               uppercase
-                              tracking-[0.16em]
-                              text-[#91897d]
+                              tracking-[0.14em]
+                              text-[#686258]
                             "
                           >
-                            Datos de entrega
-                          </p>
+                            Referencia
+                          </label>
 
-                          <p
+                          <span
                             className="
-                              mt-2
-                              text-xs
-                              leading-5
-                              text-[#8a8275]
+                              text-[10px]
+                              text-[#aaa398]
                             "
                           >
-                            Necesitamos estos datos
-                            para registrar correctamente
-                            tu pedido y coordinar la
-                            entrega.
-                          </p>
+                            Opcional
+                          </span>
                         </div>
 
-                        <div
-                          className="
-                            mt-5
-                            space-y-4
-                          "
-                        >
-                          {/* NOMBRE */}
-                          <div>
-                            <label
-                              htmlFor="nombre-cliente"
-                              className="
-                                mb-2
-                                block
-                                text-[10px]
-                                font-semibold
-                                uppercase
-                                tracking-[0.13em]
-                                text-[#6f685d]
-                              "
-                            >
-                              Nombre
-                            </label>
-
-                            <input
-                              id="nombre-cliente"
-                              type="text"
-                              value={
-                                cliente.nombre
-                              }
-                              onChange={(event) =>
-                                actualizarCliente(
-                                  "nombre",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Tu nombre completo"
-                              disabled={
-                                guardandoPedido
-                              }
-                              className="
-                                h-12
-                                w-full
-                                border
-                                border-[#ded7cb]
-                                bg-[#fffefa]
-                                px-4
-                                text-sm
-                                text-[#292821]
-                                outline-none
-                                transition
-                                placeholder:text-[#aaa296]
-                                focus:border-[#292821]
-                              "
-                            />
-                          </div>
-
-                          {/* DIRECCIÓN */}
-                          <div>
-                            <label
-                              htmlFor="direccion-cliente"
-                              className="
-                                mb-2
-                                block
-                                text-[10px]
-                                font-semibold
-                                uppercase
-                                tracking-[0.13em]
-                                text-[#6f685d]
-                              "
-                            >
-                              Dirección de entrega
-                            </label>
-
-                            <input
-                              id="direccion-cliente"
-                              type="text"
-                              value={
-                                cliente.direccion
-                              }
-                              onChange={(event) =>
-                                actualizarCliente(
-                                  "direccion",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Ej. Av. Circunvalación 123"
-                              disabled={
-                                guardandoPedido
-                              }
-                              className="
-                                h-12
-                                w-full
-                                border
-                                border-[#ded7cb]
-                                bg-[#fffefa]
-                                px-4
-                                text-sm
-                                text-[#292821]
-                                outline-none
-                                transition
-                                placeholder:text-[#aaa296]
-                                focus:border-[#292821]
-                              "
-                            />
-                          </div>
-
-                          {/* REFERENCIA */}
-                          <div>
-                            <label
-                              htmlFor="referencia-cliente"
-                              className="
-                                mb-2
-                                block
-                                text-[10px]
-                                font-semibold
-                                uppercase
-                                tracking-[0.13em]
-                                text-[#6f685d]
-                              "
-                            >
-                              Referencia
-                              <span
-                                className="
-                                  ml-1
-                                  normal-case
-                                  tracking-normal
-                                  text-[#aaa296]
-                                "
-                              >
-                                (opcional)
-                              </span>
-                            </label>
-
-                            <input
-                              id="referencia-cliente"
-                              type="text"
-                              value={
-                                cliente.referencia
-                              }
-                              onChange={(event) =>
-                                actualizarCliente(
-                                  "referencia",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Ej. Cerca del parque"
-                              disabled={
-                                guardandoPedido
-                              }
-                              className="
-                                h-12
-                                w-full
-                                border
-                                border-[#ded7cb]
-                                bg-[#fffefa]
-                                px-4
-                                text-sm
-                                text-[#292821]
-                                outline-none
-                                transition
-                                placeholder:text-[#aaa296]
-                                focus:border-[#292821]
-                              "
-                            />
-                          </div>
-                        </div>
-
-                        {/* CONFIRMAR */}
-                        <button
-                          type="button"
-                          onClick={enviarPedido}
-                          disabled={
-                            guardandoPedido
+                        <textarea
+                          id="referencia-cliente"
+                          value={cliente.referencia}
+                          onChange={(event) =>
+                            actualizarCliente(
+                              "referencia",
+                              event.target.value
+                            )
                           }
+                          placeholder="Ej. Frente al parque, puerta negra..."
+                          disabled={guardandoPedido}
+                          rows={3}
                           className="
-                            mt-5
-                            flex
-                            min-h-12
-                            w-full
-                            items-center
-                            justify-center
-                            bg-[#292821]
-                            px-7
-                            py-4
-                            text-[11px]
-                            font-semibold
-                            uppercase
-                            tracking-[0.13em]
-                            text-white
-                            shadow-sm
+                            min-h-[100px] w-full
+                            resize-none
+                            rounded-[2px]
+                            border border-[#ddd8cf]
+                            bg-transparent
+                            px-5 py-4
+                            text-[14px]
+                            leading-6
+                            outline-none
                             transition
-                            duration-200
-                            hover:bg-[#454238]
-                            hover:shadow-lg
-                            disabled:cursor-not-allowed
+                            placeholder:text-[#aaa398]
+                            focus:border-[#24231f]
                             disabled:opacity-50
                           "
-                        >
-                          {guardandoPedido ? (
-                            <>
-                              <span
-                                className="
-                                  mr-3
-                                  inline-block
-                                  h-4
-                                  w-4
-                                  animate-spin
-                                  rounded-full
-                                  border-2
-                                  border-white/30
-                                  border-t-white
-                                "
-                              />
+                        />
+                      </div>
 
-                              Registrando pedido...
-                            </>
-                          ) : (
-                            <>
-                              Confirmar y continuar por WhatsApp
-
-                              <span className="ml-3 text-base">
-                                →
-                              </span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* VOLVER */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMostrarDatos(false);
-                            setErrorPedido("");
-                          }}
-                          disabled={
-                            guardandoPedido
-                          }
+                      {/* ERROR */}
+                      {errorPedido && (
+                        <div
                           className="
-                            mt-3
-                            flex
-                            w-full
-                            items-center
-                            justify-center
-                            py-2
-                            text-[10px]
-                            font-medium
-                            uppercase
-                            tracking-[0.12em]
-                            text-[#8a8275]
-                            transition
-                            hover:text-[#292821]
-                            disabled:opacity-40
+                            mt-8
+                            border border-red-200
+                            bg-red-50
+                            px-5 py-4
+                            text-[12px]
+                            leading-5
+                            text-red-700
                           "
                         >
-                          ← Volver al carrito
-                        </button>
-                      </div>
-                    )}
-
-                    {/* ERROR */}
-                    {errorPedido && (
-                      <div
-                        className="
-                          mt-4
-                          border
-                          border-red-200
-                          bg-red-50
-                          px-4
-                          py-3
-                          text-xs
-                          leading-5
-                          text-red-700
-                        "
-                      >
-                        {errorPedido}
-                      </div>
-                    )}
-
-                    {/* VACIAR */}
-                    <div
-                      className="
-                        mt-5
-                        flex
-                        justify-center
-                        border-t
-                        border-[#eee9e0]
-                        pt-5
-                      "
-                    >
-                      <button
-                        type="button"
-                        onClick={clearCart}
-                        disabled={
-                          guardandoPedido
-                        }
-                        className="
-                          px-5
-                          py-2
-                          text-[10px]
-                          font-medium
-                          uppercase
-                          tracking-[0.14em]
-                          text-[#928a7e]
-                          underline
-                          underline-offset-4
-                          transition
-                          hover:text-red-600
-                          disabled:opacity-40
-                        "
-                      >
-                        Vaciar carrito
-                      </button>
+                          {errorPedido}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+
+                {/* TOTAL + CONFIRMAR */}
+                <div
+                  className="
+                    shrink-0
+                    border-t border-[#e9e5dd]
+                    bg-[#fffefa]
+                    px-5
+                    py-6
+                    sm:px-8
+                    sm:py-7
+                  "
+                >
+                  <div
+                    className="
+                      flex
+                      items-center
+                      justify-between
+                      gap-6
+                    "
+                  >
+                    <p
+                      className="
+                        text-[10px]
+                        font-semibold
+                        uppercase
+                        tracking-[0.16em]
+                        text-[#8d867b]
+                      "
+                    >
+                      Total del pedido
+                    </p>
+
+                    <p
+                      className="
+                        text-[28px]
+                        font-semibold
+                        tracking-[-0.045em]
+                      "
+                    >
+                      S/ {total.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={enviarPedido}
+                    disabled={guardandoPedido}
+                    className="
+                      mt-6
+                      flex min-h-[54px] w-full
+                      items-center justify-center
+                      bg-[#24231f]
+                      px-6 py-4
+                      text-[10px]
+                      font-semibold
+                      uppercase
+                      tracking-[0.14em]
+                      text-white
+                      transition
+                      hover:bg-[#3d3b35]
+                      disabled:cursor-not-allowed
+                      disabled:opacity-50
+                    "
+                  >
+                    {guardandoPedido ? (
+                      <>
+                        <span
+                          className="
+                            mr-3
+                            inline-block
+                            h-4 w-4
+                            animate-spin
+                            rounded-full
+                            border-2
+                            border-white/30
+                            border-t-white
+                          "
+                        />
+
+                        Registrando pedido...
+                      </>
+                    ) : (
+                      <>
+                        Continuar por WhatsApp
+                        <span className="ml-3 text-[16px]">
+                          →
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={volverAlCarrito}
+                    disabled={guardandoPedido}
+                    className="
+                      mt-4
+                      flex w-full
+                      items-center justify-center
+                      py-2
+                      text-[10px]
+                      font-medium
+                      uppercase
+                      tracking-[0.12em]
+                      text-[#8e877c]
+                      transition
+                      hover:text-[#24231f]
+                      disabled:opacity-40
+                    "
+                  >
+                    ← Volver al carrito
+                  </button>
+                </div>
+              </>
+            )}
           </aside>
         </div>
       )}
