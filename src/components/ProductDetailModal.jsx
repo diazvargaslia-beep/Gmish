@@ -23,7 +23,6 @@ function ProductDetailModal({ product, onClose }) {
   const closeTimeout = useRef(null);
   const closeHandlerRef = useRef(() => {});
 
-  // Reiniciar las opciones al cambiar de producto.
   useEffect(() => {
     setSelectedSize("");
     setSelectedColor("");
@@ -41,8 +40,6 @@ function ProductDetailModal({ product, onClose }) {
     return () => cancelAnimationFrame(frame);
   }, [product]);
 
-  // Registrar el detalle en el historial sin perder
-  // la página ni la posición del catálogo.
   useEffect(() => {
     if (!historyEntryAdded.current) {
       const currentState = window.history.state;
@@ -192,7 +189,8 @@ function ProductDetailModal({ product, onClose }) {
     const images = [];
 
     colors.forEach((color) => {
-      const firstImage = color.images?.[0] || color.oldImage || "";
+      const firstImage =
+        color.images?.[0] || color.oldImage || "";
 
       if (firstImage && !images.includes(firstImage)) {
         images.push(firstImage);
@@ -227,7 +225,9 @@ function ProductDetailModal({ product, onClose }) {
   }, [displayedImages, activeImage]);
 
   const displayedImage =
-    displayedImages[activeImage] || displayedImages[0] || "";
+    displayedImages[activeImage] ||
+    displayedImages[0] ||
+    "";
 
   const selectedVariant = useMemo(() => {
     if (!selectedSize || !selectedColor) return null;
@@ -302,7 +302,10 @@ function ProductDetailModal({ product, onClose }) {
 
     requestAnimationFrame(() => {
       setSelectionPulse(true);
-      setTimeout(() => setSelectionPulse(false), 350);
+
+      setTimeout(() => {
+        setSelectionPulse(false);
+      }, 350);
     });
   }
 
@@ -318,14 +321,19 @@ function ProductDetailModal({ product, onClose }) {
 
     setTimeout(() => {
       setActiveImage(index);
-      setTimeout(() => setImageChanging(false), 180);
+
+      setTimeout(() => {
+        setImageChanging(false);
+      }, 180);
     }, 120);
   }
 
   function nextImage() {
     if (displayedImages.length <= 1) return;
 
-    changeImage((activeImage + 1) % displayedImages.length);
+    changeImage(
+      (activeImage + 1) % displayedImages.length
+    );
   }
 
   function previousImage() {
@@ -345,7 +353,9 @@ function ProductDetailModal({ product, onClose }) {
     setActiveImage(0);
     setImageChanging(true);
 
-    setTimeout(() => setImageChanging(false), 300);
+    setTimeout(() => {
+      setImageChanging(false);
+    }, 300);
 
     triggerSelectionPulse();
 
@@ -372,7 +382,6 @@ function ProductDetailModal({ product, onClose }) {
 
     setSelectedSize(size);
     setQuantity(1);
-
     triggerSelectionPulse();
 
     if (
@@ -421,9 +430,7 @@ function ProductDetailModal({ product, onClose }) {
       return;
     }
 
-    differenceX > 0
-      ? nextImage()
-      : previousImage();
+    differenceX > 0 ? nextImage() : previousImage();
   }
 
   function increaseQuantity() {
@@ -466,8 +473,7 @@ function ProductDetailModal({ product, onClose }) {
 
   const isOffer =
     product.old_price &&
-    Number(product.old_price) >
-      Number(product.price);
+    Number(product.old_price) > Number(product.price);
 
   const discount = isOffer
     ? Math.round(
@@ -480,27 +486,25 @@ function ProductDetailModal({ product, onClose }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto px-4 py-5 transition-all duration-300 sm:p-5 md:p-6 ${
+      className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto p-3 transition-all duration-300 sm:p-5 md:p-6 ${
         modalVisible
           ? "bg-black/50"
           : "bg-black/0"
       }`}
       onMouseDown={(event) => {
-        if (
-          event.target === event.currentTarget
-        ) {
+        if (event.target === event.currentTarget) {
           handleClose();
         }
       }}
     >
       <div
-        className={`relative flex max-h-[94dvh] w-full max-w-[1250px] flex-col overflow-y-auto rounded-2xl border border-stone-200 bg-white text-stone-900 shadow-2xl transition-all duration-300 md:max-h-[92vh] md:flex-row md:items-stretch md:gap-8 lg:gap-12 ${
+        className={`relative flex max-h-[96dvh] w-full max-w-[1250px] flex-col overflow-y-auto rounded-2xl border border-stone-200 bg-white text-stone-900 shadow-2xl transition-all duration-300 md:max-h-[92vh] md:flex-row md:items-stretch md:gap-8 lg:gap-12 ${
           modalVisible
             ? "translate-y-0 scale-100 opacity-100"
             : "translate-y-8 scale-[0.97] opacity-0"
         }`}
       >
-        {/* BOTÓN CERRAR */}
+        {/* Cerrar */}
         <button
           type="button"
           onClick={handleClose}
@@ -510,10 +514,10 @@ function ProductDetailModal({ product, onClose }) {
           ✕
         </button>
 
-        {/* IMAGEN DEL PRODUCTO */}
-        <div className="w-full shrink-0 overflow-visible bg-stone-50 md:w-[44%] lg:w-[46%]">
+        {/* IMÁGENES */}
+        <div className="w-full shrink-0 overflow-hidden bg-stone-50 md:w-[44%] lg:w-[46%]">
           <div
-            className="relative h-[42vh] min-h-[280px] max-h-[460px] w-full overflow-hidden bg-stone-100 sm:h-[46vh] md:h-[72vh] md:max-h-none md:min-h-[500px]"
+            className="relative h-[360px] w-full overflow-hidden bg-stone-50 sm:h-[440px] md:h-[72vh] md:min-h-[500px]"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -524,7 +528,7 @@ function ProductDetailModal({ product, onClose }) {
                 src={displayedImage}
                 alt={product.name}
                 draggable="false"
-                className={`h-full w-full select-none object-contain transition-all duration-500 md:object-cover ${
+                className={`block h-full w-full select-none object-contain transition-all duration-500 ${
                   imageChanging
                     ? "translate-x-3 scale-[1.01] opacity-0"
                     : "translate-x-0 scale-100 opacity-100"
@@ -537,7 +541,7 @@ function ProductDetailModal({ product, onClose }) {
             )}
 
             {product.is_new && (
-              <span className="absolute left-5 top-16 rounded-full bg-stone-900 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white shadow sm:top-5">
+              <span className="absolute left-5 top-5 rounded-full bg-stone-900 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white shadow">
                 Nuevo
               </span>
             )}
@@ -569,25 +573,19 @@ function ProductDetailModal({ product, onClose }) {
                 </button>
 
                 <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-2 rounded-full bg-white/90 px-3 py-2 shadow">
-                  {displayedImages.map(
-                    (image, index) => (
-                      <button
-                        key={`${image}-${index}`}
-                        type="button"
-                        onClick={() =>
-                          changeImage(index)
-                        }
-                        aria-label={`Mostrar imagen ${
-                          index + 1
-                        }`}
-                        className={`h-1.5 rounded-full transition-all ${
-                          activeImage === index
-                            ? "w-7 bg-stone-900"
-                            : "w-1.5 bg-stone-300"
-                        }`}
-                      />
-                    )
-                  )}
+                  {displayedImages.map((image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => changeImage(index)}
+                      aria-label={`Mostrar imagen ${index + 1}`}
+                      className={`h-1.5 rounded-full transition-all ${
+                        activeImage === index
+                          ? "w-7 bg-stone-900"
+                          : "w-1.5 bg-stone-300"
+                      }`}
+                    />
+                  ))}
                 </div>
               </>
             )}
@@ -596,39 +594,33 @@ function ProductDetailModal({ product, onClose }) {
           {/* MINIATURAS */}
           {displayedImages.length > 1 && (
             <div className="flex gap-2.5 overflow-x-auto border-t border-stone-200 bg-white p-3.5 md:p-4">
-              {displayedImages.map(
-                (image, index) => (
-                  <button
-                    key={`${image}-${index}-thumb`}
-                    type="button"
-                    onClick={() =>
-                      changeImage(index)
-                    }
-                    aria-label={`Ver miniatura ${
-                      index + 1
-                    }`}
-                    className={`h-[76px] w-[58px] min-w-[58px] overflow-hidden rounded-lg border transition ${
-                      activeImage === index
-                        ? "border-stone-900 opacity-100"
-                        : "border-stone-200 opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt=""
-                      draggable="false"
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                )
-              )}
+              {displayedImages.map((image, index) => (
+                <button
+                  key={`${image}-${index}-thumb`}
+                  type="button"
+                  onClick={() => changeImage(index)}
+                  aria-label={`Ver miniatura ${index + 1}`}
+                  className={`h-[76px] w-[58px] min-w-[58px] overflow-hidden rounded-lg border transition ${
+                    activeImage === index
+                      ? "border-stone-900 opacity-100"
+                      : "border-stone-200 opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={image}
+                    alt=""
+                    draggable="false"
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
             </div>
           )}
         </div>
 
         {/* INFORMACIÓN DEL PRODUCTO */}
-        <div className="detalle-producto-info min-w-0 flex-1 overflow-visible px-6 pb-10 pt-12 sm:px-10 sm:pt-16 md:my-0 md:mr-0 md:ml-0 md:overflow-y-auto md:px-10 md:py-12 lg:px-14 lg:py-14">
-          <div className="detalle-producto-cabecera space-y-4">
+        <div className="min-w-0 flex-1 overflow-visible px-7 pb-9 pt-16 sm:px-10 sm:pb-10 sm:pt-16 md:overflow-y-auto md:px-10 md:py-12 lg:px-14 lg:py-14">
+          <div className="space-y-5">
             {product.subcategory && (
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-500">
                 {product.subcategory}
@@ -641,16 +633,12 @@ function ProductDetailModal({ product, onClose }) {
 
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-2xl font-bold tracking-tight text-stone-900">
-                S/{" "}
-                {Number(product.price).toFixed(2)}
+                S/ {Number(product.price).toFixed(2)}
               </span>
 
               {isOffer && (
                 <span className="text-sm text-stone-400 line-through">
-                  S/{" "}
-                  {Number(
-                    product.old_price
-                  ).toFixed(2)}
+                  S/ {Number(product.old_price).toFixed(2)}
                 </span>
               )}
             </div>
@@ -661,103 +649,91 @@ function ProductDetailModal({ product, onClose }) {
             </p>
           </div>
 
-          <div className="my-8 h-px bg-stone-200" />
+          <div className="my-7 h-px bg-stone-200" />
 
           {/* COLORES */}
           {colors.length > 0 && (
-            <section>
+            <section className="pb-2">
               <p className="text-sm font-semibold text-stone-800">
                 Elige tu color
               </p>
 
               <div className="mt-4 flex flex-wrap gap-4">
-                {availableColorsForSize.map(
-                  (color) => {
-                    const isSelected =
-                      selectedColor ===
-                      color.name;
+                {availableColorsForSize.map((color) => {
+                  const isSelected =
+                    selectedColor === color.name;
 
-                    return (
-                      <button
-                        key={color.name}
-                        type="button"
-                        onClick={() =>
-                          handleColorChange(
-                            color.name
-                          )
-                        }
-                        title={color.name}
-                        aria-label={`Color ${color.name}`}
-                        aria-pressed={
-                          isSelected
-                        }
-                        className={`relative flex h-12 w-12 items-center justify-center rounded-full border transition ${
-                          isSelected
-                            ? "scale-105 border-stone-900"
-                            : "border-stone-300 hover:border-stone-700"
-                        }`}
-                      >
-                        <span
-                          className="h-8 w-8 rounded-full border border-black/10"
-                          style={{
-                            backgroundColor:
-                              color.hex,
-                          }}
-                        />
+                  return (
+                    <button
+                      key={color.name}
+                      type="button"
+                      onClick={() =>
+                        handleColorChange(color.name)
+                      }
+                      title={color.name}
+                      aria-label={`Color ${color.name}`}
+                      aria-pressed={isSelected}
+                      className={`relative flex h-12 w-12 items-center justify-center rounded-full border transition ${
+                        isSelected
+                          ? "scale-105 border-stone-900"
+                          : "border-stone-300 hover:border-stone-700"
+                      }`}
+                    >
+                      <span
+                        className="h-8 w-8 rounded-full border border-black/10"
+                        style={{
+                          backgroundColor: color.hex,
+                        }}
+                      />
 
-                        {isSelected && (
-                          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white">
-                            ✓
-                          </span>
-                        )}
-                      </button>
-                    );
-                  }
-                )}
+                      {isSelected && (
+                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           )}
 
           {/* TALLAS */}
           {sizes.length > 0 && (
-            <section className="mt-8 border-t border-stone-100 pt-8">
+            <section className="border-t border-stone-100 pt-7">
               <p className="text-sm font-semibold text-stone-800">
                 Elige tu talla
               </p>
 
               <div className="mt-4 flex flex-wrap gap-3">
-                {availableSizesForColor.map(
-                  (size) => {
-                    const isSelected =
-                      selectedSize === size;
+                {availableSizesForColor.map((size) => {
+                  const isSelected =
+                    selectedSize === size;
 
-                    return (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() =>
-                          handleSizeChange(size)
-                        }
-                        aria-pressed={
-                          isSelected
-                        }
-                        className={`min-w-[64px] rounded-lg border px-5 py-3.5 text-sm font-bold transition ${
-                          isSelected
-                            ? "border-stone-900 bg-stone-900 text-white"
-                            : "border-stone-200 bg-white text-stone-700 hover:border-stone-500"
-                        }`}
-                      >
-                        {size}
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() =>
+                        handleSizeChange(size)
+                      }
+                      aria-pressed={isSelected}
+                      className={`min-w-[64px] rounded-lg border px-5 py-3.5 text-sm font-bold transition ${
+                        isSelected
+                          ? "border-stone-900 bg-stone-900 text-white"
+                          : "border-stone-200 bg-white text-stone-700 hover:border-stone-500"
+                      }`}
+                    >
+                      {size}
 
-                        {isSelected && (
-                          <span className="ml-1">
-                            ✓
-                          </span>
-                        )}
-                      </button>
-                    );
-                  }
-                )}
+                      {isSelected && (
+                        <span className="ml-1">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -765,7 +741,7 @@ function ProductDetailModal({ product, onClose }) {
           {/* DISPONIBILIDAD */}
           {selectedVariant && (
             <div
-              className={`mt-8 flex flex-wrap items-center justify-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 transition ${
+              className={`mt-7 flex flex-wrap items-center justify-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 transition ${
                 selectionPulse
                   ? "scale-[1.01]"
                   : ""
@@ -785,7 +761,7 @@ function ProductDetailModal({ product, onClose }) {
           )}
 
           {/* CANTIDAD */}
-          <section className="mt-8 border-t border-stone-100 pt-8">
+          <section className="border-t border-stone-100 pt-7 mt-7">
             <p className="text-sm font-semibold text-stone-800">
               Cantidad
             </p>
@@ -825,7 +801,7 @@ function ProductDetailModal({ product, onClose }) {
             type="button"
             onClick={handleAddToCart}
             disabled={!canAddToCart}
-            className={`mt-8 w-full rounded-xl px-5 py-4 text-sm font-bold tracking-wide transition ${
+            className={`mt-7 w-full rounded-xl px-5 py-4 text-sm font-bold tracking-wide transition ${
               added
                 ? "bg-stone-700 text-white"
                 : canAddToCart
@@ -835,15 +811,14 @@ function ProductDetailModal({ product, onClose }) {
           >
             {added
               ? "✓ Agregado al carrito"
-              : !selectedSize ||
-                  !selectedColor
+              : !selectedSize || !selectedColor
                 ? "Elige talla y color"
                 : remainingStock <= 0
                   ? "Stock agotado"
                   : "Agregar al carrito"}
           </button>
 
-          <p className="mt-3 pb-2 text-center text-xs leading-6 text-stone-400">
+          <p className="pb-3 pt-2 text-center text-xs leading-6 text-stone-400">
             Selecciona tu talla y color antes de añadir al carrito.
           </p>
         </div>
