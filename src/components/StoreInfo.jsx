@@ -148,7 +148,7 @@ export default function StoreInfo() {
           flexDirection: "column",
           alignItems: "center",
           boxSizing: "border-box",
-          padding: "70px 2.5vw 110px",
+          padding: "35px 2.5vw 110px",
         }}
       >
         {/* =========================
@@ -157,19 +157,19 @@ export default function StoreInfo() {
 
         <header
           style={{
-            width: "100%",
+            width: "95%",
             textAlign: "center",
           }}
         >
           <p
             style={{
               margin: 0,
-              fontSize: "10px",
-              letterSpacing: "0.4em",
+              fontSize: "15px",
+              letterSpacing: "0.23em",
               color: "rgba(0,0,0,.4)",
             }}
           >
-            GMISH
+            Tu lugar favorito
           </p>
 
           <h1
@@ -178,10 +178,10 @@ export default function StoreInfo() {
               fontFamily: "Georgia, serif",
               fontSize: "clamp(34px, 5vw, 42px)",
               fontWeight: 400,
-              lineHeight: 1.1,
+              lineHeight: 0.9,
             }}
           >
-            VISÍTANOS
+            BIENVENIDO
           </h1>
 
           <p
@@ -247,6 +247,7 @@ export default function StoreInfo() {
         ========================== */}
 
         <div
+          className="gmish-store-image"
           style={{
             width: "92%",
             height: "1190px",
@@ -524,7 +525,7 @@ export default function StoreInfo() {
                 textAlign: "center",
               }}
             >
-              Consulta nuestra ubicación y encuentra la mejor ruta para llegar a GMISH.
+              Consulta nuestra ubicación y encuentra la mejor ruta para llegar
             </p>
           </div>
 
@@ -533,6 +534,7 @@ export default function StoreInfo() {
           ========================== */}
 
           <div
+            className="gmish-map"
             style={{
               width: "88%",
               maxWidth: "988px",
@@ -610,10 +612,11 @@ export default function StoreInfo() {
 
       <style>
         {`
+          /* CELULAR */
           @media (max-width: 767px) {
-            main div[style*="height: 1190px"] {
+            .gmish-store-image {
               width: 94% !important;
-              height: 784px !important;
+              height: clamp(520px, 150vw, 620px) !important;
             }
 
             main section > div[style*="grid-template-columns"] {
@@ -629,21 +632,22 @@ export default function StoreInfo() {
               border-top: 1px solid rgba(0,0,0,.1);
             }
 
-            main div[style*="max-width: 988px"] {
+            .gmish-map {
               width: 100% !important;
             }
 
-            main div[style*="max-width: 988px"] iframe {
+            .gmish-map iframe {
               height: 330px !important;
             }
           }
 
+          /* TABLET */
           @media (min-width: 768px) and (max-width: 1024px) {
-            main div[style*="height: 1190px"] {
+            .gmish-store-image {
               height: 980px !important;
             }
 
-            main div[style*="max-width: 988px"] {
+            .gmish-map {
               width: 94% !important;
             }
           }
