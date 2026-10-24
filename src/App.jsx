@@ -19,10 +19,11 @@ function Tienda() {
   const [cargando, setCargando] = useState(true);
   const [errorProductos, setErrorProductos] = useState("");
 
+  // Portadas administrables desde Supabase.
   const [portadas, setPortadas] = useState({
-    principal: "",
-    hombre: "",
-    mujer: "",
+    inicio: null,
+    hombre: null,
+    mujer: null,
   });
 
   const [subcategoriasSeleccionadas, setSubcategoriasSeleccionadas] =
@@ -124,51 +125,56 @@ function Tienda() {
     };
   }, []);
 
-  // Cargar las portadas guardadas en Supabase.
+  // ============================================================
+  // CARGAR PORTADAS DESDE store_covers
+  // ============================================================
   useEffect(() => {
     let cancelado = false;
 
     async function cargarPortadas() {
       const { data, error } = await supabase
-        .from("store_settings")
-        .select("setting_key, setting_value")
-        .in("setting_key", [
-          "portada_principal",
-          "portada_hombre",
-          "portada_mujer",
-        ]);
+        .from("store_covers")
+        .select(`
+          tipo,
+          imagen_url,
+          titulo,
+          descripcion,
+          texto_boton,
+          destino_boton,
+          activo
+        `)
+        .in("tipo", ["inicio", "hombre", "mujer"]);
 
       if (cancelado) return;
 
       if (error) {
-        console.error("Error al cargar portadas:", error);
+        console.error(
+          "Error al cargar las portadas:",
+          error
+        );
         return;
       }
 
       const portadasGuardadas = {
-        principal: "",
-        hombre: "",
-        mujer: "",
+        inicio: null,
+        hombre: null,
+        mujer: null,
       };
 
-      (data || []).forEach((fila) => {
-        if (fila.setting_key === "portada_principal") {
-          portadasGuardadas.principal =
-            fila.setting_value || "";
-        }
-
-        if (fila.setting_key === "portada_hombre") {
-          portadasGuardadas.hombre =
-            fila.setting_value || "";
-        }
-
-        if (fila.setting_key === "portada_mujer") {
-          portadasGuardadas.mujer =
-            fila.setting_value || "";
+      (data || []).forEach((portada) => {
+        if (
+          portada.tipo === "inicio" ||
+          portada.tipo === "hombre" ||
+          portada.tipo === "mujer"
+        ) {
+          portadasGuardadas[portada.tipo] = portada;
         }
       });
 
-      console.log("Portadas cargadas:", portadasGuardadas);
+      console.log(
+        "Portadas cargadas:",
+        portadasGuardadas
+      );
 
       setPortadas(portadasGuardadas);
     }
@@ -182,7 +188,9 @@ function Tienda() {
     };
   }, [esAdmin]);
 
-  // Cargar productos activos desde Supabase.
+  // ============================================================
+  // CARGAR PRODUCTOS ACTIVOS DESDE SUPABASE
+  // ============================================================
   useEffect(() => {
     let cancelado = false;
 
@@ -214,7 +222,10 @@ function Tienda() {
       if (cancelado) return;
 
       if (error) {
-        console.error("Error al cargar productos:", error);
+        console.error(
+          "Error al cargar productos:",
+          error
+        );
 
         setErrorProductos(
           "No pudimos cargar las prendas. Inténtalo de nuevo más tarde."
@@ -456,6 +467,112 @@ function Tienda() {
     });
   }
 
+  // ============================================================
+  // BOTÓN DE UNA PORTADA
+  // ============================================================
+  function ejecutarDestinoPortada(destino) {
+    const valor = String(
+      destino || ""
+    ).trim();
+
+    if (!valor) return;
+
+    const destinoNormalizado = valor
+      .toLowerCase()
+      .replace(/\/+$/, "");
+
+    // Permite usar tanto nombres internos como rutas.
+    if (
+      destinoNormalizado === "inicio" ||
+      destinoNormalizado === "/"
+    ) {
+      irA("inicio");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "coleccion" ||
+      destinoNormalizado === "/coleccion"
+    ) {
+      irA("coleccion");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "hombre" ||
+      destinoNormalizado === "/hombre"
+    ) {
+      irA("hombre");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "mujer" ||
+      destinoNormalizado === "/mujer"
+    ) {
+      irA("mujer");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "ofertas" ||
+      destinoNormalizado === "/ofertas"
+    ) {
+      irA("ofertas");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "nuevos" ||
+      destinoNormalizado === "/nuevos"
+    ) {
+      irA("nuevos");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "visitanos" ||
+      destinoNormalizado === "/visitanos"
+    ) {
+      irA("visitanos");
+      return;
+    }
+
+    if (
+      destinoNormalizado === "contacto" ||
+      destinoNormalizado === "/contacto"
+    ) {
+      irA("contacto");
+      return;
+    }
+
+    // Si se coloca una URL externa en el administrador.
+    if (
+      /^https?:\/\//i.test(valor)
+    ) {
+      window.location.href = valor;
+    }
+  }
+
+  // ============================================================
+  // OBTENER LA PORTADA CORRESPONDIENTE A LA PÁGINA
+  // ============================================================
+  function obtenerPortadaActual() {
+    if (pagina === "inicio") {
+      return portadas.inicio;
+    }
+
+    if (pagina === "hombre") {
+      return portadas.hombre;
+    }
+
+    if (pagina === "mujer") {
+      return portadas.mujer;
+    }
+
+    return null;
+  }
+
   // ADMIN
   if (esAdmin) {
     return <Admin />;
@@ -466,6 +583,9 @@ function Tienda() {
 
   const subcategoriasMujer =
     obtenerSubcategorias("mujer");
+
+  const portadaActual =
+    obtenerPortadaActual();
 
   return (
     <div className="hero">
@@ -781,13 +901,17 @@ function Tienda() {
       )}
 
       <main className="contenido-tienda">
+
+        {/* ====================================================
+            INICIO
+        ==================================================== */}
         {pagina === "inicio" && (
           <section
             className="hero-content"
             style={{
               "--portada-inicio":
-                portadas.principal
-                  ? `url("${portadas.principal}")`
+                portadaActual?.imagen_url
+                  ? `url("${portadaActual.imagen_url}")`
                   : "url('/gmish-bg.jpg')",
             }}
           >
@@ -801,21 +925,32 @@ function Tienda() {
               </h1>
 
               <h2 className="main-heading">
-                ESTILO QUE NOS UNE
+                {portadaActual?.titulo ||
+                  "ESTILO QUE NOS UNE"}
               </h2>
 
               <p className="sub-heading">
-                OUTFITS QUE SE ADAPTAN A TÍ
+                {portadaActual?.descripcion ||
+                  "OUTFITS QUE SE ADAPTAN A TÍ"}
               </p>
 
               <div className="buttons-wrapper">
                 <button
                   className="btn"
-                  onClick={() =>
-                    irA("coleccion")
-                  }
+                  onClick={() => {
+                    if (
+                      portadaActual?.destino_boton
+                    ) {
+                      ejecutarDestinoPortada(
+                        portadaActual.destino_boton
+                      );
+                    } else {
+                      irA("coleccion");
+                    }
+                  }}
                 >
-                  VER COLECCIÓN
+                  {portadaActual?.texto_boton ||
+                    "VER COLECCIÓN"}
                 </button>
 
                 <button
@@ -831,6 +966,9 @@ function Tienda() {
           </section>
         )}
 
+        {/* ====================================================
+            COLECCIÓN
+        ==================================================== */}
         {pagina === "coleccion" && (
           <section className="seccion-interior pagina-coleccion">
             <p className="seccion-etiqueta">
@@ -854,7 +992,7 @@ function Tienda() {
               >
                 <img
                   src={
-                    portadas.hombre ||
+                    portadas.hombre?.imagen_url ||
                     "/hombre.jpg"
                   }
                   alt="Colección de hombre"
@@ -889,7 +1027,7 @@ function Tienda() {
               >
                 <img
                   src={
-                    portadas.mujer ||
+                    portadas.mujer?.imagen_url ||
                     "/mujer.jpg"
                   }
                   alt="Colección de mujer"
@@ -919,13 +1057,12 @@ function Tienda() {
           </section>
         )}
 
+        {/* ====================================================
+            HOMBRE / MUJER
+        ==================================================== */}
         {(pagina === "hombre" ||
           pagina === "mujer") && (
           <section className="seccion-interior">
-            <p className="seccion-etiqueta">
-              G’MISH COLLECTION
-            </p>
-
             <h1>
               {pagina === "hombre"
                 ? "Hombre"
@@ -936,36 +1073,29 @@ function Tienda() {
               Encuentra las prendas para tu estilo.
             </p>
 
-            {cargando ? (
-              <p>
-                Cargando prendas...
-              </p>
-            ) : errorProductos ? (
-              <p role="alert">
-                {errorProductos}
-              </p>
-            ) : (
-              <CategorySection
-                category={pagina}
-                products={productos}
-                selectedSubcategory={
-                  subcategoriasSeleccionadas[
-                    pagina
-                  ]
-                }
-                onSelectSubcategory={(
-                  subcategoria
-                ) =>
-                  seleccionarSubcategoria(
-                    pagina,
-                    subcategoria
-                  )
-                }
-              />
-            )}
+            <p
+              style={{
+                fontSize: "1.5rem",
+                margin: "2rem 0 1rem",
+              }}
+              aria-label="Buscar"
+            >
+              ⌕
+            </p>
+
+            <h2>
+              Próximamente
+            </h2>
+
+            <p className="intro-coleccion">
+              Estamos preparando nuevas prendas para esta colección.
+            </p>
           </section>
         )}
 
+        {/* ====================================================
+            OFERTAS
+        ==================================================== */}
         {pagina === "ofertas" && (
           <section className="seccion-interior">
             <p className="seccion-etiqueta">
@@ -998,6 +1128,9 @@ function Tienda() {
           </section>
         )}
 
+        {/* ====================================================
+            NUEVOS
+        ==================================================== */}
         {pagina === "nuevos" && (
           <section className="seccion-interior">
             <p className="seccion-etiqueta">
@@ -1030,6 +1163,9 @@ function Tienda() {
           </section>
         )}
 
+        {/* ====================================================
+            BUSCAR
+        ==================================================== */}
         {pagina === "buscar" && (
           <section className="seccion-interior">
             <p className="seccion-etiqueta">
@@ -1075,17 +1211,23 @@ function Tienda() {
           </section>
         )}
 
+        {/* ====================================================
+            VISÍTANOS
+        ==================================================== */}
         {pagina === "visitanos" && (
           <StoreInfo
             onSelectCategory={irA}
           />
         )}
 
+        {/* ====================================================
+            CONTACTO
+        ==================================================== */}
         {pagina === "contacto" && (
-  <Contactanos
-    onSelectCategory={irA}
-  />
-)}
+          <Contactanos
+            onSelectCategory={irA}
+          />
+        )}
       </main>
 
       <footer className="footer">
