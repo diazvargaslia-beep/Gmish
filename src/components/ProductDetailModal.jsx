@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useCart } from "../CartContext";
 
@@ -24,7 +23,6 @@ function ProductDetailModal({ product, onClose }) {
   const closeTimeout = useRef(null);
   const closeHandlerRef = useRef(() => {});
 
-  // Reiniciar las opciones al cambiar de producto.
   useEffect(() => {
     setSelectedSize("");
     setSelectedColor("");
@@ -42,8 +40,6 @@ function ProductDetailModal({ product, onClose }) {
     return () => cancelAnimationFrame(frame);
   }, [product]);
 
-  // Registrar el detalle en el historial sin perder
-  // la página ni la posición del catálogo.
   useEffect(() => {
     if (!historyEntryAdded.current) {
       const currentState = window.history.state;
@@ -87,8 +83,6 @@ function ProductDetailModal({ product, onClose }) {
     }
 
     function handlePopState() {
-      // Atrás cierra el detalle. App.jsx se encarga
-      // de recuperar la página y el scroll anteriores.
       closeModal();
     }
 
@@ -102,7 +96,6 @@ function ProductDetailModal({ product, onClose }) {
       if (closingRef.current) return;
 
       if (window.history.state?.gmishProductModal) {
-        // La X utiliza el historial para cerrar el detalle.
         window.history.back();
       } else {
         closeModal();
@@ -469,7 +462,7 @@ function ProductDetailModal({ product, onClose }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto p-2 transition-all duration-300 sm:p-5 md:p-6 ${
+      className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto p-3 transition-all duration-300 sm:p-5 md:p-6 ${
         modalVisible ? "bg-black/50" : "bg-black/0"
       }`}
       onMouseDown={(event) => {
@@ -597,8 +590,8 @@ function ProductDetailModal({ product, onClose }) {
         </div>
 
         {/* Información del producto */}
-        <div className="detalle-producto-info min-w-0 flex-1 overflow-visible px-6 pb-8 pt-16 sm:px-10 sm:pt-16 md:my-0 md:mr-0 md:ml-0 md:overflow-y-auto md:px-10 md:py-12 lg:px-14 lg:py-14">
-          <div className="detalle-producto-cabecera">
+        <div className="detalle-producto-info min-w-0 flex-1 overflow-visible px-8 pb-10 pt-16 sm:px-10 sm:pt-16 md:my-0 md:mr-0 md:ml-0 md:overflow-y-auto md:px-10 md:py-12 lg:px-14 lg:py-14">
+          <div className="detalle-producto-cabecera space-y-3">
             {product.subcategory && (
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-500">
                 {product.subcategory}
@@ -626,11 +619,11 @@ function ProductDetailModal({ product, onClose }) {
             </p>
           </div>
 
-          <div className="h-px bg-stone-200" />
+          <div className="my-7 h-px bg-stone-200 sm:my-8" />
 
           {/* Colores */}
           {colors.length > 0 && (
-            <section>
+            <section className="space-y-1">
               <p className="text-sm font-semibold text-stone-800">
                 Elige tu color
               </p>
@@ -672,7 +665,7 @@ function ProductDetailModal({ product, onClose }) {
 
           {/* Tallas */}
           {sizes.length > 0 && (
-            <section className="border-t border-stone-100 pt-6">
+            <section className="mt-7 border-t border-stone-100 pt-7 sm:mt-8 sm:pt-8">
               <p className="text-sm font-semibold text-stone-800">
                 Elige tu talla
               </p>
@@ -705,7 +698,7 @@ function ProductDetailModal({ product, onClose }) {
           {/* Disponibilidad */}
           {selectedVariant && (
             <div
-              className={`flex flex-wrap items-center justify-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 transition ${
+              className={`mt-7 flex flex-wrap items-center justify-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 transition sm:mt-8 ${
                 selectionPulse ? "scale-[1.01]" : ""
               }`}
             >
@@ -721,7 +714,7 @@ function ProductDetailModal({ product, onClose }) {
           )}
 
           {/* Cantidad */}
-          <section className="border-t border-stone-100 pt-6">
+          <section className="mt-7 border-t border-stone-100 pt-7 sm:mt-8 sm:pt-8">
             <p className="text-sm font-semibold text-stone-800">
               Cantidad
             </p>
@@ -758,7 +751,7 @@ function ProductDetailModal({ product, onClose }) {
             type="button"
             onClick={handleAddToCart}
             disabled={!canAddToCart}
-            className={`w-full rounded-xl px-5 py-4 text-sm font-bold tracking-wide transition ${
+            className={`mt-7 w-full rounded-xl px-5 py-4 text-sm font-bold tracking-wide transition sm:mt-8 ${
               added
                 ? "bg-stone-700 text-white"
                 : canAddToCart
@@ -775,7 +768,7 @@ function ProductDetailModal({ product, onClose }) {
                   : "Agregar al carrito"}
           </button>
 
-          <p className="pb-2 text-center text-xs leading-6 text-stone-400">
+          <p className="mt-3 pb-2 text-center text-xs leading-6 text-stone-400">
             Selecciona tu talla y color antes de añadir al carrito.
           </p>
         </div>
