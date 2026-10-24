@@ -208,32 +208,16 @@ function Tienda() {
         }
       });
 
-      /*
-       * Guardamos las tres portadas inmediatamente.
-       * No se elimina ninguna.
-       */
       setPortadas(portadasGuardadas);
 
-      /*
-       * SOLO esperamos la imagen de Inicio.
-       * Esto evita que Hombre y Mujer retrasen
-       * la primera aparición de la página.
-       */
       await precargarImagen(
         portadasGuardadas.inicio?.imagen_url
       );
 
       if (cancelado) return;
 
-      /*
-       * Ahora aparece toda la página de una vez.
-       */
       setSitioListo(true);
 
-      /*
-       * Hombre y Mujer se precargan en segundo plano.
-       * No bloquean la página.
-       */
       precargarImagen(
         portadasGuardadas.hombre?.imagen_url
       );
@@ -271,6 +255,11 @@ function Tienda() {
         if (cancelado) return;
 
         setProductos(data || []);
+
+        console.log(
+          "PRODUCTOS CARGADOS EN APP:",
+          data || []
+        );
       } catch (error) {
         if (cancelado) return;
 
@@ -299,6 +288,44 @@ function Tienda() {
       cancelado = true;
     };
   }, [esAdmin]);
+
+  /* =========================================
+     NORMALIZAR TEXTO PARA BÚSQUEDA
+     ========================================= */
+
+  function normalizarTexto(texto) {
+    return String(texto || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("es")
+      .trim();
+  }
+
+  /* =========================================
+     FILTRAR PRODUCTOS POR BÚSQUEDA
+     ========================================= */
+
+  function filtrarProductosPorBusqueda(listaProductos) {
+    const termino = normalizarTexto(busqueda);
+
+    if (!termino) {
+      return listaProductos;
+    }
+
+    return listaProductos.filter((producto) => {
+      const textoProducto = [
+        producto.name,
+        producto.category,
+        producto.subcategory,
+        producto.description,
+      ]
+        .filter(Boolean)
+        .map(normalizarTexto)
+        .join(" ");
+
+      return textoProducto.includes(termino);
+    });
+  }
 
   /* =========================================
      SUBCATEGORÍAS
@@ -480,8 +507,16 @@ function Tienda() {
     });
   }
 
+  /* =========================================
+     BÚSQUEDA
+     ========================================= */
+
   function buscar(evento) {
     evento.preventDefault();
+
+    const termino = busqueda.trim();
+
+    setBusqueda(termino);
 
     navegar(
       "buscar",
@@ -622,6 +657,14 @@ function Tienda() {
 
   const portadaTieneImagen =
     Boolean(portadaActual?.imagen_url);
+
+  const productosBuscados =
+    filtrarProductosPorBusqueda(productos);
+
+  console.log(
+    "PRODUCTOS PARA BUSQUEDA:",
+    productosBuscados
+  );
 
   /* =========================================
      TIENDA
@@ -1057,18 +1100,18 @@ function Tienda() {
             </p>
 
             <CategorySection
-  category={pagina}
-  products={productos}
-  selectedSubcategory={
-    subcategoriasSeleccionadas[pagina]
-  }
-  onSelectSubcategory={(subcategoria) =>
-    seleccionarSubcategoria(
-      pagina,
-      subcategoria
-    )
-  }
-/>
+              category={pagina}
+              products={productos}
+              selectedSubcategory={
+                subcategoriasSeleccionadas[pagina]
+              }
+              onSelectSubcategory={(subcategoria) =>
+                seleccionarSubcategoria(
+                  pagina,
+                  subcategoria
+                )
+              }
+            />
           </section>
         )}
 
@@ -1086,7 +1129,7 @@ function Tienda() {
             </p>
 
             <FeaturedProducts
-              productos={productos.filter(
+              products={productos.filter(
                 (producto) =>
                   Number(
                     producto.discount || 0
@@ -1111,7 +1154,7 @@ function Tienda() {
             </p>
 
             <FeaturedProducts
-              productos={productos.filter(
+              products={productos.filter(
                 (producto) =>
                   producto.is_new === true
               )}
@@ -1137,28 +1180,7 @@ function Tienda() {
             </p>
 
             <FeaturedProducts
-              productos={productos.filter(
-                (producto) => {
-                  const termino =
-                    busqueda
-                      .trim()
-                      .toLocaleLowerCase("es");
-
-                  if (!termino) return true;
-
-                  const texto = [
-                    producto.name,
-                    producto.category,
-                    producto.subcategory,
-                    producto.description,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                    .toLocaleLowerCase("es");
-
-                  return texto.includes(termino);
-                }
-              )}
+              products={productosBuscados}
               cargando={cargando}
               error={errorProductos}
             />
