@@ -169,9 +169,9 @@ export default function StoreInfo() {
         </header>
 
 
-        {/* IMAGEN */}
+        {/* IMAGEN DEL LOCAL */}
 
-        <div className="mt-12 w-full aspect-[16/8] overflow-hidden bg-[#e9e7e1]">
+        <div className="mt-12 w-full aspect-[4/3] overflow-hidden bg-[#e9e7e1] sm:aspect-[16/10]">
 
           {tienda.imagenUrl ? (
             <img
