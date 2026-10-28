@@ -1115,7 +1115,7 @@ export default function ProductsAdmin() {
       buildVariants()
 
     const {
-      error,
+      error: productError,
     } = await supabase
       .from("products")
       .update({
@@ -1139,18 +1139,17 @@ export default function ProductsAdmin() {
         editingId
       )
 
-    if (error) {
-      throw error
+    if (productError) {
+      throw productError
     }
 
     const {
       data: existing,
-      error:
-        existingError,
+      error: existingError,
     } = await supabase
       .from("product_variants")
       .select(
-        "id, size, color"
+        "id, product_id, size, color, color_hex, color_image_url, stock"
       )
       .eq(
         "product_id",
@@ -1161,34 +1160,87 @@ export default function ProductsAdmin() {
       throw existingError
     }
 
-    const existingIds =
-      (existing || []).map(
-        (item) => item.id
+    const existingVariants =
+      existing || []
+
+    function variantKey(
+      size,
+      color
+    ) {
+      return `${String(size || "")
+        .trim()
+        .toLowerCase()}::${String(color || "")
+        .trim()
+        .toLowerCase()}`
+    }
+
+    const existingByKey =
+      new Map()
+
+    for (const existingVariant of
+      existingVariants) {
+      existingByKey.set(
+        variantKey(
+          existingVariant.size,
+          existingVariant.color
+        ),
+        existingVariant
+      )
+    }
+
+    const incomingKeys =
+      new Set()
+
+    for (const variant of variants) {
+      const key = variantKey(
+        variant.size,
+        variant.color
       )
 
-    for (const variant of
-      variants) {
+      if (incomingKeys.has(key)) {
+        throw new Error(
+          `La variante "${variant.color} - talla ${variant.size}" está repetida dentro de este producto.`
+        )
+      }
+
+      incomingKeys.add(key)
+    }
+
+    for (const variant of variants) {
+      const key = variantKey(
+        variant.size,
+        variant.color
+      )
+
+      const existingByCombination =
+        existingByKey.get(key)
+
+      if (
+        !variant.id &&
+        existingByCombination
+      ) {
+        variant.id =
+          existingByCombination.id
+      }
+    }
+
+    for (const variant of variants) {
       if (!variant.id) {
         continue
       }
 
       const {
-        error:
-          variantError,
+        error: variantError,
       } = await supabase
-        .from(
-          "product_variants"
-        )
+        .from("product_variants")
         .update({
           size: variant.size,
-          color:
-            variant.color,
+          color: variant.color,
           color_hex:
             variant.color_hex,
           color_image_url:
             variant.color_image_url,
-          stock:
-            variant.stock,
+          stock: variant.stock,
         })
         .eq(
           "id",
@@ -1206,37 +1258,38 @@ export default function ProductsAdmin() {
 
     const newVariants =
       variants.filter(
-        (item) => !item.id
+        (variant) => !variant.id
       )
 
-    let inserted = []
-
     if (newVariants.length) {
-      const {
-        data,
-        error:
-          insertError,
-      } = await supabase
-        .from(
-          "product_variants"
+      const rowsToInsert =
+        newVariants.map(
+          (variant) => ({
+            product_id:
+              editingId,
+            size: variant.size,
+            color:
+              variant.color,
+            color_hex:
+              variant.color_hex,
+            color_image_url:
+              variant.color_image_url,
+            stock:
+              variant.stock,
+          })
         )
-        .insert(
-          newVariants.map(
-            (variant) => ({
-              product_id:
-                editingId,
-              size:
-                variant.size,
-              color:
-                variant.color,
-              color_hex:
-                variant.color_hex,
-              color_image_url:
-                variant.color_image_url,
-              stock:
-                variant.stock,
-            })
-          )
+
+      const {
+        data: inserted,
+        error: insertError,
+      } = await supabase
+        .from("product_variants")
+        .upsert(
+          rowsToInsert,
+          {
+            onConflict:
+              "product_id,size,color",
+          }
         )
         .select()
 
@@ -1244,52 +1297,69 @@ export default function ProductsAdmin() {
         throw insertError
       }
 
-      inserted = data || []
+      const returnedByKey =
+        new Map()
 
-      newVariants.forEach(
-        (variant, index) => {
+      for (const row of
+        inserted || []) {
+        returnedByKey.set(
+          variantKey(
+            row.size,
+            row.color
+          ),
+          row
+        )
+      }
+
+      for (const variant of
+        newVariants) {
+        const returned =
+          returnedByKey.get(
+            variantKey(
+              variant.size,
+              variant.color
+            )
+          )
+
+        if (returned?.id) {
           variant.id =
-            inserted[index]?.id ||
-            null
+            returned.id
         }
-      )
+      }
     }
 
     const incomingIds =
-      variants
-        .filter(
-          (item) => item.id
-        )
-        .map(
-          (item) => item.id
-        )
+      new Set(
+        variants
+          .map(
+            (variant) =>
+              variant.id
+          )
+          .filter(Boolean)
+      )
 
-    const idsToRemove =
-      existingIds.filter(
-        (id) =>
-          !incomingIds.includes(
-            id
+    const variantsToRemove =
+      existingVariants.filter(
+        (existingVariant) =>
+          !incomingIds.has(
+            existingVariant.id
           )
       )
 
-    for (const variantId of
-      idsToRemove) {
+    for (const variant of
+      variantsToRemove) {
       const {
         count,
-        error:
-          orderError,
+        error: orderError,
       } = await supabase
         .from("order_items")
-        .select(
-          "id",
-          {
-            count: "exact",
-            head: true,
-          }
-        )
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
         .eq(
           "variant_id",
-          variantId
+          variant.id
         )
 
       if (orderError) {
@@ -1297,7 +1367,9 @@ export default function ProductsAdmin() {
       }
 
       if ((count || 0) > 0) {
-        await supabase
+        const {
+          error: stockError,
+        } = await supabase
           .from(
             "product_variants"
           )
@@ -1306,8 +1378,12 @@ export default function ProductsAdmin() {
           })
           .eq(
             "id",
-            variantId
+            variant.id
           )
+
+        if (stockError) {
+          throw stockError
+        }
 
         continue
       }
@@ -1321,7 +1397,7 @@ export default function ProductsAdmin() {
         .delete()
         .eq(
           "variant_id",
-          variantId
+          variant.id
         )
 
       if (imageDeleteError) {
@@ -1329,16 +1405,13 @@ export default function ProductsAdmin() {
       }
 
       const {
-        error:
-          deleteError,
+        error: deleteError,
       } = await supabase
-        .from(
-          "product_variants"
-        )
+        .from("product_variants")
         .delete()
         .eq(
           "id",
-          variantId
+          variant.id
         )
 
       if (deleteError) {
@@ -1346,10 +1419,7 @@ export default function ProductsAdmin() {
       }
     }
 
-    await saveImages([
-      ...variants,
-      ...inserted,
-    ])
+    await saveImages(variants)
   }
 
   async function handleSubmit(
@@ -1692,16 +1762,33 @@ export default function ProductsAdmin() {
       setCurrentImage,
     ] = useState(0)
 
-    const [
-      dragStart,
-      setDragStart,
-    ] = useState(null)
+    /*
+     * Usamos refs para el gesto táctil.
+     * Esto evita renders innecesarios mientras
+     * el dedo se está moviendo.
+     */
+    const pointerStartX =
+      useRef(null)
+
+    const pointerStartY =
+      useRef(null)
+
+    const pointerMoved =
+      useRef(false)
+
+    const suppressClick =
+      useRef(false)
 
     useEffect(() => {
       setCurrentImage(0)
+      pointerStartX.current = null
+      pointerStartY.current = null
+      pointerMoved.current = false
+      suppressClick.current = false
     }, [product.id])
 
     function previous(event) {
+      event.preventDefault()
       event.stopPropagation()
 
       if (images.length < 2) {
@@ -1717,6 +1804,7 @@ export default function ProductsAdmin() {
     }
 
     function next(event) {
+      event.preventDefault()
       event.stopPropagation()
 
       if (images.length < 2) {
@@ -1732,45 +1820,150 @@ export default function ProductsAdmin() {
       )
     }
 
-    function pointerDown(event) {
+    function handlePointerDown(
+      event
+    ) {
       if (images.length < 2) {
         return
       }
 
-      setDragStart(
+      pointerStartX.current =
         event.clientX
-      )
+
+      pointerStartY.current =
+        event.clientY
+
+      pointerMoved.current =
+        false
+
+      suppressClick.current =
+        false
     }
 
-    function pointerUp(event) {
+    function handlePointerMove(
+      event
+    ) {
       if (
-        dragStart === null ||
+        pointerStartX.current ===
+          null ||
+        pointerStartY.current ===
+          null ||
         images.length < 2
       ) {
         return
       }
 
-      const difference =
+      const differenceX =
         event.clientX -
-        dragStart
+        pointerStartX.current
 
+      const differenceY =
+        event.clientY -
+        pointerStartY.current
+
+      /*
+       * Solo consideramos swipe si el movimiento
+       * horizontal domina al vertical.
+       */
       if (
-        Math.abs(difference) >
-        45
+        Math.abs(differenceX) > 12 &&
+        Math.abs(differenceX) >
+          Math.abs(differenceY)
       ) {
-        setCurrentImage(
-          (current) =>
-            difference < 0
-              ? (current + 1) %
-                images.length
-              : (current -
-                  1 +
-                  images.length) %
-                images.length
-        )
+        pointerMoved.current =
+          true
+      }
+    }
+
+    function handlePointerUp(
+      event
+    ) {
+      if (
+        pointerStartX.current ===
+          null ||
+        images.length < 2
+      ) {
+        return
       }
 
-      setDragStart(null)
+      const differenceX =
+        event.clientX -
+        pointerStartX.current
+
+      const differenceY =
+        event.clientY -
+        pointerStartY.current
+
+      const horizontalSwipe =
+        Math.abs(differenceX) >
+          45 &&
+        Math.abs(differenceX) >
+          Math.abs(differenceY)
+
+      if (horizontalSwipe) {
+        suppressClick.current =
+          true
+
+        if (differenceX < 0) {
+          setCurrentImage(
+            (current) =>
+              (current + 1) %
+              images.length
+          )
+        } else {
+          setCurrentImage(
+            (current) =>
+              (current -
+                1 +
+                images.length) %
+              images.length
+          )
+        }
+      }
+
+      pointerStartX.current =
+        null
+
+      pointerStartY.current =
+        null
+
+      pointerMoved.current =
+        false
+
+      /*
+       * Dejamos pasar un pequeño intervalo para
+       * impedir que el mismo gesto termine abriendo
+       * el editor mediante onClick.
+       */
+      if (horizontalSwipe) {
+        window.setTimeout(() => {
+          suppressClick.current =
+            false
+        }, 120)
+      }
+    }
+
+    function handlePointerCancel() {
+      pointerStartX.current =
+        null
+
+      pointerStartY.current =
+        null
+
+      pointerMoved.current =
+        false
+    }
+
+    function handleCardClick(
+      event
+    ) {
+      if (suppressClick.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+
+      startEditing(product)
     }
 
     return (
@@ -1780,9 +1973,7 @@ export default function ProductsAdmin() {
         <div
           role="button"
           tabIndex={0}
-          onClick={() =>
-            startEditing(product)
-          }
+          onClick={handleCardClick}
           onKeyDown={(event) => {
             if (
               event.key ===
@@ -1797,14 +1988,20 @@ export default function ProductsAdmin() {
         >
           <div
             className="group relative min-h-0 flex-1 overflow-hidden bg-[#f7f6f2]"
+            style={{
+              touchAction: "pan-y",
+            }}
             onPointerDown={
-              pointerDown
+              handlePointerDown
+            }
+            onPointerMove={
+              handlePointerMove
             }
             onPointerUp={
-              pointerUp
+              handlePointerUp
             }
-            onPointerCancel={() =>
-              setDragStart(null)
+            onPointerCancel={
+              handlePointerCancel
             }
           >
             {images.length ? (
@@ -1818,7 +2015,7 @@ export default function ProductsAdmin() {
                   product.name
                 }
                 draggable="false"
-                className="h-full w-full select-none object-contain transition duration-500 group-hover:scale-[1.025]"
+                className="pointer-events-none h-full w-full select-none object-contain transition duration-300 group-hover:scale-[1.025]"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">
@@ -1828,7 +2025,7 @@ export default function ProductsAdmin() {
 
             {(product.is_new ||
               product.is_best_seller) && (
-              <div className="absolute left-2 top-2 flex max-w-[calc(100%-16px)] flex-wrap gap-1">
+              <div className="pointer-events-none absolute left-2 top-2 flex max-w-[calc(100%-16px)] flex-wrap gap-1">
                 {product.is_new && (
                   <span className="rounded-full bg-white px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] shadow-sm">
                     Nuevo
@@ -1847,8 +2044,12 @@ export default function ProductsAdmin() {
               <>
                 <button
                   type="button"
+                  onPointerDown={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                  }}
                   onClick={previous}
-                  className="absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-sm opacity-0 shadow-sm transition group-hover:opacity-100"
+                  className="absolute left-2 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-lg text-neutral-900 shadow-sm transition hover:bg-white sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="Anterior"
                 >
                   ‹
@@ -1856,19 +2057,23 @@ export default function ProductsAdmin() {
 
                 <button
                   type="button"
+                  onPointerDown={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                  }}
                   onClick={next}
-                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-sm opacity-0 shadow-sm transition group-hover:opacity-100"
+                  className="absolute right-2 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-lg text-neutral-900 shadow-sm transition hover:bg-white sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="Siguiente"
                 >
                   ›
                 </button>
 
-                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-white/90 px-1.5 py-1">
+                <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-full bg-white/90 px-1.5 py-1">
                   {images.map(
                     (_, index) => (
                       <span
                         key={index}
-                        className={`h-1 rounded-full ${
+                        className={`h-1 rounded-full transition-all ${
                           index ===
                           currentImage
                             ? "w-2.5 bg-neutral-950"
@@ -2178,7 +2383,6 @@ export default function ProductsAdmin() {
               className={`${cardClass} p-5 sm:p-10 lg:p-14`}
             >
               <div className="mx-auto max-w-[900px]">
-                {/* 2 OPCIONES POR FILA EN TODAS LAS PANTALLAS */}
                 <div className="grid grid-cols-2 gap-4 sm:gap-12">
                   <div>
                     <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
