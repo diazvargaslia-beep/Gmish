@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../lib/supabase"
-import GraficaVentas from "./GraficaVentas"
 
 const ESTADOS = ["Pendiente", "Completado"]
 const MONEDA = "S/"
@@ -192,50 +191,6 @@ function Icono({
         <path d="M12 3v12" />
         <path d="m7 10 5 5 5-5" />
         <path d="M5 21h14" />
-      </svg>
-    )
-  }
-
-  if (nombre === "calendar") {
-    return (
-      <svg {...comunes}>
-        <rect
-          x="3"
-          y="5"
-          width="18"
-          height="16"
-          rx="2"
-        />
-        <path d="M16 3v4M8 3v4M3 10h18" />
-      </svg>
-    )
-  }
-
-  if (nombre === "money") {
-    return (
-      <svg {...comunes}>
-        <rect
-          x="3"
-          y="6"
-          width="18"
-          height="12"
-          rx="2"
-        />
-        <circle
-          cx="12"
-          cy="12"
-          r="3"
-        />
-        <path d="M7 9h.01M17 15h.01" />
-      </svg>
-    )
-  }
-
-  if (nombre === "box") {
-    return (
-      <svg {...comunes}>
-        <path d="m4 7 8-4 8 4-8 4-8-4Z" />
-        <path d="M4 7v10l8 4 8-4V7M12 11v10" />
       </svg>
     )
   }
@@ -879,95 +834,6 @@ function CabeceraModal({
           size={18}
         />
       </button>
-    </div>
-  )
-}
-
-function TarjetaMetrica({
-  icono,
-  etiqueta,
-  valor,
-  detalle,
-}) {
-  return (
-    <div
-      style={{
-        background: "#fff",
-        border:
-          "1px solid #e7e7e7",
-        borderRadius: 10,
-        padding: 18,
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          display:
-            "flex",
-          justifyContent:
-            "space-between",
-          alignItems:
-            "flex-start",
-          gap: 15,
-        }}
-      >
-        <span
-          style={{
-            width: 34,
-            height: 34,
-            border:
-              "1px solid #e5e5e5",
-            borderRadius: 7,
-            display:
-              "grid",
-            placeItems:
-              "center",
-            color: "#333",
-          }}
-        >
-          <Icono
-            nombre={icono}
-            size={16}
-          />
-        </span>
-
-        {detalle && (
-          <span
-            style={{
-              fontSize: 10,
-              color: "#999",
-              textTransform:
-                "uppercase",
-              letterSpacing:
-                "0.06em",
-            }}
-          >
-            {detalle}
-          </span>
-        )}
-      </div>
-
-      <div
-        style={{
-          marginTop: 18,
-          fontSize: 24,
-          fontWeight: 600,
-          letterSpacing:
-            "-0.04em",
-        }}
-      >
-        {valor}
-      </div>
-
-      <div
-        style={{
-          marginTop: 4,
-          color: "#777",
-          fontSize: 12,
-        }}
-      >
-        {etiqueta}
-      </div>
     </div>
   )
 }
@@ -3904,86 +3770,6 @@ export default function OrdersAdmin() {
       orden,
     ])
 
-  const estadisticas =
-    useMemo(() => {
-      const totalPedidos =
-        orders.length
-
-      const totalVentas =
-        orders.reduce(
-          (
-            suma,
-            order
-          ) =>
-            suma +
-            obtenerTotal(
-              order
-            ),
-          0
-        )
-
-      const pendientes =
-        orders.filter(
-          (order) =>
-            normalizarEstado(
-              order.status
-            ) ===
-            "Pendiente"
-        ).length
-
-      const fisicas =
-        orders.filter(
-          (order) =>
-            obtenerTipoPedido(
-              order
-            ) ===
-            "fisica"
-        )
-
-      const online =
-        orders.filter(
-          (order) =>
-            obtenerTipoPedido(
-              order
-            ) ===
-            "online"
-        )
-
-      return {
-        totalPedidos,
-        totalVentas,
-        pendientes,
-        fisicas:
-          fisicas.length,
-        ventasFisicas:
-          fisicas.reduce(
-            (
-              suma,
-              order
-            ) =>
-              suma +
-              obtenerTotal(
-                order
-              ),
-            0
-          ),
-        online:
-          online.length,
-        ventasOnline:
-          online.reduce(
-            (
-              suma,
-              order
-            ) =>
-              suma +
-              obtenerTotal(
-                order
-              ),
-            0
-          ),
-      }
-    }, [orders])
-
   async function actualizarEstado(
     orderId,
     estado
@@ -4345,10 +4131,6 @@ export default function OrdersAdmin() {
         }
 
         @media (max-width: 1100px) {
-          .gmish-orders-metrics {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-          }
-
           .gmish-orders-filters {
             grid-template-columns: 1fr 1fr !important;
           }
@@ -4363,17 +4145,7 @@ export default function OrdersAdmin() {
         }
 
         @media (max-width: 650px) {
-          .gmish-orders-metrics {
-            grid-template-columns: 1fr 1fr !important;
-          }
-
           .gmish-orders-filters {
-            grid-template-columns: 1fr !important;
-          }
-        }
-
-        @media (max-width: 500px) {
-          .gmish-orders-metrics {
             grid-template-columns: 1fr !important;
           }
         }
@@ -4453,85 +4225,6 @@ export default function OrdersAdmin() {
           </button>
         </div>
       </div>
-
-      <div
-        className="gmish-orders-metrics"
-        style={{
-          display:
-            "grid",
-          gridTemplateColumns:
-            "repeat(5,minmax(0,1fr))",
-          gap: 12,
-          marginBottom: 22,
-        }}
-      >
-        <TarjetaMetrica
-          icono="money"
-          etiqueta="Ventas totales"
-          valor={
-            <FormatoMoneda
-              valor={
-                estadisticas.totalVentas
-              }
-            />
-          }
-          detalle="General"
-        />
-
-        <TarjetaMetrica
-          icono="box"
-          etiqueta="Pedidos"
-          valor={
-            estadisticas.totalPedidos
-          }
-          detalle="Total"
-        />
-
-        <TarjetaMetrica
-          icono="calendar"
-          etiqueta="Pendientes"
-          valor={
-            estadisticas.pendientes
-          }
-          detalle="Por atender"
-        />
-
-        <TarjetaMetrica
-          icono="store"
-          etiqueta="Ventas físicas"
-          valor={
-            estadisticas.fisicas
-          }
-          detalle={
-            <FormatoMoneda
-              valor={
-                estadisticas.ventasFisicas
-              }
-            />
-          }
-        />
-
-        <TarjetaMetrica
-          icono="globe"
-          etiqueta="Ventas online"
-          valor={
-            estadisticas.online
-          }
-          detalle={
-            <FormatoMoneda
-              valor={
-                estadisticas.ventasOnline
-              }
-            />
-          }
-        />
-      </div>
-      
-      <GraficaVentas
-        orders={orders}
-        obtenerTotal={obtenerTotal}
-        obtenerTipoPedido={obtenerTipoPedido}
-      />
 
       {mensaje && (
         <div
