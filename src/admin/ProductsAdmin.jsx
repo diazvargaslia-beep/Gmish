@@ -1,32 +1,22 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "../lib/supabase"
 
 const SIZES = ["S", "M", "L", "XL"]
 
 const inputClass =
-  "w-full rounded-xl border border-neutral-200 bg-white px-[18px] py-[14px] text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-900/10"
+  "w-full rounded-2xl border border-neutral-200 bg-white px-5 py-4 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-4 focus:ring-neutral-900/[0.05]"
 
 const cardClass =
-  "rounded-2xl border border-neutral-200 bg-white shadow-[0_8px_28px_rgba(0,0,0,0.05)]"
+  "rounded-[30px] border border-neutral-200 bg-white shadow-[0_14px_50px_rgba(0,0,0,0.045)]"
 
-function ProductButton({
-  children,
-  onClick,
-  className = "",
-  disabled = false,
-  type = "button",
-}) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex min-h-[48px] items-center justify-center rounded-xl bg-neutral-900 px-7 py-[14px] text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-    >
-      {children}
-    </button>
-  )
-}
+const buttonClass =
+  "inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-neutral-950 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+
+const secondaryButtonClass =
+  "inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-neutral-200 bg-white px-7 py-3.5 text-sm font-semibold text-neutral-900 transition hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+
+const productTileClass =
+  "h-[285px] w-full overflow-hidden rounded-[18px] border border-neutral-200 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.035)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.07)] sm:h-[300px]"
 
 function normalizeSubcategory(value) {
   const normalized = String(value || "")
@@ -57,10 +47,10 @@ function normalizeSubcategory(value) {
     casacas: "Casacas",
     chompa: "Chompas",
     chompas: "Chompas",
-    accesorios: "Accesorios",
     accesorio: "Accesorios",
-    otros: "Otros",
+    accesorios: "Accesorios",
     otro: "Otros",
+    otros: "Otros",
   }
 
   if (aliases[normalized]) {
@@ -73,9 +63,106 @@ function normalizeSubcategory(value) {
       .filter(Boolean)
       .map(
         (word) =>
-          word.charAt(0).toUpperCase() + word.slice(1)
+          word.charAt(0).toUpperCase() +
+          word.slice(1)
       )
       .join(" ") || "Sin subcategoría"
+  )
+}
+
+function generateSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function createEmptyColor() {
+  return {
+    localId:
+      typeof crypto !== "undefined" &&
+      crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
+
+    name: "",
+    hex: "#777777",
+    images: [],
+
+    sizes: SIZES.map((size) => ({
+      size,
+      stock: "",
+      variantId: null,
+    })),
+  }
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}) {
+  return (
+    <div className="mx-auto max-w-3xl text-center">
+      {eyebrow && (
+        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400">
+          {eyebrow}
+        </p>
+      )}
+
+      <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-neutral-950 md:text-4xl">
+        {title}
+      </h2>
+
+      {description && (
+        <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-neutral-500 md:text-base">
+          {description}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ToggleCard({
+  checked,
+  onChange,
+  title,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`group w-full rounded-2xl border p-5 text-left transition ${
+        checked
+          ? "border-neutral-950 bg-neutral-950 text-white"
+          : "border-neutral-200 bg-white hover:border-neutral-400"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-5">
+        <p className="text-sm font-semibold">
+          {title}
+        </p>
+
+        <span
+          className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+            checked
+              ? "bg-white"
+              : "bg-neutral-200"
+          }`}
+        >
+          <span
+            className={`absolute top-1 h-4 w-4 rounded-full transition ${
+              checked
+                ? "left-6 bg-neutral-950"
+                : "left-1 bg-white shadow-sm"
+            }`}
+          />
+        </span>
+      </div>
+    </button>
   )
 }
 
@@ -83,21 +170,28 @@ export default function ProductsAdmin() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(null)
+  const [uploadingImage, setUploadingImage] =
+    useState(null)
 
   const [view, setView] = useState("list")
-  const [filterCategory, setFilterCategory] = useState("hombre")
-  const [selectedSubcategory, setSelectedSubcategory] = useState("")
+  const [filterCategory, setFilterCategory] =
+    useState("hombre")
+  const [selectedSubcategory, setSelectedSubcategory] =
+    useState("")
+  const [search, setSearch] = useState("")
   const [editingId, setEditingId] = useState(null)
 
   const [name, setName] = useState("")
-  const [category, setCategory] = useState("hombre")
-  const [subcategory, setSubcategory] = useState("")
+  const [category, setCategory] =
+    useState("hombre")
+  const [subcategory, setSubcategory] =
+    useState("")
   const [price, setPrice] = useState("")
-  const [oldPrice, setOldPrice] = useState("")
-  const [description, setDescription] = useState("")
+  const [oldPrice, setOldPrice] =
+    useState("")
   const [isNew, setIsNew] = useState(false)
-  const [isBestSeller, setIsBestSeller] = useState(false)
+  const [isBestSeller, setIsBestSeller] =
+    useState(false)
   const [colors, setColors] = useState([])
 
   const fileInputRefs = useRef({})
@@ -107,29 +201,34 @@ export default function ProductsAdmin() {
   }, [])
 
   useEffect(() => {
-    window.history.replaceState(
-      {
-        ...window.history.state,
-        productsAdminView: "list",
-        productsAdminCategory: "hombre",
-        productsAdminSubcategory: null,
-      },
-      ""
-    )
-
     const handlePopState = (event) => {
       const state = event.state || {}
 
-      setView(state.productsAdminView || "list")
+      setView(
+        state.productsAdminView ||
+          "list"
+      )
+
       setFilterCategory(
-        state.productsAdminCategory || "hombre"
+        state.productsAdminCategory ||
+          "hombre"
       )
+
       setSelectedSubcategory(
-        state.productsAdminSubcategory || ""
+        state.productsAdminSubcategory ||
+          ""
       )
+
+      window.scrollTo({
+        top: 0,
+        behavior: "auto",
+      })
     }
 
-    window.addEventListener("popstate", handlePopState)
+    window.addEventListener(
+      "popstate",
+      handlePopState
+    )
 
     return () => {
       window.removeEventListener(
@@ -139,28 +238,39 @@ export default function ProductsAdmin() {
     }
   }, [])
 
-  const navigate = (
+  function navigate(
     nextView,
-    nextSubcategory = null,
+    nextSubcategory = "",
     replace = false,
     nextCategory = filterCategory
-  ) => {
+  ) {
     const state = {
       ...window.history.state,
+      adminSection: "productos",
       productsAdminView: nextView,
-      productsAdminCategory: nextCategory,
-      productsAdminSubcategory: nextSubcategory,
+      productsAdminCategory:
+        nextCategory,
+      productsAdminSubcategory:
+        nextSubcategory,
     }
 
     if (replace) {
-      window.history.replaceState(state, "")
+      window.history.replaceState(
+        state,
+        ""
+      )
     } else {
-      window.history.pushState(state, "")
+      window.history.pushState(
+        state,
+        ""
+      )
     }
 
     setView(nextView)
     setFilterCategory(nextCategory)
-    setSelectedSubcategory(nextSubcategory || "")
+    setSelectedSubcategory(
+      nextSubcategory
+    )
 
     window.scrollTo({
       top: 0,
@@ -168,21 +278,13 @@ export default function ProductsAdmin() {
     })
   }
 
-  /*
-   * CARGA DE PRODUCTOS
-   *
-   * Separamos las consultas para evitar depender de que
-   * Supabase resuelva correctamente toda la relación anidada
-   * products -> product_variants -> product_variant_images.
-   */
   async function loadProducts() {
     setLoading(true)
 
     try {
-      // 1. Productos
       const {
-        data: productsData,
-        error: productsError,
+        data: productRows,
+        error: productError,
       } = await supabase
         .from("products")
         .select("*")
@@ -190,80 +292,76 @@ export default function ProductsAdmin() {
           ascending: false,
         })
 
-      if (productsError) {
-        throw productsError
+      if (productError) {
+        throw productError
       }
 
-      if (!productsData?.length) {
+      if (!productRows?.length) {
         setProducts([])
         return
       }
 
-      // 2. Variantes
-      const productIds = productsData.map(
-        (product) => product.id
-      )
+      const productIds =
+        productRows.map(
+          (product) => product.id
+        )
 
       const {
-        data: variantsData,
-        error: variantsError,
+        data: variantRows,
+        error: variantError,
       } = await supabase
         .from("product_variants")
-        .select(`
-          id,
-          product_id,
-          size,
-          color,
-          color_hex,
-          color_image_url,
-          stock,
-          sku
-        `)
-        .in("product_id", productIds)
+        .select(
+          "id, product_id, size, color, color_hex, color_image_url, stock, sku"
+        )
+        .in(
+          "product_id",
+          productIds
+        )
 
-      if (variantsError) {
-        throw variantsError
+      if (variantError) {
+        throw variantError
       }
 
-      // 3. Imágenes
-      const variantIds = (variantsData || []).map(
-        (variant) => variant.id
-      )
+      const variantIds =
+        (variantRows || []).map(
+          (variant) => variant.id
+        )
 
-      let imagesData = []
+      let imageRows = []
 
       if (variantIds.length) {
         const {
           data,
-          error: imagesError,
+          error,
         } = await supabase
-          .from("product_variant_images")
-          .select(`
-            id,
-            variant_id,
-            image_url,
-            position
-          `)
-          .in("variant_id", variantIds)
+          .from(
+            "product_variant_images"
+          )
+          .select(
+            "id, variant_id, image_url, position"
+          )
+          .in(
+            "variant_id",
+            variantIds
+          )
           .order("position", {
             ascending: true,
           })
 
-        if (imagesError) {
-          throw imagesError
+        if (error) {
+          throw error
         }
 
-        imagesData = data || []
+        imageRows = data || []
       }
 
-      // 4. Volvemos a construir la estructura
-      // que utiliza el resto del componente.
-      const variantsWithImages =
-        (variantsData || []).map(
+      const variants =
+        (variantRows || []).map(
           (variant) => ({
             ...variant,
             product_variant_images:
-              imagesData.filter(
+              imageRows.filter(
                 (image) =>
                   image.variant_id ===
                   variant.id
@@ -271,20 +369,19 @@ export default function ProductsAdmin() {
           })
         )
 
-      const finalProducts =
-        productsData.map(
+      setProducts(
+        productRows.map(
           (product) => ({
             ...product,
             product_variants:
-              variantsWithImages.filter(
+              variants.filter(
                 (variant) =>
                   variant.product_id ===
                   product.id
               ),
           })
         )
-
-      setProducts(finalProducts)
+      )
     } catch (error) {
       console.error(
         "Error cargando productos:",
@@ -292,229 +389,276 @@ export default function ProductsAdmin() {
       )
 
       alert(
-        `No se pudieron cargar los productos: ${
-          error.message || "Error desconocido"
-        }`
+        error?.message ||
+          "No se pudieron cargar los productos."
       )
-
-      setProducts([])
     } finally {
       setLoading(false)
     }
   }
 
-  const generateSlug = (value) =>
-    value
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-
-  const createEmptyColor = () => ({
-    name: "",
-    hex: "#777777",
-    imageUrl: "",
-    images: [],
-    sizes: SIZES.map((size) => ({
-      size,
-      stock: "",
-      enabled: false,
-      variantId: null,
-    })),
-  })
-
-  const resetForm = () => {
+  function resetForm(
+    nextCategory = filterCategory
+  ) {
     setEditingId(null)
     setName("")
-    setCategory(filterCategory)
+    setCategory(nextCategory)
     setSubcategory("")
     setPrice("")
     setOldPrice("")
-    setDescription("")
-    setIsNew(false)
-    setIsBestSeller(false)
-    setColors([])
-  }
-
-  const startNewProduct = () => {
-    setEditingId(null)
-    setName("")
-    setCategory(filterCategory)
-    setSubcategory("")
-    setPrice("")
-    setOldPrice("")
-    setDescription("")
     setIsNew(false)
     setIsBestSeller(false)
     setColors([createEmptyColor()])
-
-    navigate("editor")
   }
 
-  const addColor = () => {
+  function startNewProduct() {
+    resetForm(filterCategory)
+
+    navigate(
+      "editor",
+      "",
+      false,
+      filterCategory
+    )
+  }
+
+  function addColor() {
     setColors((current) => [
       ...current,
       createEmptyColor(),
     ])
   }
 
-  const removeColor = (colorIndex) => {
+  function removeColor(index) {
     setColors((current) =>
       current.filter(
-        (_, index) => index !== colorIndex
+        (_, colorIndex) =>
+          colorIndex !== index
       )
     )
   }
 
-  const updateColor = (
-    colorIndex,
+  function updateColor(
+    index,
     field,
     value
-  ) => {
+  ) {
     setColors((current) =>
-      current.map((color, index) =>
-        index === colorIndex
-          ? {
-              ...color,
-              [field]: value,
-            }
-          : color
+      current.map(
+        (color, colorIndex) =>
+          colorIndex === index
+            ? {
+                ...color,
+                [field]: value,
+              }
+            : color
       )
     )
   }
 
-  const updateColorSize = (
+  function updateStock(
     colorIndex,
     sizeIndex,
-    field,
     value
-  ) => {
+  ) {
     setColors((current) =>
-      current.map((color, index) => {
-        if (index !== colorIndex) {
-          return color
-        }
+      current.map(
+        (color, currentColor) => {
+          if (
+            currentColor !==
+            colorIndex
+          ) {
+            return color
+          }
 
-        return {
-          ...color,
-          sizes: color.sizes.map(
-            (item, currentIndex) =>
-              currentIndex === sizeIndex
-                ? {
-                    ...item,
-                    [field]: value,
-                  }
-                : item
-          ),
+          return {
+            ...color,
+            sizes: color.sizes.map(
+              (
+                size,
+                currentSize
+              ) =>
+                currentSize ===
+                sizeIndex
+                  ? {
+                      ...size,
+                      stock:
+                        value === ""
+                          ? ""
+                          : Math.max(
+                              0,
+                              Number.parseInt(
+                                value,
+                                10
+                              ) || 0
+                            ),
+                    }
+                  : size
+            ),
+          }
         }
-      })
+      )
     )
   }
 
-  const uploadColorImages = async (
+  function setMainImage(
+    colorIndex,
+    imageIndex
+  ) {
+    setColors((current) =>
+      current.map(
+        (color, index) => {
+          if (
+            index !== colorIndex
+          ) {
+            return color
+          }
+
+          const images = [
+            ...(color.images || []),
+          ]
+
+          if (!images[imageIndex]) {
+            return color
+          }
+
+          const selected =
+            images.splice(
+              imageIndex,
+              1
+            )[0]
+
+          images.unshift(selected)
+
+          return {
+            ...color,
+            images,
+          }
+        }
+      )
+    )
+  }
+
+  function removeImage(
+    colorIndex,
+    imageIndex
+  ) {
+    setColors((current) =>
+      current.map(
+        (color, index) => {
+          if (
+            index !== colorIndex
+          ) {
+            return color
+          }
+
+          return {
+            ...color,
+            images: (
+              color.images || []
+            ).filter(
+              (_, imageIndexCurrent) =>
+                imageIndexCurrent !==
+                imageIndex
+            ),
+          }
+        }
+      )
+    )
+  }
+
+  async function uploadImages(
     colorIndex,
     event
-  ) => {
+  ) {
     const files = Array.from(
       event.target.files || []
     )
 
-    if (!files.length) return
-
-    if (
-      files.some(
-        (file) =>
-          !file.type.startsWith("image/")
-      )
-    ) {
-      alert(
-        "Selecciona solamente archivos de imagen."
-      )
-
-      event.target.value = ""
+    if (!files.length) {
       return
     }
 
     try {
       setUploadingImage(colorIndex)
 
-      const uploadedImages = []
+      const uploaded = []
 
       for (const file of files) {
+        if (
+          !file.type.startsWith(
+            "image/"
+          )
+        ) {
+          continue
+        }
+
         const extension =
           file.name
             .split(".")
             .pop()
-            ?.toLowerCase() || "png"
+            ?.toLowerCase() ||
+          "jpg"
 
-        const safeName = generateSlug(
-          name || "producto"
-        )
-
-        const uniqueName =
-          `${safeName}-${Date.now()}-${Math.random()
+        const filename =
+          `${generateSlug(
+            name || "producto"
+          )}-${Date.now()}-${Math.random()
             .toString(36)
-            .substring(2, 8)}.${extension}`
+            .slice(2, 8)}.${extension}`
 
-        const filePath =
-          `products/${uniqueName}`
+        const path =
+          `products/${filename}`
 
         const {
-          error: uploadError,
+          error,
         } = await supabase.storage
           .from("product-images")
           .upload(
-            filePath,
+            path,
             file,
             {
-              cacheControl: "3600",
+              cacheControl:
+                "3600",
               upsert: false,
-              contentType: file.type,
+              contentType:
+                file.type,
             }
           )
 
-        if (uploadError) {
-          throw uploadError
+        if (error) {
+          throw error
         }
 
         const {
           data,
         } = supabase.storage
-          .from("product-images")
-          .getPublicUrl(filePath)
+          .from(
+            "product-images"
+          )
+          .getPublicUrl(path)
 
-        if (!data?.publicUrl) {
-          throw new Error(
-            "No se pudo obtener la URL de la imagen."
+        if (data?.publicUrl) {
+          uploaded.push(
+            data.publicUrl
           )
         }
-
-        uploadedImages.push(
-          data.publicUrl
-        )
       }
 
       setColors((current) =>
-        current.map((color, index) => {
-          if (index !== colorIndex) {
-            return color
-          }
-
-          const images = [
-            ...(color.images || []),
-            ...uploadedImages,
-          ]
-
-          return {
-            ...color,
-            images,
-            imageUrl:
-              color.imageUrl ||
-              images[0] ||
-              "",
-          }
-        })
+        current.map(
+          (color, index) =>
+            index === colorIndex
+              ? {
+                  ...color,
+                  images: [
+                    ...(color.images ||
+                      []),
+                    ...uploaded,
+                  ],
+                }
+              : color
+        )
       )
     } catch (error) {
       console.error(
@@ -523,7 +667,8 @@ export default function ProductsAdmin() {
       )
 
       alert(
-        `No se pudieron subir las imágenes: ${error.message}`
+        error?.message ||
+          "No se pudieron subir las imágenes."
       )
     } finally {
       setUploadingImage(null)
@@ -534,45 +679,20 @@ export default function ProductsAdmin() {
     }
   }
 
-  const removeColorImage = (
-    colorIndex,
-    imageIndex
-  ) => {
-    setColors((current) =>
-      current.map((color, index) => {
-        if (index !== colorIndex) {
-          return color
-        }
+  function startEditing(product) {
+    const grouped = {}
 
-        const images = (
-          color.images || []
-        ).filter(
-          (_, currentIndex) =>
-            currentIndex !== imageIndex
-        )
-
-        return {
-          ...color,
-          images,
-          imageUrl:
-            images[0] || "",
-        }
-      })
-    )
-  }
-
-  const startEditing = (product) => {
-    const groupedColors = {}
-
-    ;(
-      product.product_variants || []
-    ).forEach((variant) => {
+    for (const variant of
+      product.product_variants ||
+      []) {
       const colorName =
-        variant.color || "Sin nombre"
+        variant.color ||
+        "Sin nombre"
 
-      if (!groupedColors[colorName]) {
+      if (!grouped[colorName]) {
         const images = (
-          variant.product_variant_images ||
+          variant
+            .product_variant_images ||
           []
         )
           .slice()
@@ -586,90 +706,92 @@ export default function ProductsAdmin() {
               image.image_url
           )
 
-        const fallbackImages =
-          variant.color_image_url
-            ? [variant.color_image_url]
-            : []
-
-        const allImages = images.length
-          ? [...new Set(images)]
-          : fallbackImages
-
-        groupedColors[colorName] = {
+        grouped[colorName] = {
+          localId:
+            `${Date.now()}-${Math.random()}`,
           name: colorName,
           hex:
             variant.color_hex ||
             "#777777",
-          imageUrl:
-            allImages[0] || "",
-          images: allImages,
-          sizes: SIZES.map(
-            (size) => ({
-              size,
-              stock: "",
-              enabled: false,
-              variantId: null,
-            })
-          ),
+          images: [
+            ...new Set(
+              images.length
+                ? images
+                : variant.color_image_url
+                  ? [
+                      variant.color_image_url,
+                    ]
+                  : []
+            ),
+          ],
+          sizes:
+            SIZES.map(
+              (size) => ({
+                size,
+                stock: "",
+                variantId:
+                  null,
+              })
+            ),
         }
       }
 
-      const sizeItem =
-        groupedColors[
-          colorName
-        ].sizes.find(
-          (item) =>
-            item.size === variant.size
-        )
+      const size = grouped[
+        colorName
+      ].sizes.find(
+        (item) =>
+          item.size ===
+          variant.size
+      )
 
-      if (sizeItem) {
-        sizeItem.enabled = true
-        sizeItem.stock =
+      if (size) {
+        size.stock =
           variant.stock ?? 0
-        sizeItem.variantId =
+        size.variantId =
           variant.id
       }
-    })
+    }
 
     setEditingId(product.id)
     setName(product.name || "")
     setCategory(
-      product.category || "hombre"
+      product.category ||
+        filterCategory
     )
     setSubcategory(
-      product.subcategory || ""
+      product.subcategory ||
+        ""
     )
-    setPrice(product.price ?? "")
+    setPrice(
+      product.price ?? ""
+    )
     setOldPrice(
       product.old_price ?? ""
-    )
-    setDescription(
-      product.description || ""
     )
     setIsNew(
       Boolean(product.is_new)
     )
     setIsBestSeller(
-      Boolean(product.is_best_seller)
+      Boolean(
+        product.is_best_seller
+      )
     )
-
     setColors(
-      Object.values(groupedColors)
-        .length
-        ? Object.values(groupedColors)
+      Object.values(grouped).length
+        ? Object.values(grouped)
         : [createEmptyColor()]
     )
 
     navigate(
       "editor",
-      null,
+      "",
       false,
       product.category ||
-        "hombre"
+        filterCategory
     )
   }
 
-  const validateForm = () => {
+  function validateForm() {
     if (!name.trim()) {
       alert(
         "Completa el nombre del producto."
@@ -689,7 +811,7 @@ export default function ProductsAdmin() {
       Number(price) < 0
     ) {
       alert(
-        "Completa un precio válido."
+        "Ingresa un precio válido."
       )
       return false
     }
@@ -704,6 +826,17 @@ export default function ProductsAdmin() {
       return false
     }
 
+    if (
+      oldPrice !== "" &&
+      Number(oldPrice) <=
+        Number(price)
+    ) {
+      alert(
+        "El precio anterior debe ser mayor que el precio actual."
+      )
+      return false
+    }
+
     if (!colors.length) {
       alert(
         "Agrega al menos un color."
@@ -714,104 +847,100 @@ export default function ProductsAdmin() {
     for (const color of colors) {
       if (!color.name.trim()) {
         alert(
-          "Completa el nombre de cada color."
+          "Todos los colores necesitan un nombre."
         )
         return false
       }
 
-      if (
-        !color.sizes.some(
-          (item) => item.enabled
-        )
-      ) {
-        alert(
-          `Selecciona al menos una talla para ${color.name}.`
-        )
-        return false
-      }
-
-      if (
+      const hasStock =
         color.sizes.some(
-          (item) =>
-            item.enabled &&
-            (
-              item.stock === "" ||
-              !Number.isInteger(
-                Number(item.stock)
-              ) ||
-              Number(item.stock) < 0
-            )
+          (size) =>
+            Number(
+              size.stock || 0
+            ) > 0
         )
-      ) {
+
+      if (!hasStock) {
         alert(
-          `Revisa el stock de las tallas del color ${color.name}.`
+          `Agrega stock para ${color.name}.`
         )
         return false
+      }
+
+      for (const size of
+        color.sizes) {
+        if (
+          size.stock !== "" &&
+          (!Number.isInteger(
+            Number(size.stock)
+          ) ||
+            Number(size.stock) < 0)
+        ) {
+          alert(
+            `El stock de ${color.name} debe ser un número entero.`
+          )
+          return false
+        }
       }
     }
 
     return true
   }
 
-  const buildVariants = () => {
-    const variants = []
+  function buildVariants() {
+    const result = []
 
-    colors.forEach((color) => {
-      color.sizes.forEach(
-        (item) => {
-          if (!item.enabled) {
-            return
-          }
-
-          variants.push({
-            id:
-              item.variantId ||
-              null,
-            size: item.size,
-            color:
-              color.name.trim(),
-            color_hex:
-              color.hex ||
-              "#777777",
-            color_image_url:
-              color.images?.[0] ||
-              null,
-            stock: Math.max(
-              0,
-              Number(item.stock) || 0
-            ),
-          })
+    for (const color of colors) {
+      for (const size of
+        color.sizes) {
+        if (
+          Number(size.stock || 0) <=
+          0
+        ) {
+          continue
         }
-      )
-    })
 
-    return variants
+        result.push({
+          id:
+            size.variantId ||
+            null,
+          size: size.size,
+          color:
+            color.name.trim(),
+          color_hex:
+            color.hex ||
+            "#777777",
+          color_image_url:
+            color.images?.[0] ||
+            null,
+          stock: Number(
+            size.stock
+          ),
+        })
+      }
+    }
+
+    return result
   }
 
-  const saveVariantImages = async (
+  async function saveImages(
     variants
-  ) => {
-    for (const variant of variants) {
+  ) {
+    for (const variant of
+      variants) {
       if (!variant.id) {
         continue
       }
 
-      const colorData =
-        colors.find(
-          (color) =>
-            color.name.trim() ===
-            variant.color
-        )
+      const color = colors.find(
+        (item) =>
+          item.name.trim() ===
+          variant.color
+      )
 
-      if (!colorData) {
+      if (!color) {
         continue
       }
-
-      const images = [
-        ...new Set(
-          colorData.images || []
-        ),
-      ]
 
       const {
         error: deleteError,
@@ -829,85 +958,81 @@ export default function ProductsAdmin() {
         throw deleteError
       }
 
-      if (!images.length) {
+      if (!color.images?.length) {
         continue
       }
 
-      const rows = images.map(
-        (
-          imageUrl,
-          index
-        ) => ({
-          variant_id:
-            variant.id,
-          image_url:
-            imageUrl,
-          position: index,
-        })
-      )
+      const rows =
+        color.images.map(
+          (image, position) => ({
+            variant_id:
+              variant.id,
+            image_url: image,
+            position,
+          })
+        )
 
       const {
-        error: insertError,
+        error,
       } = await supabase
         .from(
           "product_variant_images"
         )
         .insert(rows)
 
-      if (insertError) {
-        throw insertError
+      if (error) {
+        throw error
       }
     }
   }
 
-  const createProduct = async () => {
-    const slug =
-      `${generateSlug(name)}-${Date.now()}`
-
+  async function createProduct() {
     const variants =
       buildVariants()
 
     const {
       data: product,
-      error: productError,
+      error,
     } = await supabase
       .from("products")
       .insert({
         name: name.trim(),
-        slug,
+        slug: `${generateSlug(
+          name
+        )}-${Date.now()}`,
         category,
         subcategory:
           subcategory.trim(),
         price: Number(price),
-        old_price: oldPrice
-          ? Number(oldPrice)
-          : null,
+        old_price:
+          oldPrice === ""
+            ? null
+            : Number(oldPrice),
         is_new: isNew,
         is_best_seller:
           isBestSeller,
         is_active: true,
         owner_role: "principal",
-        description:
-          description.trim() ||
-          null,
       })
       .select()
       .single()
 
-    if (productError) {
-      throw productError
+    if (error) {
+      throw error
     }
 
     const {
       data: insertedVariants,
-      error: variantsError,
+      error:
+        variantsError,
     } = await supabase
       .from("product_variants")
       .insert(
         variants.map(
           (variant) => ({
-            size:
-              variant.size,
+            product_id:
+              product.id,
+            size: variant.size,
             color:
               variant.color,
             color_hex:
@@ -916,8 +1041,6 @@ export default function ProductsAdmin() {
               variant.color_image_url,
             stock:
               variant.stock,
-            product_id:
-              product.id,
           })
         )
       )
@@ -935,17 +1058,18 @@ export default function ProductsAdmin() {
       throw variantsError
     }
 
-    await saveVariantImages(
-      insertedVariants || []
+    await saveImages(
+      insertedVariants ||
+        []
     )
   }
 
-  const updateProduct = async () => {
+  async function updateProduct() {
     const variants =
       buildVariants()
 
     const {
-      error: productError,
+      error,
     } = await supabase
       .from("products")
       .update({
@@ -954,15 +1078,13 @@ export default function ProductsAdmin() {
         subcategory:
           subcategory.trim(),
         price: Number(price),
-        old_price: oldPrice
-          ? Number(oldPrice)
-          : null,
+        old_price:
+          oldPrice === ""
+            ? null
+            : Number(oldPrice),
         is_new: isNew,
         is_best_seller:
           isBestSeller,
-        description:
-          description.trim() ||
-          null,
         updated_at:
           new Date().toISOString(),
       })
@@ -971,13 +1093,14 @@ export default function ProductsAdmin() {
         editingId
       )
 
-    if (productError) {
-      throw productError
+    if (error) {
+      throw error
     }
 
     const {
-      data: existingVariants,
-      error: readError,
+      data: existing,
+      error:
+        existingError,
     } = await supabase
       .from("product_variants")
       .select(
@@ -988,41 +1111,30 @@ export default function ProductsAdmin() {
         editingId
       )
 
-    if (readError) {
-      throw readError
+    if (existingError) {
+      throw existingError
     }
 
     const existingIds =
-      (existingVariants || []).map(
-        (variant) =>
-          variant.id
+      (existing || []).map(
+        (item) => item.id
       )
 
-    const incomingIds =
-      variants
-        .filter(
-          (variant) =>
-            variant.id
-        )
-        .map(
-          (variant) =>
-            variant.id
-        )
-
-    for (const variant of variants) {
+    for (const variant of
+      variants) {
       if (!variant.id) {
         continue
       }
 
       const {
-        error,
+        error:
+          variantError,
       } = await supabase
         .from(
           "product_variants"
         )
         .update({
-          size:
-            variant.size,
+          size: variant.size,
           color:
             variant.color,
           color_hex:
@@ -1041,23 +1153,23 @@ export default function ProductsAdmin() {
           editingId
         )
 
-      if (error) {
-        throw error
+      if (variantError) {
+        throw variantError
       }
     }
 
     const newVariants =
       variants.filter(
-        (variant) =>
-          !variant.id
+        (item) => !item.id
       )
 
-    let insertedNewVariants = []
+    let inserted = []
 
     if (newVariants.length) {
       const {
         data,
-        error,
+        error:
+          insertError,
       } = await supabase
         .from(
           "product_variants"
@@ -1082,25 +1194,29 @@ export default function ProductsAdmin() {
         )
         .select()
 
-      if (error) {
-        throw error
+      if (insertError) {
+        throw insertError
       }
 
-      insertedNewVariants =
-        data || []
+      inserted = data || []
 
       newVariants.forEach(
-        (
-          variant,
-          index
-        ) => {
+        (variant, index) => {
           variant.id =
-            insertedNewVariants[
-              index
-            ]?.id || null
+            inserted[index]?.id ||
+            null
         }
       )
     }
+
+    const incomingIds =
+      variants
+        .filter(
+          (item) => item.id
+        )
+        .map(
+          (item) => item.id
+        )
 
     const idsToRemove =
       existingIds.filter(
@@ -1110,11 +1226,12 @@ export default function ProductsAdmin() {
           )
       )
 
-    for (const variantId of idsToRemove) {
+    for (const variantId of
+      idsToRemove) {
       const {
         count,
         error:
-          orderItemsError,
+          orderError,
       } = await supabase
         .from("order_items")
         .select(
@@ -1129,14 +1246,12 @@ export default function ProductsAdmin() {
           variantId
         )
 
-      if (orderItemsError) {
-        throw orderItemsError
+      if (orderError) {
+        throw orderError
       }
 
       if ((count || 0) > 0) {
-        const {
-          error,
-        } = await supabase
+        await supabase
           .from(
             "product_variants"
           )
@@ -1148,15 +1263,11 @@ export default function ProductsAdmin() {
             variantId
           )
 
-        if (error) {
-          throw error
-        }
-
         continue
       }
 
       const {
-        error: deleteImagesError,
+        error: imageDeleteError,
       } = await supabase
         .from(
           "product_variant_images"
@@ -1167,12 +1278,13 @@ export default function ProductsAdmin() {
           variantId
         )
 
-      if (deleteImagesError) {
-        throw deleteImagesError
+      if (imageDeleteError) {
+        throw imageDeleteError
       }
 
       const {
-        error,
+        error:
+          deleteError,
       } = await supabase
         .from(
           "product_variants"
@@ -1183,19 +1295,20 @@ export default function ProductsAdmin() {
           variantId
         )
 
-      if (error) {
-        throw error
+      if (deleteError) {
+        throw deleteError
       }
     }
 
-    await saveVariantImages(
-      variants
-    )
+    await saveImages([
+      ...variants,
+      ...inserted,
+    ])
   }
 
-  const handleSubmit = async (
+  async function handleSubmit(
     event
-  ) => {
+  ) {
     event.preventDefault()
 
     if (!validateForm()) {
@@ -1218,17 +1331,16 @@ export default function ProductsAdmin() {
         await createProduct()
 
         alert(
-          "Producto guardado correctamente."
+          "Producto creado correctamente."
         )
       }
 
       await loadProducts()
-
-      resetForm()
+      resetForm(savedCategory)
 
       navigate(
         "category",
-        null,
+        "",
         true,
         savedCategory
       )
@@ -1239,7 +1351,7 @@ export default function ProductsAdmin() {
       )
 
       alert(
-        error.message ||
+        error?.message ||
           "No se pudo guardar el producto."
       )
     } finally {
@@ -1247,234 +1359,274 @@ export default function ProductsAdmin() {
     }
   }
 
-  const toggleProductVisibility =
-    async (product) => {
-      const newStatus =
-        !product.is_active
+  async function toggleVisibility(
+    product
+  ) {
+    const next =
+      !product.is_active
 
-      const {
-        error,
-      } = await supabase
-        .from("products")
-        .update({
-          is_active:
-            newStatus,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq(
-          "id",
-          product.id
-        )
-
-      if (error) {
-        alert(error.message)
-        return
-      }
-
-      setProducts(
-        (current) =>
-          current.map(
-            (item) =>
-              item.id ===
-              product.id
-                ? {
-                    ...item,
-                    is_active:
-                      newStatus,
-                  }
-                : item
-          )
+    const {
+      error,
+    } = await supabase
+      .from("products")
+      .update({
+        is_active: next,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq(
+        "id",
+        product.id
       )
+
+    if (error) {
+      alert(error.message)
+      return
     }
 
-  const deleteProduct =
-    async (product) => {
-      if (
-        !window.confirm(
-          `¿Eliminar definitivamente "${product.name}"?`
-        )
-      ) {
-        return
-      }
-
-      const variantIds =
-        (
-          product.product_variants ||
-          []
-        ).map(
-          (variant) =>
-            variant.id
-        )
-
-      if (variantIds.length) {
-        const {
-          count,
-          error,
-        } = await supabase
-          .from("order_items")
-          .select(
-            "id",
-            {
-              count: "exact",
-              head: true,
-            }
-          )
-          .in(
-            "variant_id",
-            variantIds
-          )
-
-        if (error) {
-          alert(error.message)
-          return
-        }
-
-        if ((count || 0) > 0) {
-          alert(
-            "No puedes eliminar este producto porque tiene ventas registradas. Puedes ocultarlo de la tienda."
-          )
-          return
-        }
-
-        const {
-          error: imagesError,
-        } = await supabase
-          .from(
-            "product_variant_images"
-          )
-          .delete()
-          .in(
-            "variant_id",
-            variantIds
-          )
-
-        if (imagesError) {
-          alert(imagesError.message)
-          return
-        }
-
-        const {
-          error: variantsError,
-        } = await supabase
-          .from("product_variants")
-          .delete()
-          .in(
-            "id",
-            variantIds
-          )
-
-        if (variantsError) {
-          alert(variantsError.message)
-          return
-        }
-      }
-
-      const {
-        error,
-      } = await supabase
-        .from("products")
-        .delete()
-        .eq(
-          "id",
-          product.id
-        )
-
-      if (error) {
-        alert(error.message)
-        return
-      }
-
-      setProducts(
-        (current) =>
-          current.filter(
-            (item) =>
-              item.id !==
-              product.id
-          )
+    setProducts((current) =>
+      current.map(
+        (item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                is_active: next,
+              }
+            : item
       )
+    )
+  }
+
+  async function deleteProduct(
+    product
+  ) {
+    if (
+      !window.confirm(
+        `¿Eliminar definitivamente "${product.name}"?`
+      )
+    ) {
+      return
     }
 
-  const getProductImage =
-    (product) => {
-      for (const variant of
+    const variantIds =
+      (
         product.product_variants ||
-        []) {
-        const images = (
-          variant.product_variant_images ||
-          []
+        []
+      ).map(
+        (variant) => variant.id
+      )
+
+    if (variantIds.length) {
+      const {
+        count,
+        error,
+      } = await supabase
+        .from("order_items")
+        .select(
+          "id",
+          {
+            count: "exact",
+            head: true,
+          }
         )
-          .slice()
-          .sort(
-            (a, b) =>
-              (a.position || 0) -
-              (b.position || 0)
-          )
+        .in(
+          "variant_id",
+          variantIds
+        )
 
-        if (
-          images[0]?.image_url
-        ) {
-          return images[0]
-            .image_url
-        }
-
-        if (
-          variant.color_image_url
-        ) {
-          return variant.color_image_url
-        }
+      if (error) {
+        alert(error.message)
+        return
       }
 
-      return ""
+      if ((count || 0) > 0) {
+        alert(
+          "Este producto tiene ventas registradas. No se puede eliminar; puedes ocultarlo."
+        )
+        return
+      }
+
+      const {
+        error: imageDeleteError,
+      } = await supabase
+        .from(
+          "product_variant_images"
+        )
+        .delete()
+        .in(
+          "variant_id",
+          variantIds
+        )
+
+      if (imageDeleteError) {
+        alert(
+          imageDeleteError.message
+        )
+        return
+      }
+
+      const {
+        error:
+          variantsError,
+      } = await supabase
+        .from(
+          "product_variants"
+        )
+        .delete()
+        .in(
+          "id",
+          variantIds
+        )
+
+      if (variantsError) {
+        alert(
+          variantsError.message
+        )
+        return
+      }
     }
+
+    const {
+      error,
+    } = await supabase
+      .from("products")
+      .delete()
+      .eq(
+        "id",
+        product.id
+      )
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setProducts((current) =>
+      current.filter(
+        (item) =>
+          item.id !== product.id
+      )
+    )
+  }
+
+  function getColorImages(product) {
+    const result = []
+    const seen = new Set()
+
+    for (const variant of
+      product.product_variants ||
+      []) {
+      const color =
+        String(
+          variant.color || ""
+        ).trim()
+
+      if (
+        !color ||
+        seen.has(color)
+      ) {
+        continue
+      }
+
+      const images = (
+        variant
+          .product_variant_images ||
+        []
+      )
+        .slice()
+        .sort(
+          (a, b) =>
+            (a.position || 0) -
+            (b.position || 0)
+        )
+
+      const image =
+        images[0]?.image_url ||
+        variant.color_image_url ||
+        ""
+
+      if (image) {
+        result.push({
+          color,
+          image,
+        })
+      }
+
+      seen.add(color)
+    }
+
+    return result
+  }
 
   const visibleProducts =
-    products.filter(
-      (product) =>
-        product.category ===
-        filterCategory
-    )
+    useMemo(() => {
+      const query =
+        search.trim().toLowerCase()
 
-  const groupedSubcategories =
-    Object.values(
-      visibleProducts.reduce(
-        (
-          groups,
-          product
-        ) => {
-          const label =
-            normalizeSubcategory(
-              product.subcategory
-            )
-
-          const key =
-            label.toLowerCase()
-
-          if (!groups[key]) {
-            groups[key] = {
-              key,
-              label,
-              products: [],
-            }
+      return products
+        .filter(
+          (product) =>
+            product.category ===
+            filterCategory
+        )
+        .filter((product) => {
+          if (!query) {
+            return true
           }
 
-          groups[
-            key
-          ].products.push(
-            product
+          return [
+            product.name,
+            product.subcategory,
+          ]
+            .filter(Boolean)
+            .some((value) =>
+              String(value)
+                .toLowerCase()
+                .includes(query)
+            )
+        })
+    }, [
+      products,
+      filterCategory,
+      search,
+    ])
+
+  const groupedSubcategories =
+    useMemo(() => {
+      const groups = {}
+
+      for (const product of
+        visibleProducts) {
+        const label =
+          normalizeSubcategory(
+            product.subcategory
           )
 
-          return groups
-        },
-        {}
-      )
-    ).sort(
-      (a, b) =>
+        const key =
+          label.toLowerCase()
+
+        if (!groups[key]) {
+          groups[key] = {
+            key,
+            label,
+            products: [],
+          }
+        }
+
+        groups[key].products.push(
+          product
+        )
+      }
+
+      return Object.values(
+        groups
+      ).sort((a, b) =>
         a.label.localeCompare(
           b.label,
           "es"
         )
-    )
+      )
+    }, [visibleProducts])
 
   const selectedGroup =
     groupedSubcategories.find(
@@ -1483,72 +1635,246 @@ export default function ProductsAdmin() {
         selectedSubcategory
     )
 
-  const categoryCount =
-    (categoryId) =>
-      products.filter(
-        (product) =>
-          product.category ===
-          categoryId
-      ).length
-
-  const ProductCard = ({
+  function ProductCard({
     product,
-  }) => {
-    const image =
-      getProductImage(
-        product
+  }) {
+    const images =
+      getColorImages(product)
+
+    const [
+      currentImage,
+      setCurrentImage,
+    ] = useState(0)
+
+    const [
+      dragStart,
+      setDragStart,
+    ] = useState(null)
+
+    useEffect(() => {
+      setCurrentImage(0)
+    }, [product.id])
+
+    function previous(event) {
+      event.stopPropagation()
+
+      if (images.length < 2) {
+        return
+      }
+
+      setCurrentImage(
+        (current) =>
+          current === 0
+            ? images.length - 1
+            : current - 1
       )
+    }
+
+    function next(event) {
+      event.stopPropagation()
+
+      if (images.length < 2) {
+        return
+      }
+
+      setCurrentImage(
+        (current) =>
+          current ===
+          images.length - 1
+            ? 0
+            : current + 1
+      )
+    }
+
+    function pointerDown(event) {
+      if (images.length < 2) {
+        return
+      }
+
+      setDragStart(
+        event.clientX
+      )
+    }
+
+    function pointerUp(event) {
+      if (
+        dragStart === null ||
+        images.length < 2
+      ) {
+        return
+      }
+
+      const difference =
+        event.clientX -
+        dragStart
+
+      if (
+        Math.abs(difference) >
+        45
+      ) {
+        setCurrentImage(
+          (current) =>
+            difference < 0
+              ? (current + 1) %
+                images.length
+              : (current -
+                  1 +
+                  images.length) %
+                images.length
+        )
+      }
+
+      setDragStart(null)
+    }
 
     return (
       <article
-        className={`${cardClass} w-full min-w-0 overflow-hidden`}
+        className={`${productTileClass} flex flex-col`}
       >
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() =>
-            startEditing(
-              product
-            )
+            startEditing(product)
           }
-          className="block aspect-[3/4] w-full overflow-hidden bg-neutral-50"
-          aria-label={`Editar ${product.name}`}
+          onKeyDown={(event) => {
+            if (
+              event.key ===
+                "Enter" ||
+              event.key === " "
+            ) {
+              event.preventDefault()
+              startEditing(product)
+            }
+          }}
+          className="flex min-h-0 flex-1 cursor-pointer flex-col text-left outline-none"
         >
-          {image ? (
-            <img
-              src={image}
-              alt={
-                product.name
-              }
-              loading="lazy"
-              className="h-full w-full object-contain transition duration-300 hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center px-3 text-center text-xs text-neutral-400">
-              Sin fotografía
+          <div
+            className="group relative min-h-0 flex-1 overflow-hidden bg-[#f7f6f2]"
+            onPointerDown={
+              pointerDown
+            }
+            onPointerUp={
+              pointerUp
+            }
+            onPointerCancel={() =>
+              setDragStart(null)
+            }
+          >
+            {images.length ? (
+              <img
+                src={
+                  images[
+                    currentImage
+                  ].image
+                }
+                alt={
+                  product.name
+                }
+                draggable="false"
+                className="h-full w-full select-none object-contain transition duration-500 group-hover:scale-[1.025]"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">
+                Sin fotografía
+              </div>
+            )}
+
+            {product.is_new && (
+              <span className="absolute left-2 top-2 rounded-full bg-white px-2 py-1 text-[7px] font-bold uppercase tracking-[0.1em] shadow-sm">
+                Nuevo
+              </span>
+            )}
+
+            {product.is_best_seller && (
+              <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-2 py-1 text-[7px] font-bold uppercase tracking-[0.1em] shadow-sm">
+                Más vendido
+              </span>
+            )}
+
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={previous}
+                  className="absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-sm opacity-0 shadow-sm transition group-hover:opacity-100"
+                  aria-label="Anterior"
+                >
+                  ‹
+                </button>
+
+                <button
+                  type="button"
+                  onClick={next}
+                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-sm opacity-0 shadow-sm transition group-hover:opacity-100"
+                  aria-label="Siguiente"
+                >
+                  ›
+                </button>
+
+                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-white/90 px-1.5 py-1">
+                  {images.map(
+                    (_, index) => (
+                      <span
+                        key={index}
+                        className={`h-1 rounded-full ${
+                          index ===
+                          currentImage
+                            ? "w-2.5 bg-neutral-950"
+                            : "w-1 bg-neutral-300"
+                        }`}
+                      />
+                    )
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex h-[75px] shrink-0 flex-col items-center justify-center px-2 py-2 text-center">
+            <p className="line-clamp-1 text-[7px] font-medium uppercase tracking-[0.11em] text-neutral-400">
+              {normalizeSubcategory(
+                product.subcategory
+              )}
+            </p>
+
+            <h3 className="mt-1 line-clamp-2 text-[9px] font-semibold leading-3.5 text-neutral-900">
+              {product.name}
+            </h3>
+
+            <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+              <span className="text-[9px] font-semibold">
+                {Number(
+                  product.price
+                ).toFixed(2)}
+              </span>
+
+              {product.old_price &&
+                Number(
+                  product.old_price
+                ) >
+                  Number(
+                    product.price
+                  ) && (
+                  <span className="text-[7px] text-neutral-400 line-through">
+                    {Number(
+                      product.old_price
+                    ).toFixed(2)}
+                  </span>
+                )}
             </div>
-          )}
-        </button>
+          </div>
+        </div>
 
-        <div className="flex flex-col gap-[14px] p-[18px] text-center">
-          <h2 className="line-clamp-2 min-h-10 break-words text-xs font-semibold text-neutral-900">
-            {product.name}
-          </h2>
-
-          <p className="text-sm font-semibold text-neutral-900">
-            S/{" "}
-            {Number(
-              product.price || 0
-            ).toFixed(2)}
-          </p>
-
+        <div className="grid h-[39px] shrink-0 grid-cols-2 gap-1 border-t border-neutral-100 p-1">
           <button
             type="button"
             onClick={() =>
-              toggleProductVisibility(
+              toggleVisibility(
                 product
               )
             }
-            className="min-h-[42px] w-full rounded-xl border border-neutral-300 px-3 py-[11px] text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50"
+            className="min-h-7 rounded-md border border-neutral-200 text-[7px] font-semibold transition hover:bg-neutral-50"
           >
             {product.is_active
               ? "Ocultar"
@@ -1562,7 +1888,7 @@ export default function ProductsAdmin() {
                 product
               )
             }
-            className="min-h-[42px] w-full rounded-xl border border-red-200 px-3 py-[11px] text-xs font-semibold text-red-600 transition hover:bg-red-50"
+            className="min-h-7 rounded-md border border-red-200 text-[7px] font-semibold text-red-600 transition hover:bg-red-50"
           >
             Eliminar
           </button>
@@ -1571,552 +1897,641 @@ export default function ProductsAdmin() {
     )
   }
 
+  function AddProductCard() {
+    return (
+      <button
+        type="button"
+        onClick={
+          startNewProduct
+        }
+        className={`${productTileClass} flex flex-col items-center justify-center border-dashed bg-white text-center hover:-translate-y-1 hover:border-neutral-500 hover:bg-neutral-50`}
+      >
+        <span className="text-3xl font-light text-neutral-400">
+          +
+        </span>
+
+        <span className="mt-2 text-[8px] font-semibold uppercase tracking-[0.12em] text-neutral-700">
+          Agregar producto
+        </span>
+      </button>
+    )
+  }
+
   if (loading) {
     return (
-      <div className="flex min-h-[65vh] w-full items-center justify-center bg-white px-6 text-neutral-500">
+      <div className="flex min-h-[60vh] items-center justify-center bg-white text-sm text-neutral-500">
         Cargando productos...
       </div>
     )
   }
 
   return (
-    <div className="w-full bg-white px-5 py-12 text-neutral-900 sm:px-8 sm:py-16 lg:px-10">
-      <div className="flex w-full flex-col items-center gap-16">
-
+    <div className="min-h-full w-full bg-white px-5 py-12 text-neutral-900 sm:px-8 md:px-12 lg:px-16 xl:px-20">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col items-center">
         {view === "list" && (
-          <div className="flex w-full flex-col items-center justify-center gap-12">
+          <div className="flex w-full flex-col items-center gap-16">
+            <SectionHeader
+              eyebrow="Catálogo"
+              title="Productos"
+            />
 
-            <div className="flex w-full flex-col items-center justify-center text-center">
-              <div className="mb-8 h-px w-16 bg-neutral-200" />
+            <div className="grid w-full max-w-[900px] grid-cols-1 gap-8 md:grid-cols-2">
+              {[
+                {
+                  id: "hombre",
+                  label: "HOMBRE",
+                },
+                {
+                  id: "mujer",
+                  label: "MUJER",
+                },
+              ].map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        "category",
+                        "",
+                        false,
+                        item.id
+                      )
+                    }
+                    className="group flex min-h-[260px] flex-col items-center justify-center gap-7 rounded-[28px] border border-neutral-200 bg-white px-10 py-12 text-center shadow-[0_10px_35px_rgba(0,0,0,0.035)] transition hover:-translate-y-1 hover:border-neutral-300 hover:shadow-[0_18px_45px_rgba(0,0,0,0.07)]"
+                  >
+                    <span className="text-xl font-semibold tracking-[0.22em]">
+                      {item.label}
+                    </span>
 
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-neutral-400">
-                Selecciona una categoría
-              </p>
+                    <span className="rounded-full border border-neutral-200 bg-neutral-50 px-5 py-2.5 text-xs font-medium text-neutral-600">
+                      {
+                        products.filter(
+                          (product) =>
+                            product.category ===
+                            item.id
+                        ).length
+                      }{" "}
+                      productos
+                    </span>
 
-              <div className="mt-4 h-px w-10 bg-neutral-200" />
-            </div>
-
-            <div className="flex w-full items-center justify-center">
-
-              <div className="grid w-full max-w-[900px] grid-cols-1 gap-9 sm:grid-cols-2">
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      "category",
-                      null,
-                      false,
-                      "hombre"
-                    )
-                  }
-                  className="flex min-h-[230px] w-full flex-col items-center justify-center gap-7 rounded-2xl border border-neutral-200 bg-white px-8 py-10 text-center shadow-[0_8px_25px_rgba(0,0,0,0.04)] transition hover:-translate-y-1 hover:border-neutral-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.07)]"
-                >
-                  <span className="text-xl font-semibold tracking-[0.2em] text-neutral-900">
-                    HOMBRE
-                  </span>
-
-                  <span className="rounded-full border border-neutral-200 bg-neutral-50 px-6 py-3 text-sm font-medium text-neutral-700">
-                    {categoryCount("hombre")}{" "}
-                    productos
-                  </span>
-
-                  <span className="text-sm font-medium text-neutral-500">
-                    Administrar prendas →
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      "category",
-                      null,
-                      false,
-                      "mujer"
-                    )
-                  }
-                  className="flex min-h-[230px] w-full flex-col items-center justify-center gap-7 rounded-2xl border border-neutral-200 bg-white px-8 py-10 text-center shadow-[0_8px_25px_rgba(0,0,0,0.04)] transition hover:-translate-y-1 hover:border-neutral-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.07)]"
-                >
-                  <span className="text-xl font-semibold tracking-[0.2em] text-neutral-900">
-                    MUJER
-                  </span>
-
-                  <span className="rounded-full border border-neutral-200 bg-neutral-50 px-6 py-3 text-sm font-medium text-neutral-700">
-                    {categoryCount("mujer")}{" "}
-                    productos
-                  </span>
-
-                  <span className="text-sm font-medium text-neutral-500">
-                    Administrar prendas →
-                  </span>
-                </button>
-
-              </div>
+                    <span className="text-sm font-medium text-neutral-500 transition group-hover:text-neutral-900">
+                      Administrar colección →
+                    </span>
+                  </button>
+                )
+              )}
             </div>
           </div>
         )}
 
         {view === "category" && (
-          <div className="flex w-full flex-col items-center gap-16">
-            <header className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-neutral-400">
-                Categoría
-              </p>
-
-              <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                {filterCategory ===
+          <div className="flex w-full flex-col items-center gap-14">
+            <SectionHeader
+              eyebrow="Colección"
+              title={
+                filterCategory ===
                 "hombre"
                   ? "HOMBRE"
-                  : "MUJER"}
-              </h1>
+                  : "MUJER"
+              }
+            />
 
-              <p className="mt-5 text-sm text-neutral-500">
-                {visibleProducts.length}{" "}
-                productos registrados
-              </p>
-            </header>
+            <div className="flex w-full max-w-[900px] items-center gap-3">
+              <div className="shrink-0 text-neutral-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="11"
+                    cy="11"
+                    r="7"
+                  />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+              </div>
 
-            <div className="flex w-full justify-center">
-              <ProductButton
-                onClick={
-                  startNewProduct
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value
+                  )
                 }
-              >
-                + Agregar producto
-              </ProductButton>
+                placeholder="Buscar producto..."
+                className={inputClass}
+              />
             </div>
 
-            {!visibleProducts.length ? (
-              <div
-                className={`${cardClass} mx-auto flex w-full max-w-2xl flex-col items-center gap-7 border-dashed px-9 py-[70px] text-center`}
-              >
-                <p className="text-neutral-500">
-                  Todavía no hay
-                  productos en esta
-                  categoría.
+            <div className="grid w-full grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-6 lg:gap-4">
+              <AddProductCard />
+
+              {visibleProducts.map(
+                (product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                  />
+                )
+              )}
+            </div>
+
+            {!visibleProducts.length && (
+              <div className="flex w-full flex-col items-center py-16 text-center">
+                <p className="text-sm text-neutral-500">
+                  No hay productos registrados en esta colección.
                 </p>
-
-                <ProductButton
-                  onClick={
-                    startNewProduct
-                  }
-                >
-                  + Registrar primera prenda
-                </ProductButton>
-              </div>
-            ) : (
-              <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-[72px]">
-                {groupedSubcategories.map(
-                  (group) => (
-                    <section
-                      key={
-                        group.key
-                      }
-                      className="mx-auto w-full"
-                    >
-                      <div className="mb-9 flex w-full flex-col items-center justify-center gap-5 text-center">
-                        <div>
-                          <h2 className="text-xl font-semibold text-neutral-900">
-                            {group.label}
-                          </h2>
-
-                          <p className="mt-2 text-sm text-neutral-500">
-                            {
-                              group
-                                .products
-                                .length
-                            }{" "}
-                            {group
-                              .products
-                              .length ===
-                            1
-                              ? "producto"
-                              : "productos"}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(
-                              "subcategory",
-                              group.key
-                            )
-                          }
-                          className="min-h-[43px] rounded-xl border border-neutral-300 px-6 py-[11px] text-sm font-semibold text-neutral-800 transition hover:bg-neutral-50"
-                        >
-                          Ver más →
-                        </button>
-                      </div>
-
-                      <div className="mx-auto flex w-full snap-x snap-mandatory gap-7 overflow-x-auto px-2 pb-7">
-                        {group.products.map(
-                          (
-                            product
-                          ) => (
-                            <div
-                              key={
-                                product.id
-                              }
-                              className="w-[185px] min-w-[185px] snap-start sm:w-[205px] sm:min-w-[205px]"
-                            >
-                              <ProductCard
-                                product={
-                                  product
-                                }
-                              />
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </section>
-                  )
-                )}
               </div>
             )}
           </div>
         )}
 
         {view === "subcategory" && (
-          <div className="flex w-full flex-col items-center gap-16">
-            <header className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-neutral-400">
-                {filterCategory ===
+          <div className="flex w-full flex-col items-center gap-14">
+            <SectionHeader
+              eyebrow={
+                filterCategory ===
                 "hombre"
                   ? "HOMBRE"
-                  : "MUJER"}
-              </p>
+                  : "MUJER"
+              }
+              title={
+                selectedGroup?.label ||
+                selectedSubcategory
+              }
+            />
 
-              <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                {
-                  selectedGroup?.label ||
-                  selectedSubcategory
-                }
-              </h1>
+            <div className="grid w-full grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-6 lg:gap-4">
+              <AddProductCard />
 
-              <p className="mt-5 text-sm text-neutral-500">
-                {
-                  selectedGroup
-                    ?.products
-                    .length || 0
-                }{" "}
-                productos registrados
-              </p>
-            </header>
-
-            <div className="flex w-full justify-center">
-              <ProductButton
-                onClick={
-                  startNewProduct
-                }
-              >
-                + Agregar producto
-              </ProductButton>
+              {selectedGroup?.products?.map(
+                (product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                  />
+                )
+              )}
             </div>
 
-            {!selectedGroup ||
-            !selectedGroup.products
-              .length ? (
-              <div className="mx-auto py-[70px] text-center text-neutral-500">
+            {!selectedGroup?.products
+              ?.length && (
+              <p className="py-20 text-sm text-neutral-500">
                 No hay productos en
                 esta subcategoría.
-              </div>
-            ) : (
-              <div className="mx-auto grid w-full max-w-[1200px] grid-cols-2 justify-items-center gap-x-8 gap-y-12 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                {selectedGroup.products.map(
-                  (product) => (
-                    <div
-                      key={
-                        product.id
-                      }
-                      className="w-full max-w-[205px]"
-                    >
-                      <ProductCard
-                        product={
-                          product
-                        }
-                      />
-                    </div>
-                  )
-                )}
-              </div>
+              </p>
             )}
           </div>
         )}
 
         {view === "editor" && (
-          <div className="flex w-full flex-col items-center gap-16">
-            <header className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-neutral-400">
-                Productos
-              </p>
-
-              <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+          <form
+            onSubmit={
+              handleSubmit
+            }
+            className="flex w-full max-w-[1250px] flex-col gap-16"
+          >
+            <div className="flex flex-col items-center text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400">
                 {editingId
                   ? "Editar producto"
+                  : "Nuevo producto"}
+              </p>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-5xl">
+                {editingId
+                  ? name ||
+                    "Editar producto"
                   : "Agregar producto"}
               </h1>
-            </header>
 
-            <form
-              onSubmit={
-                handleSubmit
-              }
-              className="mx-auto flex w-full max-w-[1100px] flex-col gap-12"
+              <span className="mt-6 rounded-full bg-neutral-950 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white">
+                {category ===
+                "mujer"
+                  ? "MUJER"
+                  : "HOMBRE"}
+              </span>
+            </div>
+
+            <section
+              className={`${cardClass} p-7 sm:p-10 lg:p-14`}
             >
-              <section
-                className={`${cardClass} w-full p-8 sm:p-12`}
-              >
-                <div className="mx-auto w-full max-w-[950px]">
-                  <h2 className="mb-10 text-center text-xl font-semibold text-neutral-900">
-                    Información general
-                  </h2>
-
-                  <div className="grid gap-x-9 gap-y-9 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-3 block text-sm font-medium text-neutral-800">
-                        Nombre del producto *
-                      </label>
-
-                      <input
-                        value={name}
-                        onChange={(e) =>
-                          setName(
-                            e.target.value
-                          )
-                        }
-                        placeholder="Ej. Polo Oversize"
-                        className={
-                          inputClass
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-3 block text-sm font-medium text-neutral-800">
-                        Categoría *
-                      </label>
-
-                      <select
-                        value={
-                          category
-                        }
-                        onChange={(
-                          e
-                        ) => {
-                          setCategory(
-                            e.target.value
-                          )
-
-                          setFilterCategory(
-                            e.target.value
-                          )
-                        }}
-                        className={
-                          inputClass
-                        }
-                      >
-                        <option value="hombre">
-                          Hombre
-                        </option>
-
-                        <option value="mujer">
-                          Mujer
-                        </option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-3 block text-sm font-medium text-neutral-800">
-                        Subcategoría *
-                      </label>
-
-                      <input
-                        value={
-                          subcategory
-                        }
-                        onChange={(e) =>
-                          setSubcategory(
-                            e.target.value
-                          )
-                        }
-                        placeholder="Ej. Polos, pantalones, tops"
-                        className={
-                          inputClass
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-7 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-3 block text-sm font-medium text-neutral-800">
-                          Precio (S/) *
-                        </label>
-
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={price}
-                          onChange={(e) =>
-                            setPrice(
-                              e.target.value
-                            )
-                          }
-                          className={
-                            inputClass
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-3 block text-sm font-medium text-neutral-800">
-                          Precio anterior
-                        </label>
-
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={
-                            oldPrice
-                          }
-                          onChange={(e) =>
-                            setOldPrice(
-                              e.target.value
-                            )
-                          }
-                          className={
-                            inputClass
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-6 rounded-2xl border border-neutral-200 bg-neutral-50 px-7 py-7 sm:col-span-2">
-                      <label className="flex cursor-pointer items-center gap-3 text-sm text-neutral-800">
-                        <input
-                          type="checkbox"
-                          checked={
-                            isNew
-                          }
-                          onChange={(e) =>
-                            setIsNew(
-                              e.target.checked
-                            )
-                          }
-                          className="h-5 w-5 accent-neutral-900"
-                        />
-
-                        Mostrar como nuevo
-                      </label>
-
-                      <label className="flex cursor-pointer items-center gap-3 text-sm text-neutral-800">
-                        <input
-                          type="checkbox"
-                          checked={
-                            isBestSeller
-                          }
-                          onChange={(e) =>
-                            setIsBestSeller(
-                              e.target.checked
-                            )
-                          }
-                          className="h-5 w-5 accent-neutral-900"
-                        />
-
-                        Mostrar como más vendido
-                      </label>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="mb-3 block text-sm font-medium text-neutral-800">
-                        Descripción
-                      </label>
-
-                      <textarea
-                        rows={6}
-                        value={
-                          description
-                        }
-                        onChange={(e) =>
-                          setDescription(
-                            e.target.value
-                          )
-                        }
-                        placeholder="Detalles de la prenda..."
-                        className={
-                          inputClass
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section
-                className={`${cardClass} w-full p-8 sm:p-12`}
-              >
-                <div className="mb-12 flex flex-col items-center gap-7 text-center">
+              <div className="mx-auto max-w-[900px]">
+                <div className="grid gap-12 md:grid-cols-2">
                   <div>
-                    <h2 className="text-xl font-semibold text-neutral-900">
-                      Colores, fotos y stock
-                    </h2>
+                    <label className="mb-4 block text-sm font-semibold">
+                      Nombre del producto
+                    </label>
 
-                    <p className="mt-3 text-sm leading-6 text-neutral-500">
-                      Configura cada color,
-                      sus fotografías y las
-                      tallas disponibles.
-                    </p>
+                    <input
+                      value={name}
+                      onChange={(event) =>
+                        setName(
+                          event.target.value
+                        )
+                      }
+                      placeholder=""
+                      className={inputClass}
+                    />
                   </div>
 
-                  <ProductButton
-                    onClick={
-                      addColor
-                    }
-                  >
-                    + Agregar color
-                  </ProductButton>
+                  <div>
+                    <label className="mb-4 block text-sm font-semibold">
+                      Subcategoría
+                    </label>
+
+                    <input
+                      value={
+                        subcategory
+                      }
+                      onChange={(event) =>
+                        setSubcategory(
+                          event.target.value
+                        )
+                      }
+                      placeholder=""
+                      list="gmish-subcategories"
+                      className={inputClass}
+                    />
+
+                    <datalist id="gmish-subcategories">
+                      {[
+                        ...new Set(
+                          products
+                            .filter(
+                              (product) =>
+                                product.category ===
+                                category
+                            )
+                            .map(
+                              (product) =>
+                                normalizeSubcategory(
+                                  product.subcategory
+                                )
+                            )
+                        ),
+                      ].map(
+                        (item) => (
+                          <option
+                            key={item}
+                            value={item}
+                          />
+                        )
+                      )}
+                    </datalist>
+                  </div>
                 </div>
 
-                {!colors.length && (
-                  <div className="rounded-xl border border-dashed border-neutral-300 p-12 text-center text-sm text-neutral-500">
-                    Sin colores.
+                <div className="mt-16 grid gap-12 md:grid-cols-2">
+                  <div>
+                    <label className="mb-4 block text-sm font-semibold">
+                      Precio actual
+                    </label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={price}
+                      onChange={(event) =>
+                        setPrice(
+                          event.target.value
+                        )
+                      }
+                      placeholder=""
+                      className={inputClass}
+                    />
                   </div>
-                )}
 
-                <div className="mx-auto flex w-full max-w-[950px] flex-col gap-12">
-                  {colors.map(
-                    (
-                      color,
-                      colorIndex
-                    ) => (
-                      <div
-                        key={
-                          colorIndex
-                        }
-                        className="rounded-2xl border border-neutral-200 bg-neutral-50 p-7 sm:p-9"
-                      >
-                        <div className="mb-9 flex flex-col items-center justify-center gap-6 text-center">
-                          <div>
-                            <p className="text-xs uppercase tracking-widest text-neutral-400">
-                              Variante
-                            </p>
+                  <div>
+                    <label className="mb-4 block text-sm font-semibold">
+                      Precio anterior
+                    </label>
 
-                            <h3 className="mt-2 font-semibold text-neutral-900">
-                              Color{" "}
-                              {colorIndex +
-                                1}
-                              {color.name
-                                ? ` · ${color.name}`
-                                : ""}
-                            </h3>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={
+                        oldPrice
+                      }
+                      onChange={(event) =>
+                        setOldPrice(
+                          event.target.value
+                        )
+                      }
+                      placeholder=""
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-16 grid gap-7 md:grid-cols-2">
+                  <ToggleCard
+                    checked={
+                      isBestSeller
+                    }
+                    onChange={
+                      setIsBestSeller
+                    }
+                    title="Más vendido"
+                  />
+
+                  <ToggleCard
+                    checked={isNew}
+                    onChange={setIsNew}
+                    title="Nuevo"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section
+              className={`${cardClass} p-7 sm:p-10 lg:p-14`}
+            >
+              <SectionHeader
+                title="Colores y fotografías"
+              />
+
+              <div className="mx-auto mt-14 flex max-w-[1050px] flex-col gap-12">
+                {colors.map(
+                  (
+                    color,
+                    colorIndex
+                  ) => (
+                    <div
+                      key={
+                        color.localId ||
+                        colorIndex
+                      }
+                      className="rounded-[26px] border border-neutral-200 bg-[#faf9f6] p-7 sm:p-10"
+                    >
+                      <div className="flex flex-col items-center gap-8 text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-semibold">
+                          {String(
+                            colorIndex +
+                              1
+                          ).padStart(
+                            2,
+                            "0"
+                          )}
+                        </div>
+
+                        <div className="grid w-full gap-7 md:grid-cols-[1fr_130px]">
+                          <div className="text-left">
+                            <label className="mb-3 block text-sm font-semibold">
+                              Nombre del color
+                            </label>
+
+                            <input
+                              value={
+                                color.name
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                updateColor(
+                                  colorIndex,
+                                  "name",
+                                  event
+                                    .target
+                                    .value
+                                )
+                              }
+                              placeholder=""
+                              className={
+                                inputClass
+                              }
+                            />
                           </div>
 
+                          <div className="flex flex-col items-center">
+                            <label className="mb-3 block text-sm font-semibold">
+                              Color
+                            </label>
+
+                            <label className="relative flex h-[58px] w-[58px] cursor-pointer overflow-hidden rounded-full border-4 border-white shadow-[0_0_0_1px_#d4d4d4]">
+                              <input
+                                type="color"
+                                value={
+                                  color.hex ||
+                                  "#777777"
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  updateColor(
+                                    colorIndex,
+                                    "hex",
+                                    event
+                                      .target
+                                      .value
+                                  )
+                                }
+                                className="absolute inset-[-10px] h-[80px] w-[80px] cursor-pointer opacity-0"
+                              />
+
+                              <span
+                                className="h-full w-full rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    color.hex ||
+                                    "#777777",
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="w-full border-t border-neutral-200 pt-9">
+                          <div className="flex flex-col items-center gap-2 text-center">
+                            <p className="text-sm font-semibold">
+                              Fotografías
+                            </p>
+
+                            <p className="text-xs leading-5 text-neutral-500">
+                              La primera imagen es la principal.
+                            </p>
+                          </div>
+
+                          <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                            {(
+                              color.images ||
+                              []
+                            ).map(
+                              (
+                                image,
+                                imageIndex
+                              ) => (
+                                <div
+                                  key={`${image}-${imageIndex}`}
+                                  className={`group relative aspect-[3/4] overflow-hidden rounded-2xl border-2 bg-white ${
+                                    imageIndex ===
+                                    0
+                                      ? "border-neutral-950"
+                                      : "border-neutral-200"
+                                  }`}
+                                >
+                                  <img
+                                    src={
+                                      image
+                                    }
+                                    alt={`${color.name} ${imageIndex + 1}`}
+                                    className="h-full w-full object-contain"
+                                  />
+
+                                  {imageIndex ===
+                                    0 && (
+                                    <span className="absolute left-3 top-3 rounded-full bg-neutral-950 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white">
+                                      Principal
+                                    </span>
+                                  )}
+
+                                  <div className="absolute inset-x-3 bottom-3 flex flex-col gap-2 opacity-0 transition group-hover:opacity-100">
+                                    {imageIndex !==
+                                      0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setMainImage(
+                                            colorIndex,
+                                            imageIndex
+                                          )
+                                        }
+                                        className="rounded-xl bg-white px-3 py-2 text-[10px] font-semibold shadow-sm"
+                                      >
+                                        Usar como principal
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeImage(
+                                          colorIndex,
+                                          imageIndex
+                                        )
+                                      }
+                                      className="rounded-xl bg-white px-3 py-2 text-[10px] font-semibold text-red-600 shadow-sm"
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                fileInputRefs.current[
+                                  colorIndex
+                                ]?.click()
+                              }
+                              disabled={
+                                uploadingImage ===
+                                colorIndex
+                              }
+                              className="flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white text-center transition hover:border-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                            >
+                              <span className="text-3xl font-light">
+                                +
+                              </span>
+
+                              <span className="text-xs font-semibold">
+                                {uploadingImage ===
+                                colorIndex
+                                  ? "Subiendo..."
+                                  : "Agregar fotos"}
+                              </span>
+                            </button>
+
+                            <input
+                              ref={(element) => {
+                                fileInputRefs.current[
+                                  colorIndex
+                                ] = element
+                              }}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(
+                                event
+                              ) =>
+                                uploadImages(
+                                  colorIndex,
+                                  event
+                                )
+                              }
+                              className="hidden"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="w-full border-t border-neutral-200 pt-9">
+                          <div className="flex flex-col items-center gap-2 text-center">
+                            <p className="text-sm font-semibold">
+                              Stock por talla
+                            </p>
+
+                            <p className="text-xs text-neutral-500">
+                              Las tallas con 0 no se publicarán.
+                            </p>
+                          </div>
+
+                          <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-4">
+                            {color.sizes.map(
+                              (
+                                size,
+                                sizeIndex
+                              ) => (
+                                <div
+                                  key={
+                                    size.size
+                                  }
+                                  className="rounded-2xl border border-neutral-200 bg-white p-5 text-center"
+                                >
+                                  <p className="text-sm font-bold">
+                                    {size.size}
+                                  </p>
+
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={
+                                      size.stock
+                                    }
+                                    onChange={(
+                                      event
+                                    ) =>
+                                      updateStock(
+                                        colorIndex,
+                                        sizeIndex,
+                                        event
+                                          .target
+                                          .value
+                                      )
+                                    }
+                                    placeholder="0"
+                                    className="mt-4 h-12 w-full rounded-xl border border-neutral-200 bg-white text-center text-sm outline-none focus:border-neutral-950"
+                                  />
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+
+                        {colors.length >
+                          1 && (
                           <button
                             type="button"
                             onClick={() =>
@@ -2124,339 +2539,58 @@ export default function ProductsAdmin() {
                                 colorIndex
                               )
                             }
-                            className="min-h-[43px] rounded-xl border border-red-200 px-6 py-[11px] text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                            className="text-xs font-semibold text-red-600 transition hover:text-red-700"
                           >
-                            Eliminar color
+                            Eliminar este color
                           </button>
-                        </div>
-
-                        <div className="grid gap-x-9 gap-y-9 sm:grid-cols-2">
-                          <div>
-                            <label className="mb-3 block text-sm font-medium text-neutral-800">
-                              Nombre del color *
-                            </label>
-
-                            <input
-                              value={
-                                color.name
-                              }
-                              onChange={(e) =>
-                                updateColor(
-                                  colorIndex,
-                                  "name",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Ej. Negro"
-                              className={
-                                inputClass
-                              }
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-3 block text-sm font-medium text-neutral-800">
-                              Color de referencia
-                            </label>
-
-                            <div className="flex min-h-[52px] items-center justify-center gap-4 rounded-xl border border-neutral-200 bg-white p-2">
-                              <input
-                                type="color"
-                                value={
-                                  color.hex
-                                }
-                                onChange={(e) =>
-                                  updateColor(
-                                    colorIndex,
-                                    "hex",
-                                    e.target.value
-                                  )
-                                }
-                                className="h-10 w-12 cursor-pointer border-0 bg-transparent"
-                              />
-
-                              <span className="text-sm text-neutral-500">
-                                {color.hex}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <input
-                          ref={(
-                            element
-                          ) => {
-                            fileInputRefs.current[
-                              colorIndex
-                            ] =
-                              element
-                          }}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) =>
-                            uploadColorImages(
-                              colorIndex,
-                              e
-                            )
-                          }
-                        />
-
-                        <div className="mt-12 border-t border-neutral-200 pt-10">
-                          <div className="mb-8 flex flex-col items-center gap-6 text-center">
-                            <div>
-                              <h4 className="font-semibold text-neutral-900">
-                                Fotografías
-                              </h4>
-
-                              <p className="mt-2 text-xs text-neutral-500">
-                                La primera será la
-                                principal.
-                              </p>
-                            </div>
-
-                            <ProductButton
-                              onClick={() =>
-                                fileInputRefs
-                                  .current[
-                                    colorIndex
-                                  ]
-                                  ?.click()
-                              }
-                              disabled={
-                                uploadingImage ===
-                                colorIndex
-                              }
-                            >
-                              {uploadingImage ===
-                              colorIndex
-                                ? "Subiendo..."
-                                : "+ Agregar fotos"}
-                            </ProductButton>
-                          </div>
-
-                          {!color
-                            .images
-                            ?.length ? (
-                            <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-12 text-center text-sm text-neutral-500">
-                              Sin fotografías.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 justify-items-center gap-x-9 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
-                              {color.images.map(
-                                (
-                                  imageUrl,
-                                  imageIndex
-                                ) => (
-                                  <div
-                                    key={`${imageUrl}-${imageIndex}`}
-                                    className="w-full max-w-[230px] overflow-hidden rounded-xl border border-neutral-200 bg-white"
-                                  >
-                                    <div className="relative aspect-[3/4] bg-neutral-50">
-                                      <img
-                                        src={
-                                          imageUrl
-                                        }
-                                        alt={`${
-                                          color.name ||
-                                          "Prenda"
-                                        } foto ${
-                                          imageIndex +
-                                          1
-                                        }`}
-                                        className="h-full w-full object-contain"
-                                      />
-
-                                      <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm">
-                                        {imageIndex ===
-                                        0
-                                          ? "Principal"
-                                          : `Foto ${
-                                              imageIndex +
-                                              1
-                                            }`}
-                                      </span>
-
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removeColorImage(
-                                            colorIndex,
-                                            imageIndex
-                                          )
-                                        }
-                                        className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-bold text-red-600 shadow-sm transition hover:bg-red-50"
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-
-                                    {imageIndex >
-                                      0 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const images =
-                                            [
-                                              ...color.images,
-                                            ]
-
-                                          const [
-                                            selected,
-                                          ] =
-                                            images.splice(
-                                              imageIndex,
-                                              1
-                                            )
-
-                                          images.unshift(
-                                            selected
-                                          )
-
-                                          setColors(
-                                            (
-                                              current
-                                            ) =>
-                                              current.map(
-                                                (
-                                                  item,
-                                                  index
-                                                ) =>
-                                                  index ===
-                                                  colorIndex
-                                                    ? {
-                                                        ...item,
-                                                        images,
-                                                        imageUrl:
-                                                          images[0] ||
-                                                          "",
-                                                      }
-                                                    : item
-                                              )
-                                          )
-                                        }}
-                                        className="min-h-[46px] w-full border-t border-neutral-200 px-3 py-3 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50"
-                                      >
-                                        Usar como principal
-                                      </button>
-                                    )}
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-12 border-t border-neutral-200 pt-10">
-                          <div className="mb-8 text-center">
-                            <h4 className="font-semibold text-neutral-900">
-                              Tallas y stock
-                            </h4>
-
-                            <p className="mt-2 text-xs text-neutral-500">
-                              Activa solamente las
-                              tallas disponibles.
-                            </p>
-                          </div>
-
-                          <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-4">
-                            {color.sizes.map(
-                              (
-                                sizeItem,
-                                sizeIndex
-                              ) => (
-                                <div
-                                  key={
-                                    sizeItem.size
-                                  }
-                                  className={`rounded-xl border p-6 ${
-                                    sizeItem.enabled
-                                      ? "border-neutral-400 bg-white shadow-sm"
-                                      : "border-neutral-200 bg-white"
-                                  }`}
-                                >
-                                  <label className="flex cursor-pointer items-center justify-center gap-3 font-semibold text-neutral-900">
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        sizeItem.enabled
-                                      }
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateColorSize(
-                                          colorIndex,
-                                          sizeIndex,
-                                          "enabled",
-                                          e.target.checked
-                                        )
-                                      }
-                                      className="h-5 w-5 accent-neutral-900"
-                                    />
-
-                                    Talla{" "}
-                                    {sizeItem.size}
-                                  </label>
-
-                                  <label className="mb-3 mt-6 block text-center text-xs text-neutral-500">
-                                    Unidades disponibles
-                                  </label>
-
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={
-                                      sizeItem.stock
-                                    }
-                                    onChange={(
-                                      e
-                                    ) =>
-                                      updateColorSize(
-                                        colorIndex,
-                                        sizeIndex,
-                                        "stock",
-                                        e.target.value
-                                      )
-                                    }
-                                    disabled={
-                                      !sizeItem.enabled
-                                    }
-                                    placeholder="Cantidad"
-                                    className={`${inputClass} text-center disabled:bg-neutral-50 disabled:text-neutral-300`}
-                                  />
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
+                        )}
                       </div>
-                    )
-                  )}
-                </div>
-              </section>
+                    </div>
+                  )
+                )}
 
-              <div className="flex w-full justify-center border-t border-neutral-200 pt-10">
                 <button
-                  type="submit"
-                  disabled={
-                    saving ||
-                    uploadingImage !==
-                      null
+                  type="button"
+                  onClick={
+                    addColor
                   }
-                  className="inline-flex min-h-[52px] w-full max-w-[440px] items-center justify-center rounded-xl bg-neutral-900 px-7 py-[15px] text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mx-auto flex min-h-[58px] w-full max-w-[500px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white text-sm font-semibold text-neutral-700 transition hover:border-neutral-600 hover:bg-neutral-50"
                 >
-                  {saving
-                    ? "Guardando..."
-                    : editingId
-                      ? "Guardar cambios"
-                      : "Guardar producto"}
+                  + Agregar otro color
                 </button>
               </div>
-            </form>
-          </div>
+            </section>
+
+            <div className="mx-auto flex w-full max-w-[700px] flex-col gap-4 pb-8 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm()
+                  navigate(
+                    "category",
+                    "",
+                    false,
+                    filterCategory
+                  )
+                }}
+                className={`${secondaryButtonClass} flex-1`}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className={`${buttonClass} flex-1`}
+              >
+                {saving
+                  ? "Guardando..."
+                  : editingId
+                    ? "Guardar cambios"
+                    : "Publicar producto"}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>
