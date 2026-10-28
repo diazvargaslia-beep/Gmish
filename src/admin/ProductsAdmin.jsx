@@ -456,6 +456,52 @@ export default function ProductsAdmin() {
     )
   }
 
+  async function pickColorWithEyeDropper(
+    colorIndex
+  ) {
+    if (
+      typeof window === "undefined" ||
+      !("EyeDropper" in window)
+    ) {
+      alert(
+        "Tu navegador no tiene cuentagotas. Puedes usar el círculo de color para elegirlo manualmente."
+      )
+      return
+    }
+
+    try {
+      const eyeDropper =
+        new window.EyeDropper()
+
+      const result =
+        await eyeDropper.open()
+
+      if (
+        result?.sRGBHex
+      ) {
+        updateColor(
+          colorIndex,
+          "hex",
+          result.sRGBHex
+        )
+      }
+    } catch (error) {
+      if (
+        error?.name !==
+        "AbortError"
+      ) {
+        console.error(
+          "Error usando el cuentagotas:",
+          error
+        )
+
+        alert(
+          "No se pudo seleccionar el color."
+        )
+      }
+    }
+  }
+
   function updateStock(
     colorIndex,
     sizeIndex,
@@ -2129,12 +2175,13 @@ export default function ProductsAdmin() {
             </div>
 
             <section
-              className={`${cardClass} p-7 sm:p-10 lg:p-14`}
+              className={`${cardClass} p-5 sm:p-10 lg:p-14`}
             >
               <div className="mx-auto max-w-[900px]">
-                <div className="grid gap-12 md:grid-cols-2">
+                {/* 2 OPCIONES POR FILA EN TODAS LAS PANTALLAS */}
+                <div className="grid grid-cols-2 gap-4 sm:gap-12">
                   <div>
-                    <label className="mb-4 block text-sm font-semibold">
+                    <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
                       Nombre del producto
                     </label>
 
@@ -2146,12 +2193,12 @@ export default function ProductsAdmin() {
                         )
                       }
                       placeholder=""
-                      className={inputClass}
+                      className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
                   </div>
 
                   <div>
-                    <label className="mb-4 block text-sm font-semibold">
+                    <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
                       Subcategoría
                     </label>
 
@@ -2166,7 +2213,7 @@ export default function ProductsAdmin() {
                       }
                       placeholder=""
                       list="gmish-subcategories"
-                      className={inputClass}
+                      className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
 
                     <datalist id="gmish-subcategories">
@@ -2197,9 +2244,9 @@ export default function ProductsAdmin() {
                   </div>
                 </div>
 
-                <div className="mt-16 grid gap-12 md:grid-cols-2">
+                <div className="mt-8 grid grid-cols-2 gap-4 sm:mt-16 sm:gap-12">
                   <div>
-                    <label className="mb-4 block text-sm font-semibold">
+                    <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
                       Precio actual
                     </label>
 
@@ -2214,12 +2261,12 @@ export default function ProductsAdmin() {
                         )
                       }
                       placeholder=""
-                      className={inputClass}
+                      className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
                   </div>
 
                   <div>
-                    <label className="mb-4 block text-sm font-semibold">
+                    <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
                       Precio anterior
                     </label>
 
@@ -2236,12 +2283,12 @@ export default function ProductsAdmin() {
                         )
                       }
                       placeholder=""
-                      className={inputClass}
+                      className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
                   </div>
                 </div>
 
-                <div className="mt-16 grid gap-7 md:grid-cols-2">
+                <div className="mt-8 grid grid-cols-2 gap-4 sm:mt-16 sm:gap-7">
                   <ToggleCard
                     checked={
                       isBestSeller
@@ -2262,13 +2309,13 @@ export default function ProductsAdmin() {
             </section>
 
             <section
-              className={`${cardClass} p-7 sm:p-10 lg:p-14`}
+              className={`${cardClass} p-5 sm:p-10 lg:p-14`}
             >
               <SectionHeader
                 title="Colores y fotografías"
               />
 
-              <div className="mx-auto mt-14 flex max-w-[1050px] flex-col gap-12">
+              <div className="mx-auto mt-10 flex max-w-[1050px] flex-col gap-12 sm:mt-14">
                 {colors.map(
                   (
                     color,
@@ -2279,7 +2326,7 @@ export default function ProductsAdmin() {
                         color.localId ||
                         colorIndex
                       }
-                      className="rounded-[26px] border border-neutral-200 bg-[#faf9f6] p-7 sm:p-10"
+                      className="rounded-[26px] border border-neutral-200 bg-[#faf9f6] p-5 sm:p-10"
                     >
                       <div className="flex flex-col items-center gap-8 text-center">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-semibold">
@@ -2292,9 +2339,9 @@ export default function ProductsAdmin() {
                           )}
                         </div>
 
-                        <div className="grid w-full gap-7 md:grid-cols-[1fr_130px]">
+                        <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-[1fr_190px] sm:gap-7">
                           <div className="text-left">
-                            <label className="mb-3 block text-sm font-semibold">
+                            <label className="mb-3 block text-xs font-semibold sm:text-sm">
                               Nombre del color
                             </label>
 
@@ -2314,47 +2361,81 @@ export default function ProductsAdmin() {
                                 )
                               }
                               placeholder=""
-                              className={
-                                inputClass
-                              }
+                              className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                             />
                           </div>
 
                           <div className="flex flex-col items-center">
-                            <label className="mb-3 block text-sm font-semibold">
+                            <label className="mb-3 block text-xs font-semibold sm:text-sm">
                               Color
                             </label>
 
-                            <label className="relative flex h-[58px] w-[58px] cursor-pointer overflow-hidden rounded-full border-4 border-white shadow-[0_0_0_1px_#d4d4d4]">
-                              <input
-                                type="color"
-                                value={
-                                  color.hex ||
-                                  "#777777"
-                                }
-                                onChange={(
-                                  event
-                                ) =>
-                                  updateColor(
-                                    colorIndex,
-                                    "hex",
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <label className="relative flex h-[48px] w-[48px] shrink-0 cursor-pointer overflow-hidden rounded-full border-4 border-white shadow-[0_0_0_1px_#d4d4d4] sm:h-[58px] sm:w-[58px]">
+                                <input
+                                  type="color"
+                                  value={
+                                    color.hex ||
+                                    "#777777"
+                                  }
+                                  onChange={(
                                     event
-                                      .target
-                                      .value
+                                  ) =>
+                                    updateColor(
+                                      colorIndex,
+                                      "hex",
+                                      event
+                                        .target
+                                        .value
+                                    )
+                                  }
+                                  className="absolute inset-[-10px] h-[70px] w-[70px] cursor-pointer opacity-0 sm:h-[80px] sm:w-[80px]"
+                                />
+
+                                <span
+                                  className="h-full w-full rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      color.hex ||
+                                      "#777777",
+                                  }}
+                                />
+                              </label>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  pickColorWithEyeDropper(
+                                    colorIndex
                                   )
                                 }
-                                className="absolute inset-[-10px] h-[80px] w-[80px] cursor-pointer opacity-0"
-                              />
+                                title="Tomar color de la pantalla"
+                                aria-label="Tomar color de la pantalla"
+                                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-700 shadow-sm transition hover:border-neutral-400 hover:bg-neutral-50"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-5 w-5"
+                                >
+                                  <path d="m18 2 4 4" />
+                                  <path d="m7.5 16.5-5 5" />
+                                  <path d="m14 4 6 6" />
+                                  <path d="M17 7 7 17l-4 1 1-4L14 4" />
+                                  <path d="m13 5 6 6" />
+                                </svg>
+                              </button>
+                            </div>
 
-                              <span
-                                className="h-full w-full rounded-full"
-                                style={{
-                                  backgroundColor:
-                                    color.hex ||
-                                    "#777777",
-                                }}
-                              />
-                            </label>
+                            <span className="mt-2 text-[9px] text-neutral-400">
+                              {color.hex ||
+                                "#777777"}
+                            </span>
                           </div>
                         </div>
 
@@ -2369,7 +2450,7 @@ export default function ProductsAdmin() {
                             </p>
                           </div>
 
-                          <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
                             {(
                               color.images ||
                               []
@@ -2397,12 +2478,12 @@ export default function ProductsAdmin() {
 
                                   {imageIndex ===
                                     0 && (
-                                    <span className="absolute left-3 top-3 rounded-full bg-neutral-950 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white">
+                                    <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.12em] text-white sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-[9px]">
                                       Principal
                                     </span>
                                   )}
 
-                                  <div className="absolute inset-x-3 bottom-3 flex flex-col gap-2 opacity-0 transition group-hover:opacity-100">
+                                  <div className="absolute inset-x-2 bottom-2 flex flex-col gap-2 opacity-0 transition group-hover:opacity-100 sm:inset-x-3 sm:bottom-3">
                                     {imageIndex !==
                                       0 && (
                                       <button
@@ -2413,7 +2494,7 @@ export default function ProductsAdmin() {
                                             imageIndex
                                           )
                                         }
-                                        className="rounded-xl bg-white px-3 py-2 text-[10px] font-semibold shadow-sm"
+                                        className="rounded-xl bg-white px-2 py-2 text-[9px] font-semibold shadow-sm sm:px-3 sm:text-[10px]"
                                       >
                                         Usar como principal
                                       </button>
@@ -2427,7 +2508,7 @@ export default function ProductsAdmin() {
                                           imageIndex
                                         )
                                       }
-                                      className="rounded-xl bg-white px-3 py-2 text-[10px] font-semibold text-red-600 shadow-sm"
+                                      className="rounded-xl bg-white px-2 py-2 text-[9px] font-semibold text-red-600 shadow-sm sm:px-3 sm:text-[10px]"
                                     >
                                       Quitar
                                     </button>
@@ -2447,13 +2528,13 @@ export default function ProductsAdmin() {
                                 uploadingImage ===
                                 colorIndex
                               }
-                              className="flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white text-center transition hover:border-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                              className="flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white px-2 text-center transition hover:border-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
                             >
                               <span className="text-3xl font-light">
                                 +
                               </span>
 
-                              <span className="text-xs font-semibold">
+                              <span className="text-[10px] font-semibold sm:text-xs">
                                 {uploadingImage ===
                                 colorIndex
                                   ? "Subiendo..."
@@ -2494,7 +2575,7 @@ export default function ProductsAdmin() {
                             </p>
                           </div>
 
-                          <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-4">
+                          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5">
                             {color.sizes.map(
                               (
                                 size,
@@ -2504,7 +2585,7 @@ export default function ProductsAdmin() {
                                   key={
                                     size.size
                                   }
-                                  className="rounded-2xl border border-neutral-200 bg-white p-5 text-center"
+                                  className="rounded-2xl border border-neutral-200 bg-white p-4 text-center sm:p-5"
                                 >
                                   <p className="text-sm font-bold">
                                     {size.size}
