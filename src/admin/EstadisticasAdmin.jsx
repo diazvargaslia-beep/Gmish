@@ -1453,7 +1453,7 @@ export default function EstadisticasAdmin() {
 
         @media (max-width: 650px) {
           .gmish-stats-metrics {
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
 
           .gmish-stats-secondary-grid {
@@ -1467,12 +1467,6 @@ export default function EstadisticasAdmin() {
           .gmish-stats-header-controls select,
           .gmish-stats-header-controls button {
             flex: 1;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .gmish-stats-metrics {
-            grid-template-columns: 1fr !important;
           }
         }
       `}</style>
