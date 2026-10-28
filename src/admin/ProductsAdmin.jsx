@@ -16,7 +16,7 @@ const secondaryButtonClass =
   "inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-neutral-200 bg-white px-7 py-3.5 text-sm font-semibold text-neutral-900 transition hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
 
 const productTileClass =
-  "h-[285px] w-full overflow-hidden rounded-[18px] border border-neutral-200 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.035)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.07)] sm:h-[300px]"
+  "h-[340px] w-full overflow-hidden rounded-[20px] border border-neutral-200 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.035)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.07)] sm:h-[360px]"
 
 function normalizeSubcategory(value) {
   const normalized = String(value || "")
@@ -1780,16 +1780,21 @@ export default function ProductsAdmin() {
               </div>
             )}
 
-            {product.is_new && (
-              <span className="absolute left-2 top-2 rounded-full bg-white px-2 py-1 text-[7px] font-bold uppercase tracking-[0.1em] shadow-sm">
-                Nuevo
-              </span>
-            )}
+            {(product.is_new ||
+              product.is_best_seller) && (
+              <div className="absolute left-2 top-2 flex max-w-[calc(100%-16px)] flex-wrap gap-1">
+                {product.is_new && (
+                  <span className="rounded-full bg-white px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] shadow-sm">
+                    Nuevo
+                  </span>
+                )}
 
-            {product.is_best_seller && (
-              <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-2 py-1 text-[7px] font-bold uppercase tracking-[0.1em] shadow-sm">
-                Más vendido
-              </span>
+                {product.is_best_seller && (
+                  <span className="rounded-full bg-white/95 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] shadow-sm">
+                    Más vendido
+                  </span>
+                )}
+              </div>
             )}
 
             {images.length > 1 && (
@@ -1831,19 +1836,20 @@ export default function ProductsAdmin() {
             )}
           </div>
 
-          <div className="flex h-[75px] shrink-0 flex-col items-center justify-center px-2 py-2 text-center">
-            <p className="line-clamp-1 text-[7px] font-medium uppercase tracking-[0.11em] text-neutral-400">
+          <div className="flex min-h-[92px] shrink-0 flex-col justify-center px-3 py-3 text-left sm:px-4">
+            <p className="text-[9px] font-medium uppercase tracking-[0.12em] text-neutral-400">
               {normalizeSubcategory(
                 product.subcategory
               )}
             </p>
 
-            <h3 className="mt-1 line-clamp-2 text-[9px] font-semibold leading-3.5 text-neutral-900">
+            <h3 className="mt-1 line-clamp-2 text-[12px] font-semibold leading-4 text-neutral-900 sm:text-[13px]">
               {product.name}
             </h3>
 
-            <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
-              <span className="text-[9px] font-semibold">
+            <div className="mt-2 flex flex-wrap items-baseline gap-2">
+              <span className="text-[12px] font-semibold text-neutral-950 sm:text-[13px]">
+                S/{" "}
                 {Number(
                   product.price
                 ).toFixed(2)}
@@ -1856,7 +1862,8 @@ export default function ProductsAdmin() {
                   Number(
                     product.price
                   ) && (
-                  <span className="text-[7px] text-neutral-400 line-through">
+                  <span className="text-[9px] text-neutral-400 line-through sm:text-[10px]">
+                    S/{" "}
                     {Number(
                       product.old_price
                     ).toFixed(2)}
@@ -1866,7 +1873,7 @@ export default function ProductsAdmin() {
           </div>
         </div>
 
-        <div className="grid h-[39px] shrink-0 grid-cols-2 gap-1 border-t border-neutral-100 p-1">
+        <div className="grid h-[42px] shrink-0 grid-cols-2 gap-1.5 border-t border-neutral-100 p-1.5">
           <button
             type="button"
             onClick={() =>
@@ -1874,7 +1881,7 @@ export default function ProductsAdmin() {
                 product
               )
             }
-            className="min-h-7 rounded-md border border-neutral-200 text-[7px] font-semibold transition hover:bg-neutral-50"
+            className="min-h-7 rounded-lg border border-neutral-200 text-[8px] font-semibold transition hover:bg-neutral-50 sm:text-[9px]"
           >
             {product.is_active
               ? "Ocultar"
@@ -1888,7 +1895,7 @@ export default function ProductsAdmin() {
                 product
               )
             }
-            className="min-h-7 rounded-md border border-red-200 text-[7px] font-semibold text-red-600 transition hover:bg-red-50"
+            className="min-h-7 rounded-lg border border-red-200 text-[8px] font-semibold text-red-600 transition hover:bg-red-50 sm:text-[9px]"
           >
             Eliminar
           </button>
@@ -1906,11 +1913,11 @@ export default function ProductsAdmin() {
         }
         className={`${productTileClass} flex flex-col items-center justify-center border-dashed bg-white text-center hover:-translate-y-1 hover:border-neutral-500 hover:bg-neutral-50`}
       >
-        <span className="text-3xl font-light text-neutral-400">
+        <span className="text-4xl font-light text-neutral-400">
           +
         </span>
 
-        <span className="mt-2 text-[8px] font-semibold uppercase tracking-[0.12em] text-neutral-700">
+        <span className="mt-3 text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-700 sm:text-[10px]">
           Agregar producto
         </span>
       </button>
@@ -1926,7 +1933,7 @@ export default function ProductsAdmin() {
   }
 
   return (
-    <div className="min-h-full w-full bg-white px-5 py-12 text-neutral-900 sm:px-8 md:px-12 lg:px-16 xl:px-20">
+    <div className="min-h-full w-full bg-white px-4 py-10 text-neutral-900 sm:px-8 sm:py-12 md:px-12 lg:px-16 xl:px-20">
       <div className="mx-auto flex w-full max-w-[1500px] flex-col items-center">
         {view === "list" && (
           <div className="flex w-full flex-col items-center gap-16">
@@ -2031,7 +2038,7 @@ export default function ProductsAdmin() {
               />
             </div>
 
-            <div className="grid w-full grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-6 lg:gap-4">
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6 lg:gap-4">
               <AddProductCard />
 
               {visibleProducts.map(
@@ -2069,7 +2076,7 @@ export default function ProductsAdmin() {
               }
             />
 
-            <div className="grid w-full grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-6 lg:gap-4">
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6 lg:gap-4">
               <AddProductCard />
 
               {selectedGroup?.products?.map(
