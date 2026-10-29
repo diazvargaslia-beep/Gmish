@@ -43,9 +43,11 @@ function FeaturedProducts({
           Number(product.old_price) > Number(product.price));
 
       const name = String(product.name || "").toLowerCase();
+
       const subcategory = String(
         product.subcategory || ""
       ).toLowerCase();
+
       const description = String(
         product.description || ""
       ).toLowerCase();
@@ -109,22 +111,37 @@ function FeaturedProducts({
         return discountB - discountA;
       }
 
+      /*
+        MÁS VENDIDOS
+
+        No oculta productos.
+
+        Los productos marcados en el admin
+        con is_best_seller aparecen primero.
+
+        Los demás siguen apareciendo debajo.
+      */
       if (sortMode === "best-sellers") {
-        const salesA = Number(
-          a.units_sold ??
-            a.sales_count ??
-            a.sold_count ??
-            0
-        );
+        const bestSellerA =
+          a.is_best_seller === true ||
+          a.is_best_seller === 1 ||
+          a.is_best_seller === "1" ||
+          a.is_best_seller === "true";
 
-        const salesB = Number(
-          b.units_sold ??
-            b.sales_count ??
-            b.sold_count ??
-            0
-        );
+        const bestSellerB =
+          b.is_best_seller === true ||
+          b.is_best_seller === 1 ||
+          b.is_best_seller === "1" ||
+          b.is_best_seller === "true";
 
-        return salesB - salesA;
+        if (bestSellerA !== bestSellerB) {
+          return Number(bestSellerB) - Number(bestSellerA);
+        }
+
+        return (
+          new Date(b.created_at || 0).getTime() -
+          new Date(a.created_at || 0).getTime()
+        );
       }
 
       if (sortMode === "new-in") {
@@ -160,6 +177,10 @@ function FeaturedProducts({
     sortMode,
   ]);
 
+  /*
+    CARRUSEL ORIGINAL.
+    NO MODIFICADO.
+  */
   const getColorImages = (product) => {
     const variants =
       product.product_variants || [];
@@ -610,6 +631,7 @@ function FeaturedProducts({
                         }
                         onClick={(event) => {
                           event.stopPropagation();
+
                           moveCarousel(
                             product.id,
                             -1,
@@ -631,6 +653,7 @@ function FeaturedProducts({
                         }
                         onClick={(event) => {
                           event.stopPropagation();
+
                           moveCarousel(
                             product.id,
                             1,

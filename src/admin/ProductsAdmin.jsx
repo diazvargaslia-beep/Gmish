@@ -182,6 +182,7 @@ export default function ProductsAdmin() {
   const [editingId, setEditingId] = useState(null)
 
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [category, setCategory] =
     useState("hombre")
   const [subcategory, setSubcategory] =
@@ -193,6 +194,9 @@ export default function ProductsAdmin() {
   const [isBestSeller, setIsBestSeller] =
     useState(false)
   const [colors, setColors] = useState([])
+
+  const [selectedPhoto, setSelectedPhoto] =
+    useState(null)
 
   const fileInputRefs = useRef({})
 
@@ -402,6 +406,7 @@ export default function ProductsAdmin() {
   ) {
     setEditingId(null)
     setName("")
+    setDescription("")
     setCategory(nextCategory)
     setSubcategory("")
     setPrice("")
@@ -409,6 +414,7 @@ export default function ProductsAdmin() {
     setIsNew(false)
     setIsBestSeller(false)
     setColors([createEmptyColor()])
+    setSelectedPhoto(null)
   }
 
   function startNewProduct() {
@@ -436,6 +442,40 @@ export default function ProductsAdmin() {
           colorIndex !== index
       )
     )
+
+    setSelectedPhoto(null)
+  }
+
+  function moveColor(
+    index,
+    direction
+  ) {
+    setColors((current) => {
+      const targetIndex =
+        index + direction
+
+      if (
+        targetIndex < 0 ||
+        targetIndex >= current.length
+      ) {
+        return current
+      }
+
+      const next = [...current]
+
+      const [selected] =
+        next.splice(index, 1)
+
+      next.splice(
+        targetIndex,
+        0,
+        selected
+      )
+
+      return next
+    })
+
+    setSelectedPhoto(null)
   }
 
   function updateColor(
@@ -476,9 +516,7 @@ export default function ProductsAdmin() {
       const result =
         await eyeDropper.open()
 
-      if (
-        result?.sRGBHex
-      ) {
+      if (result?.sRGBHex) {
         updateColor(
           colorIndex,
           "hex",
@@ -547,6 +585,29 @@ export default function ProductsAdmin() {
     )
   }
 
+  function selectPhoto(
+    colorIndex,
+    imageIndex
+  ) {
+    setSelectedPhoto(
+      (current) => {
+        if (
+          current?.colorIndex ===
+            colorIndex &&
+          current?.imageIndex ===
+            imageIndex
+        ) {
+          return null
+        }
+
+        return {
+          colorIndex,
+          imageIndex,
+        }
+      }
+    )
+  }
+
   function setMainImage(
     colorIndex,
     imageIndex
@@ -583,6 +644,8 @@ export default function ProductsAdmin() {
         }
       )
     )
+
+    setSelectedPhoto(null)
   }
 
   function removeImage(
@@ -611,6 +674,8 @@ export default function ProductsAdmin() {
         }
       )
     )
+
+    setSelectedPhoto(null)
   }
 
   async function uploadImages(
@@ -800,6 +865,9 @@ export default function ProductsAdmin() {
 
     setEditingId(product.id)
     setName(product.name || "")
+    setDescription(
+      product.description || ""
+    )
     setCategory(
       product.category ||
         filterCategory
@@ -827,6 +895,7 @@ export default function ProductsAdmin() {
         ? Object.values(grouped)
         : [createEmptyColor()]
     )
+    setSelectedPhoto(null)
 
     navigate(
       "editor",
@@ -936,35 +1005,39 @@ export default function ProductsAdmin() {
   function buildVariants() {
     const result = []
 
-    for (const color of colors) {
-      for (const size of
-        color.sizes) {
-        if (
-          Number(size.stock || 0) <=
-          0
-        ) {
-          continue
-        }
+    colors.forEach(
+      (color, colorIndex) => {
+        for (const size of
+          color.sizes) {
+          if (
+            Number(size.stock || 0) <=
+            0
+          ) {
+            continue
+          }
 
-        result.push({
-          id:
-            size.variantId ||
-            null,
-          size: size.size,
-          color:
-            color.name.trim(),
-          color_hex:
-            color.hex ||
-            "#777777",
-          color_image_url:
-            color.images?.[0] ||
-            null,
-          stock: Number(
-            size.stock
-          ),
-        })
+          result.push({
+            id:
+              size.variantId ||
+              null,
+            size: size.size,
+            color:
+              color.name.trim(),
+            color_hex:
+              color.hex ||
+              "#777777",
+            color_image_url:
+              color.images?.[0] ||
+              null,
+            stock: Number(
+              size.stock
+            ),
+            colorOrder:
+              colorIndex,
+          })
+        }
       }
-    }
+    )
 
     return result
   }
@@ -1043,6 +1116,9 @@ export default function ProductsAdmin() {
       .from("products")
       .insert({
         name: name.trim(),
+        description:
+          description.trim() ||
+          null,
         slug: `${generateSlug(
           name
         )}-${Date.now()}`,
@@ -1120,6 +1196,9 @@ export default function ProductsAdmin() {
       .from("products")
       .update({
         name: name.trim(),
+        description:
+          description.trim() ||
+          null,
         category,
         subcategory:
           subcategory.trim(),
@@ -1693,6 +1772,7 @@ export default function ProductsAdmin() {
           return [
             product.name,
             product.subcategory,
+            product.description,
           ]
             .filter(Boolean)
             .some((value) =>
@@ -1762,11 +1842,6 @@ export default function ProductsAdmin() {
       setCurrentImage,
     ] = useState(0)
 
-    /*
-     * Usamos refs para el gesto táctil.
-     * Esto evita renders innecesarios mientras
-     * el dedo se está moviendo.
-     */
     const pointerStartX =
       useRef(null)
 
@@ -1861,10 +1936,6 @@ export default function ProductsAdmin() {
         event.clientY -
         pointerStartY.current
 
-      /*
-       * Solo consideramos swipe si el movimiento
-       * horizontal domina al vertical.
-       */
       if (
         Math.abs(differenceX) > 12 &&
         Math.abs(differenceX) >
@@ -1930,11 +2001,6 @@ export default function ProductsAdmin() {
       pointerMoved.current =
         false
 
-      /*
-       * Dejamos pasar un pequeño intervalo para
-       * impedir que el mismo gesto termine abriendo
-       * el editor mediante onClick.
-       */
       if (horizontalSwipe) {
         window.setTimeout(() => {
           suppressClick.current =
@@ -2343,8 +2409,7 @@ export default function ProductsAdmin() {
             {!selectedGroup?.products
               ?.length && (
               <p className="py-20 text-sm text-neutral-500">
-                No hay productos en
-                esta subcategoría.
+                No hay productos en esta subcategoría.
               </p>
             )}
           </div>
@@ -2396,7 +2461,6 @@ export default function ProductsAdmin() {
                           event.target.value
                         )
                       }
-                      placeholder=""
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
                   </div>
@@ -2415,7 +2479,6 @@ export default function ProductsAdmin() {
                           event.target.value
                         )
                       }
-                      placeholder=""
                       list="gmish-subcategories"
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
@@ -2448,6 +2511,24 @@ export default function ProductsAdmin() {
                   </div>
                 </div>
 
+                <div className="mt-8 sm:mt-12">
+                  <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
+                    Descripción
+                  </label>
+
+                  <textarea
+                    value={description}
+                    onChange={(event) =>
+                      setDescription(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Describe brevemente el producto, su tela, corte, estilo o características."
+                    rows={4}
+                    className={`${inputClass} min-h-[120px] resize-y px-3 py-3 text-xs leading-6 sm:px-5 sm:py-4 sm:text-sm`}
+                  />
+                </div>
+
                 <div className="mt-8 grid grid-cols-2 gap-4 sm:mt-16 sm:gap-12">
                   <div>
                     <label className="mb-3 block text-xs font-semibold sm:mb-4 sm:text-sm">
@@ -2464,7 +2545,6 @@ export default function ProductsAdmin() {
                           event.target.value
                         )
                       }
-                      placeholder=""
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
                   </div>
@@ -2486,7 +2566,6 @@ export default function ProductsAdmin() {
                           event.target.value
                         )
                       }
-                      placeholder=""
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                     />
                   </div>
@@ -2517,6 +2596,7 @@ export default function ProductsAdmin() {
             >
               <SectionHeader
                 title="Colores y fotografías"
+                description="Puedes cambiar el orden de los colores con las flechas."
               />
 
               <div className="mx-auto mt-10 flex max-w-[1050px] flex-col gap-12 sm:mt-14">
@@ -2530,8 +2610,61 @@ export default function ProductsAdmin() {
                         color.localId ||
                         colorIndex
                       }
-                      className="rounded-[26px] border border-neutral-200 bg-[#faf9f6] p-5 sm:p-10"
+                      className="relative rounded-[26px] border border-neutral-200 bg-[#faf9f6] p-5 pt-16 sm:p-10 sm:pt-20"
                     >
+                      <div className="absolute left-4 top-4 flex items-center gap-2 sm:left-6 sm:top-6">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            moveColor(
+                              colorIndex,
+                              -1
+                            )
+                          }
+                          disabled={
+                            colorIndex === 0
+                          }
+                          title="Mover color hacia arriba"
+                          aria-label="Mover color hacia arriba"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white text-lg text-neutral-700 shadow-sm transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          ↑
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            moveColor(
+                              colorIndex,
+                              1
+                            )
+                          }
+                          disabled={
+                            colorIndex ===
+                            colors.length - 1
+                          }
+                          title="Mover color hacia abajo"
+                          aria-label="Mover color hacia abajo"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white text-lg text-neutral-700 shadow-sm transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          ↓
+                        </button>
+                      </div>
+
+                      {colors.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeColor(
+                              colorIndex
+                            )
+                          }
+                          className="absolute right-4 top-4 rounded-xl border border-red-200 bg-white px-3 py-2 text-[10px] font-semibold text-red-600 shadow-sm transition hover:bg-red-50 sm:right-6 sm:top-6 sm:px-4 sm:text-xs"
+                        >
+                          Eliminar color
+                        </button>
+                      )}
+
                       <div className="flex flex-col items-center gap-8 text-center">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-semibold">
                           {String(
@@ -2564,7 +2697,6 @@ export default function ProductsAdmin() {
                                     .value
                                 )
                               }
-                              placeholder=""
                               className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
                             />
                           </div>
@@ -2650,7 +2782,7 @@ export default function ProductsAdmin() {
                             </p>
 
                             <p className="text-xs leading-5 text-neutral-500">
-                              La primera imagen es la principal.
+                              Toca una foto para ver sus opciones. La primera imagen es la principal.
                             </p>
                           </div>
 
@@ -2662,72 +2794,121 @@ export default function ProductsAdmin() {
                               (
                                 image,
                                 imageIndex
-                              ) => (
-                                <div
-                                  key={`${image}-${imageIndex}`}
-                                  className={`group relative aspect-[3/4] overflow-hidden rounded-2xl border-2 bg-white ${
-                                    imageIndex ===
-                                    0
-                                      ? "border-neutral-950"
-                                      : "border-neutral-200"
-                                  }`}
-                                >
-                                  <img
-                                    src={
-                                      image
-                                    }
-                                    alt={`${color.name} ${imageIndex + 1}`}
-                                    className="h-full w-full object-contain"
-                                  />
+                              ) => {
+                                const isSelected =
+                                  selectedPhoto?.colorIndex ===
+                                    colorIndex &&
+                                  selectedPhoto?.imageIndex ===
+                                    imageIndex
 
-                                  {imageIndex ===
-                                    0 && (
-                                    <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.12em] text-white sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-[9px]">
-                                      Principal
-                                    </span>
-                                  )}
-
-                                  <div className="absolute inset-x-2 bottom-2 flex flex-col gap-2 opacity-0 transition group-hover:opacity-100 sm:inset-x-3 sm:bottom-3">
-                                    {imageIndex !==
-                                      0 && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setMainImage(
-                                            colorIndex,
-                                            imageIndex
-                                          )
-                                        }
-                                        className="rounded-xl bg-white px-2 py-2 text-[9px] font-semibold shadow-sm sm:px-3 sm:text-[10px]"
-                                      >
-                                        Usar como principal
-                                      </button>
-                                    )}
-
+                                return (
+                                  <div
+                                    key={`${image}-${imageIndex}`}
+                                    className={`relative aspect-[3/4] overflow-hidden rounded-2xl border-2 bg-white transition ${
+                                      isSelected
+                                        ? "border-neutral-950 ring-4 ring-neutral-950/10"
+                                        : imageIndex ===
+                                            0
+                                          ? "border-neutral-950"
+                                          : "border-neutral-200"
+                                    }`}
+                                  >
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        removeImage(
+                                        selectPhoto(
                                           colorIndex,
                                           imageIndex
                                         )
                                       }
-                                      className="rounded-xl bg-white px-2 py-2 text-[9px] font-semibold text-red-600 shadow-sm sm:px-3 sm:text-[10px]"
-                                    >
-                                      Quitar
-                                    </button>
+                                      className="absolute inset-0 z-10 h-full w-full"
+                                      aria-label={`Seleccionar fotografía ${imageIndex + 1}`}
+                                    />
+
+                                    <img
+                                      src={
+                                        image
+                                      }
+                                      alt={`${color.name} ${imageIndex + 1}`}
+                                      className="pointer-events-none h-full w-full object-contain"
+                                    />
+
+                                    {imageIndex ===
+                                      0 && (
+                                      <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-neutral-950 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.12em] text-white sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-[9px]">
+                                        Principal
+                                      </span>
+                                    )}
+
+                                    {isSelected && (
+                                      <div
+                                        className="absolute inset-0 z-30 flex items-end bg-black/20 p-2 sm:p-3"
+                                        onClick={(
+                                          event
+                                        ) =>
+                                          event.stopPropagation()
+                                        }
+                                      >
+                                        <div className="flex w-full flex-col gap-2">
+                                          {imageIndex !==
+                                            0 && (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setMainImage(
+                                                  colorIndex,
+                                                  imageIndex
+                                                )
+                                              }
+                                              className="min-h-[38px] rounded-xl bg-white px-2 py-2 text-[9px] font-semibold text-neutral-900 shadow-sm sm:text-[10px]"
+                                            >
+                                              Usar como principal
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              removeImage(
+                                                colorIndex,
+                                                imageIndex
+                                              )
+                                            }
+                                            className="min-h-[38px] rounded-xl bg-white px-2 py-2 text-[9px] font-semibold text-red-600 shadow-sm sm:text-[10px]"
+                                          >
+                                            Quitar
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedPhoto(
+                                                null
+                                              )
+                                            }
+                                            className="min-h-[34px] rounded-xl bg-neutral-950/90 px-2 py-2 text-[9px] font-semibold text-white shadow-sm sm:text-[10px]"
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                              )
+                                )
+                              }
                             )}
 
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                setSelectedPhoto(
+                                  null
+                                )
+
                                 fileInputRefs.current[
                                   colorIndex
                                 ]?.click()
-                              }
+                              }}
                               disabled={
                                 uploadingImage ===
                                 colorIndex
@@ -2821,21 +3002,6 @@ export default function ProductsAdmin() {
                             )}
                           </div>
                         </div>
-
-                        {colors.length >
-                          1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeColor(
-                                colorIndex
-                              )
-                            }
-                            className="text-xs font-semibold text-red-600 transition hover:text-red-700"
-                          >
-                            Eliminar este color
-                          </button>
-                        )}
                       </div>
                     </div>
                   )
@@ -2858,6 +3024,7 @@ export default function ProductsAdmin() {
                 type="button"
                 onClick={() => {
                   resetForm()
+
                   navigate(
                     "category",
                     "",

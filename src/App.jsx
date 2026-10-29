@@ -328,6 +328,33 @@ function Tienda() {
   }
 
   /* =========================================
+     PRODUCTOS EN OFERTA
+     ========================================= */
+
+  function productoEstaEnOferta(producto) {
+    const precio = Number(producto?.price);
+    const precioAnterior = Number(producto?.old_price);
+
+    return (
+      Number.isFinite(precio) &&
+      Number.isFinite(precioAnterior) &&
+      precioAnterior > precio
+    );
+  }
+
+  /* =========================================
+     PRODUCTOS NUEVOS
+     ========================================= */
+
+  function productoEsNuevo(producto) {
+    return (
+      producto?.is_new === true ||
+      producto?.is_new === 1 ||
+      producto?.is_new === "1"
+    );
+  }
+
+  /* =========================================
      SUBCATEGORÍAS
      ========================================= */
 
@@ -661,10 +688,11 @@ function Tienda() {
   const productosBuscados =
     filtrarProductosPorBusqueda(productos);
 
-  console.log(
-    "PRODUCTOS PARA BUSQUEDA:",
-    productosBuscados
-  );
+  const productosEnOferta =
+    productos.filter(productoEstaEnOferta);
+
+  const productosNuevos =
+    productos.filter(productoEsNuevo);
 
   /* =========================================
      TIENDA
@@ -756,6 +784,11 @@ function Tienda() {
           >
             Inicio
           </button>
+
+          <div
+            className="menu-separador"
+            aria-hidden="true"
+          />
 
           <button
             type="button"
@@ -877,12 +910,10 @@ function Tienda() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => irA("coleccion")}
-          >
-            Colección
-          </button>
+          <div
+            className="menu-separador"
+            aria-hidden="true"
+          />
 
           <button
             type="button"
@@ -897,6 +928,11 @@ function Tienda() {
           >
             Nuevos
           </button>
+
+          <div
+            className="menu-separador"
+            aria-hidden="true"
+          />
 
           <button
             type="button"
@@ -1124,17 +1160,11 @@ function Tienda() {
             <h1>OFERTAS</h1>
 
             <p>
-              Descubre nuestras prendas en
-              oferta.
+              Descubre nuestras prendas en oferta.
             </p>
 
             <FeaturedProducts
-              products={productos.filter(
-                (producto) =>
-                  Number(
-                    producto.discount || 0
-                  ) > 0
-              )}
+              products={productosEnOferta}
               cargando={cargando}
               error={errorProductos}
             />
@@ -1154,10 +1184,7 @@ function Tienda() {
             </p>
 
             <FeaturedProducts
-              products={productos.filter(
-                (producto) =>
-                  producto.is_new === true
-              )}
+              products={productosNuevos}
               cargando={cargando}
               error={errorProductos}
             />
@@ -1214,7 +1241,7 @@ function Tienda() {
         </div>
 
         <p>
-          ESTILO QUE NOS UNE · OUTFITS QUE SE
+          SOMOS TU TIENDA PREFERIDA · OUTFITS QUE SE
           ADAPTAN A TU ESTILO
         </p>
 
