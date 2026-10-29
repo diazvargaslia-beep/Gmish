@@ -14,10 +14,33 @@ function ordenarPorPosicion(lista = []) {
 
 /* =========================================
    ORDENAR VARIANTES
+
+   IMPORTANTE:
+   1. Primero respeta color_position.
+   2. Después ordena las tallas dentro
+      de cada color.
    ========================================= */
 
 function ordenarVariantes(lista = []) {
   return [...lista].sort((a, b) => {
+    const posicionColorA = Number(
+      a?.color_position ?? 0
+    );
+
+    const posicionColorB = Number(
+      b?.color_position ?? 0
+    );
+
+    if (
+      posicionColorA !==
+      posicionColorB
+    ) {
+      return (
+        posicionColorA -
+        posicionColorB
+      );
+    }
+
     const colorA = String(
       a?.color || ""
     ).trim();
@@ -88,16 +111,6 @@ export async function getProducts() {
   try {
     /* =======================================
        1. PRODUCTOS ACTIVOS
-
-       Usamos select("*") para traer también:
-       - is_new
-       - is_best_seller
-       - old_price
-       - price
-       - category
-       - subcategory
-       - description
-       - cualquier otro campo de products
        ======================================= */
 
     const {
@@ -141,6 +154,8 @@ export async function getProducts() {
 
     /* =======================================
        2. VARIANTES
+
+       AHORA TRAEMOS color_position.
        ======================================= */
 
     const {
@@ -155,11 +170,18 @@ export async function getProducts() {
         color,
         color_hex,
         color_image_url,
-        stock
+        stock,
+        color_position
       `)
       .in(
         "product_id",
         productIds
+      )
+      .order(
+        "color_position",
+        {
+          ascending: true,
+        }
       );
 
     if (variantsError) {
@@ -370,6 +392,12 @@ export async function getProducts() {
         const variantCompleta = {
           ...variant,
 
+          color_position:
+            Number(
+              variant.color_position ??
+                0
+            ),
+
           product_variant_images:
             imagesByVariant[
               variant.id
@@ -485,12 +513,6 @@ export async function getProducts() {
 
     /* =======================================
        10. RECONSTRUIR PRODUCTOS
-
-       Esta es la estructura que reciben:
-       - App.jsx
-       - CategorySection.jsx
-       - FeaturedProducts.jsx
-       - ProductDetailModal.jsx
        ======================================= */
 
     const resultado =
@@ -499,13 +521,18 @@ export async function getProducts() {
           const productId =
             product.id;
 
+          const variantesOrdenadas =
+            ordenarVariantes(
+              variantsByProduct[
+                productId
+              ] || []
+            );
+
           return {
             ...product,
 
             product_variants:
-              variantsByProduct[
-                productId
-              ] || [],
+              variantesOrdenadas,
 
             product_images:
               imagesByProduct[

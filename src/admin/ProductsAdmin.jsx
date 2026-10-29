@@ -87,11 +87,9 @@ function createEmptyColor() {
       crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`,
-
     name: "",
     hex: "#777777",
     images: [],
-
     sizes: SIZES.map((size) => ({
       size,
       stock: "",
@@ -316,12 +314,15 @@ export default function ProductsAdmin() {
       } = await supabase
         .from("product_variants")
         .select(
-          "id, product_id, size, color, color_hex, color_image_url, stock, sku"
+          "id, product_id, size, color, color_hex, color_image_url, stock, sku, color_position"
         )
         .in(
           "product_id",
           productIds
         )
+        .order("color_position", {
+          ascending: true,
+        })
 
       if (variantError) {
         throw variantError
@@ -378,11 +379,21 @@ export default function ProductsAdmin() {
           (product) => ({
             ...product,
             product_variants:
-              variants.filter(
-                (variant) =>
-                  variant.product_id ===
-                  product.id
-              ),
+              variants
+                .filter(
+                  (variant) =>
+                    variant.product_id ===
+                    product.id
+                )
+                .sort(
+                  (a, b) =>
+                    Number(
+                      a.color_position ?? 0
+                    ) -
+                    Number(
+                      b.color_position ?? 0
+                    )
+                ),
           })
         )
       )
@@ -791,16 +802,33 @@ export default function ProductsAdmin() {
   }
 
   function startEditing(product) {
-    const grouped = {}
+    const grouped = new Map()
+
+    const orderedVariants = [
+      ...(product.product_variants ||
+        []),
+    ].sort(
+      (a, b) =>
+        Number(
+          a.color_position ?? 0
+        ) -
+        Number(
+          b.color_position ?? 0
+        )
+    )
 
     for (const variant of
-      product.product_variants ||
-      []) {
+      orderedVariants) {
       const colorName =
         variant.color ||
         "Sin nombre"
 
-      if (!grouped[colorName]) {
+      const colorKey =
+        colorName
+          .trim()
+          .toLowerCase()
+
+      if (!grouped.has(colorKey)) {
         const images = (
           variant
             .product_variant_images ||
@@ -817,43 +845,84 @@ export default function ProductsAdmin() {
               image.image_url
           )
 
-        grouped[colorName] = {
-          localId:
-            `${Date.now()}-${Math.random()}`,
-          name: colorName,
-          hex:
-            variant.color_hex ||
-            "#777777",
-          images: [
-            ...new Set(
-              images.length
-                ? images
-                : variant.color_image_url
-                  ? [
-                      variant.color_image_url,
-                    ]
-                  : []
-            ),
-          ],
-          sizes:
-            SIZES.map(
-              (size) => ({
-                size,
-                stock: "",
-                variantId:
-                  null,
-              })
-            ),
-        }
+        grouped.set(
+          colorKey,
+          {
+            localId:
+              typeof crypto !==
+                "undefined" &&
+              crypto.randomUUID
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random()}`,
+            name: colorName,
+            hex:
+              variant.color_hex ||
+              "#777777",
+            colorPosition:
+              Number(
+                variant.color_position ??
+                  0
+              ),
+            images: [
+              ...new Set(
+                images.length
+                  ? images
+                  : variant.color_image_url
+                    ? [
+                        variant.color_image_url,
+                      ]
+                    : []
+              ),
+            ],
+            sizes:
+              SIZES.map(
+                (size) => ({
+                  size,
+                  stock: "",
+                  variantId:
+                    null,
+                })
+              ),
+          }
+        )
       }
 
-      const size = grouped[
-        colorName
-      ].sizes.find(
-        (item) =>
-          item.size ===
-          variant.size
-      )
+      const color =
+        grouped.get(colorKey)
+
+      if (
+        (!color.images ||
+          !color.images.length) &&
+        variant
+          .product_variant_images
+          ?.length
+      ) {
+        color.images = [
+          ...new Set(
+            variant
+              .product_variant_images
+              .slice()
+              .sort(
+                (a, b) =>
+                  (a.position ||
+                    0) -
+                  (b.position ||
+                    0)
+              )
+              .map(
+                (image) =>
+                  image.image_url
+              )
+          ),
+        ]
+      }
+
+      const size =
+        color.sizes.find(
+          (item) =>
+            item.size ===
+            variant.size
+        )
 
       if (size) {
         size.stock =
@@ -862,6 +931,19 @@ export default function ProductsAdmin() {
           variant.id
       }
     }
+
+    const orderedColors =
+      Array.from(
+        grouped.values()
+      ).sort(
+        (a, b) =>
+          Number(
+            a.colorPosition ?? 0
+          ) -
+          Number(
+            b.colorPosition ?? 0
+          )
+      )
 
     setEditingId(product.id)
     setName(product.name || "")
@@ -890,11 +972,13 @@ export default function ProductsAdmin() {
         product.is_best_seller
       )
     )
+
     setColors(
-      Object.values(grouped).length
-        ? Object.values(grouped)
+      orderedColors.length
+        ? orderedColors
         : [createEmptyColor()]
     )
+
     setSelectedPhoto(null)
 
     navigate(
@@ -959,6 +1043,9 @@ export default function ProductsAdmin() {
       return false
     }
 
+    const usedColorNames =
+      new Set()
+
     for (const color of colors) {
       if (!color.name.trim()) {
         alert(
@@ -966,6 +1053,26 @@ export default function ProductsAdmin() {
         )
         return false
       }
+
+      const normalizedColor =
+        color.name
+          .trim()
+          .toLowerCase()
+
+      if (
+        usedColorNames.has(
+          normalizedColor
+        )
+      ) {
+        alert(
+          `El color "${color.name}" está repetido.`
+        )
+        return false
+      }
+
+      usedColorNames.add(
+        normalizedColor
+      )
 
       const hasStock =
         color.sizes.some(
@@ -1010,8 +1117,9 @@ export default function ProductsAdmin() {
         for (const size of
           color.sizes) {
           if (
-            Number(size.stock || 0) <=
-            0
+            Number(
+              size.stock || 0
+            ) <= 0
           ) {
             continue
           }
@@ -1032,7 +1140,7 @@ export default function ProductsAdmin() {
             stock: Number(
               size.stock
             ),
-            colorOrder:
+            color_position:
               colorIndex,
           })
         }
@@ -1051,11 +1159,12 @@ export default function ProductsAdmin() {
         continue
       }
 
-      const color = colors.find(
-        (item) =>
-          item.name.trim() ===
-          variant.color
-      )
+      const color =
+        colors.find(
+          (item) =>
+            item.name.trim() ===
+            variant.color
+        )
 
       if (!color) {
         continue
@@ -1163,6 +1272,8 @@ export default function ProductsAdmin() {
               variant.color_image_url,
             stock:
               variant.stock,
+            color_position:
+              variant.color_position,
           })
         )
       )
@@ -1228,7 +1339,7 @@ export default function ProductsAdmin() {
     } = await supabase
       .from("product_variants")
       .select(
-        "id, product_id, size, color, color_hex, color_image_url, stock"
+        "id, product_id, size, color, color_hex, color_image_url, stock, color_position"
       )
       .eq(
         "product_id",
@@ -1276,7 +1387,9 @@ export default function ProductsAdmin() {
         variant.color
       )
 
-      if (incomingKeys.has(key)) {
+      if (
+        incomingKeys.has(key)
+      ) {
         throw new Error(
           `La variante "${variant.color} - talla ${variant.size}" está repetida dentro de este producto.`
         )
@@ -1320,6 +1433,8 @@ export default function ProductsAdmin() {
           color_image_url:
             variant.color_image_url,
           stock: variant.stock,
+          color_position:
+            variant.color_position,
         })
         .eq(
           "id",
@@ -1337,7 +1452,8 @@ export default function ProductsAdmin() {
 
     const newVariants =
       variants.filter(
-        (variant) => !variant.id
+        (variant) =>
+          !variant.id
       )
 
     if (newVariants.length) {
@@ -1355,6 +1471,8 @@ export default function ProductsAdmin() {
               variant.color_image_url,
             stock:
               variant.stock,
+            color_position:
+              variant.color_position,
           })
         )
 
@@ -1362,7 +1480,9 @@ export default function ProductsAdmin() {
         data: inserted,
         error: insertError,
       } = await supabase
-        .from("product_variants")
+        .from(
+          "product_variants"
+        )
         .upsert(
           rowsToInsert,
           {
@@ -1486,7 +1606,9 @@ export default function ProductsAdmin() {
       const {
         error: deleteError,
       } = await supabase
-        .from("product_variants")
+        .from(
+          "product_variants"
+        )
         .delete()
         .eq(
           "id",
@@ -1708,17 +1830,32 @@ export default function ProductsAdmin() {
     const result = []
     const seen = new Set()
 
+    const orderedVariants = [
+      ...(product.product_variants ||
+        []),
+    ].sort(
+      (a, b) =>
+        Number(
+          a.color_position ?? 0
+        ) -
+        Number(
+          b.color_position ?? 0
+        )
+    )
+
     for (const variant of
-      product.product_variants ||
-      []) {
+      orderedVariants) {
       const color =
         String(
           variant.color || ""
         ).trim()
 
+      const colorKey =
+        color.toLowerCase()
+
       if (
         !color ||
-        seen.has(color)
+        seen.has(colorKey)
       ) {
         continue
       }
@@ -1744,13 +1881,22 @@ export default function ProductsAdmin() {
         result.push({
           color,
           image,
+          color_position:
+            Number(
+              variant.color_position ??
+                0
+            ),
         })
       }
 
-      seen.add(color)
+      seen.add(colorKey)
     }
 
-    return result
+    return result.sort(
+      (a, b) =>
+        a.color_position -
+        b.color_position
+    )
   }
 
   const visibleProducts =
@@ -2622,7 +2768,8 @@ export default function ProductsAdmin() {
                             )
                           }
                           disabled={
-                            colorIndex === 0
+                            colorIndex ===
+                            0
                           }
                           title="Mover color hacia arriba"
                           aria-label="Mover color hacia arriba"
@@ -2641,7 +2788,8 @@ export default function ProductsAdmin() {
                           }
                           disabled={
                             colorIndex ===
-                            colors.length - 1
+                            colors.length -
+                              1
                           }
                           title="Mover color hacia abajo"
                           aria-label="Mover color hacia abajo"
@@ -2651,7 +2799,8 @@ export default function ProductsAdmin() {
                         </button>
                       </div>
 
-                      {colors.length > 1 && (
+                      {colors.length >
+                        1 && (
                         <button
                           type="button"
                           onClick={() =>
@@ -2822,14 +2971,20 @@ export default function ProductsAdmin() {
                                         )
                                       }
                                       className="absolute inset-0 z-10 h-full w-full"
-                                      aria-label={`Seleccionar fotografía ${imageIndex + 1}`}
+                                      aria-label={`Seleccionar fotografía ${
+                                        imageIndex +
+                                        1
+                                      }`}
                                     />
 
                                     <img
                                       src={
                                         image
                                       }
-                                      alt={`${color.name} ${imageIndex + 1}`}
+                                      alt={`${color.name} ${
+                                        imageIndex +
+                                        1
+                                      }`}
                                       className="pointer-events-none h-full w-full object-contain"
                                     />
 
@@ -2841,14 +2996,7 @@ export default function ProductsAdmin() {
                                     )}
 
                                     {isSelected && (
-                                      <div
-                                        className="absolute inset-0 z-30 flex items-end bg-black/20 p-2 sm:p-3"
-                                        onClick={(
-                                          event
-                                        ) =>
-                                          event.stopPropagation()
-                                        }
-                                      >
+                                      <div className="absolute inset-0 z-30 flex items-end bg-black/20 p-2 sm:p-3">
                                         <div className="flex w-full flex-col gap-2">
                                           {imageIndex !==
                                             0 && (
@@ -2931,7 +3079,8 @@ export default function ProductsAdmin() {
                               ref={(element) => {
                                 fileInputRefs.current[
                                   colorIndex
-                                ] = element
+                                ] =
+                                  element
                               }}
                               type="file"
                               accept="image/*"
