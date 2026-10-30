@@ -20,6 +20,58 @@ function CategorySection({
   }
 
   /* =========================================
+     OBTENER POSICIÓN NUMÉRICA
+     ========================================= */
+
+  function obtenerPosicion(valor) {
+    const numero = Number(valor);
+
+    return Number.isFinite(numero)
+      ? numero
+      : Number.MAX_SAFE_INTEGER;
+  }
+
+  /* =========================================
+     ORDENAR PRODUCTOS MANUALMENTE
+     ========================================= */
+
+  function ordenarProductos(lista) {
+    return [...lista].sort((a, b) => {
+      const posicionA = obtenerPosicion(
+        a?.product_position
+      );
+
+      const posicionB = obtenerPosicion(
+        b?.product_position
+      );
+
+      if (posicionA !== posicionB) {
+        return posicionA - posicionB;
+      }
+
+      const fechaA = new Date(
+        a?.created_at || 0
+      ).getTime();
+
+      const fechaB = new Date(
+        b?.created_at || 0
+      ).getTime();
+
+      if (fechaA !== fechaB) {
+        return fechaA - fechaB;
+      }
+
+      return String(a?.name || "").localeCompare(
+        String(b?.name || ""),
+        "es",
+        {
+          sensitivity: "base",
+        }
+      );
+    });
+  }
+
+  /* =========================================
      PRODUCTOS DE LA CATEGORÍA
      ========================================= */
 
@@ -27,16 +79,21 @@ function CategorySection({
     const categoriaActual =
       normalizarTexto(category);
 
-    return products.filter(
+    const encontrados = products.filter(
       (product) =>
         normalizarTexto(
           product?.category
         ) === categoriaActual
     );
+
+    return ordenarProductos(encontrados);
   }, [products, category]);
 
   /* =========================================
      SUBCATEGORÍAS DISPONIBLES
+
+     YA NO SE ORDENAN ALFABÉTICAMENTE.
+     RESPETAN subcategory_position.
      ========================================= */
 
   const subcategories = useMemo(() => {
@@ -54,6 +111,11 @@ function CategorySection({
         const normalized =
           normalizarTexto(original);
 
+        const position =
+          obtenerPosicion(
+            product?.subcategory_position
+          );
+
         if (
           !uniqueSubcategories.has(
             normalized
@@ -61,28 +123,55 @@ function CategorySection({
         ) {
           uniqueSubcategories.set(
             normalized,
-            original
+            {
+              value: normalized,
+              label: original,
+              position,
+            }
+          );
+
+          return;
+        }
+
+        const existing =
+          uniqueSubcategories.get(
+            normalized
+          );
+
+        if (
+          position <
+          existing.position
+        ) {
+          uniqueSubcategories.set(
+            normalized,
+            {
+              ...existing,
+              position,
+            }
           );
         }
       }
     );
 
     return [
-      ...uniqueSubcategories.entries(),
-    ]
-      .sort((a, b) =>
-        a[1].localeCompare(
-          b[1],
-          "es",
-          {
-            sensitivity: "base",
-          }
-        )
-      )
-      .map(([value, label]) => ({
-        value,
-        label,
-      }));
+      ...uniqueSubcategories.values(),
+    ].sort((a, b) => {
+      if (
+        a.position !== b.position
+      ) {
+        return (
+          a.position - b.position
+        );
+      }
+
+      return a.label.localeCompare(
+        b.label,
+        "es",
+        {
+          sensitivity: "base",
+        }
+      );
+    });
   }, [categoryProducts]);
 
   /* =========================================
@@ -106,11 +195,16 @@ function CategorySection({
         return categoryProducts;
       }
 
-      return categoryProducts.filter(
-        (product) =>
-          normalizarTexto(
-            product?.subcategory
-          ) === subcategoriaActual
+      const encontrados =
+        categoryProducts.filter(
+          (product) =>
+            normalizarTexto(
+              product?.subcategory
+            ) === subcategoriaActual
+        );
+
+      return ordenarProductos(
+        encontrados
       );
     }, [
       categoryProducts,
@@ -157,12 +251,6 @@ function CategorySection({
 
   /* =========================================
      SUBCATEGORÍA ESPECÍFICA
-
-     Ejemplo:
-     Hombre → Polos → Ver todos
-
-     Aquí sí mostramos:
-     "Ordenar por"
      ========================================= */
 
   if (
@@ -174,7 +262,9 @@ function CategorySection({
           category="todos"
           search=""
           newOnly={false}
-          products={filteredProducts}
+          products={
+            filteredProducts
+          }
           layout="grid"
           showSort={true}
         />
@@ -184,15 +274,6 @@ function CategorySection({
 
   /* =========================================
      VISTA GENERAL DE LA CATEGORÍA
-
-     Ejemplo:
-     HOMBRE
-
-     Polos          Ver todos →
-     [productos...]
-
-     Pantalones     Ver todos →
-     [productos...]
      ========================================= */
 
   return (
@@ -201,12 +282,14 @@ function CategorySection({
         {subcategories.map(
           (subcategory) => {
             const productsInSubcategory =
-              categoryProducts.filter(
-                (product) =>
-                  normalizarTexto(
-                    product?.subcategory
-                  ) ===
-                  subcategory.value
+              ordenarProductos(
+                categoryProducts.filter(
+                  (product) =>
+                    normalizarTexto(
+                      product?.subcategory
+                    ) ===
+                    subcategory.value
+                )
               );
 
             if (

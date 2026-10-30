@@ -290,8 +290,16 @@ export default function ProductsAdmin() {
       } = await supabase
         .from("products")
         .select("*")
+        .order("subcategory_position", {
+          ascending: true,
+          nullsFirst: false,
+        })
+        .order("product_position", {
+          ascending: true,
+          nullsFirst: false,
+        })
         .order("created_at", {
-          ascending: false,
+          ascending: true,
         })
 
       if (productError) {
@@ -1214,9 +1222,434 @@ export default function ProductsAdmin() {
     }
   }
 
+  function sameSubcategory(a, b) {
+    return (
+      normalizeSubcategory(a) ===
+      normalizeSubcategory(b)
+    )
+  }
+
+  function getCategorySubcategories(
+    categoryName,
+    sourceProducts = products
+  ) {
+    const groups = new Map()
+
+    sourceProducts
+      .filter(
+        (product) =>
+          product.category ===
+          categoryName
+      )
+      .forEach((product) => {
+        const label =
+          normalizeSubcategory(
+            product.subcategory
+          )
+        const key = label.toLowerCase()
+
+        if (!groups.has(key)) {
+          groups.set(key, {
+            key,
+            label,
+            position:
+              product.subcategory_position ==
+              null
+                ? Number.MAX_SAFE_INTEGER
+                : Number(
+                    product.subcategory_position
+                  ),
+            products: [],
+          })
+        }
+
+        const group = groups.get(key)
+        group.products.push(product)
+
+        if (
+          product.subcategory_position !=
+          null
+        ) {
+          group.position = Math.min(
+            group.position,
+            Number(
+              product.subcategory_position
+            )
+          )
+        }
+      })
+
+    return [...groups.values()]
+      .sort((a, b) => {
+        if (a.position !== b.position) {
+          return a.position - b.position
+        }
+
+        return a.label.localeCompare(
+          b.label,
+          "es",
+          { sensitivity: "base" }
+        )
+      })
+      .map((group, index) => ({
+        ...group,
+        effectivePosition: index,
+        products: [...group.products].sort(
+          (a, b) => {
+            const positionA =
+              a.product_position == null
+                ? Number.MAX_SAFE_INTEGER
+                : Number(
+                    a.product_position
+                  )
+            const positionB =
+              b.product_position == null
+                ? Number.MAX_SAFE_INTEGER
+                : Number(
+                    b.product_position
+                  )
+
+            if (
+              positionA !== positionB
+            ) {
+              return positionA - positionB
+            }
+
+            return (
+              new Date(
+                a.created_at || 0
+              ).getTime() -
+              new Date(
+                b.created_at || 0
+              ).getTime()
+            )
+          }
+        ),
+      }))
+  }
+
+  async function moveSubcategory(
+    subcategoryKey,
+    direction
+  ) {
+    const groups =
+      getCategorySubcategories(
+        filterCategory
+      )
+
+    const currentIndex =
+      groups.findIndex(
+        (group) =>
+          group.key ===
+          subcategoryKey
+      )
+
+    const targetIndex =
+      currentIndex + direction
+
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= groups.length
+    ) {
+      return
+    }
+
+    const reordered = [...groups]
+    const [selected] =
+      reordered.splice(
+        currentIndex,
+        1
+      )
+
+    reordered.splice(
+      targetIndex,
+      0,
+      selected
+    )
+
+    try {
+      setSaving(true)
+
+      for (
+        let position = 0;
+        position < reordered.length;
+        position += 1
+      ) {
+        const group =
+          reordered[position]
+        const ids = group.products.map(
+          (product) => product.id
+        )
+
+        if (!ids.length) continue
+
+        const { error } =
+          await supabase
+            .from("products")
+            .update({
+              subcategory_position:
+                position,
+            })
+            .in("id", ids)
+
+        if (error) throw error
+      }
+
+      setProducts((current) =>
+        current.map((product) => {
+          const groupIndex =
+            reordered.findIndex(
+              (group) =>
+                group.products.some(
+                  (item) =>
+                    item.id ===
+                    product.id
+                )
+            )
+
+          return groupIndex >= 0
+            ? {
+                ...product,
+                subcategory_position:
+                  groupIndex,
+              }
+            : product
+        })
+      )
+    } catch (error) {
+      console.error(
+        "Error ordenando subcategorías:",
+        error
+      )
+      alert(
+        error?.message ||
+          "No se pudo cambiar el orden de las categorías."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function moveProduct(
+    product,
+    direction
+  ) {
+    const siblings = products
+      .filter(
+        (item) =>
+          item.category ===
+            product.category &&
+          sameSubcategory(
+            item.subcategory,
+            product.subcategory
+          )
+      )
+      .sort((a, b) => {
+        const positionA =
+          a.product_position == null
+            ? Number.MAX_SAFE_INTEGER
+            : Number(
+                a.product_position
+              )
+        const positionB =
+          b.product_position == null
+            ? Number.MAX_SAFE_INTEGER
+            : Number(
+                b.product_position
+              )
+
+        if (positionA !== positionB) {
+          return positionA - positionB
+        }
+
+        return (
+          new Date(
+            a.created_at || 0
+          ).getTime() -
+          new Date(
+            b.created_at || 0
+          ).getTime()
+        )
+      })
+
+    const currentIndex =
+      siblings.findIndex(
+        (item) =>
+          item.id === product.id
+      )
+    const targetIndex =
+      currentIndex + direction
+
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= siblings.length
+    ) {
+      return
+    }
+
+    const reordered = [...siblings]
+    const [selected] =
+      reordered.splice(
+        currentIndex,
+        1
+      )
+
+    reordered.splice(
+      targetIndex,
+      0,
+      selected
+    )
+
+    try {
+      setSaving(true)
+
+      for (
+        let position = 0;
+        position < reordered.length;
+        position += 1
+      ) {
+        const { error } =
+          await supabase
+            .from("products")
+            .update({
+              product_position:
+                position,
+            })
+            .eq(
+              "id",
+              reordered[position].id
+            )
+
+        if (error) throw error
+      }
+
+      const positionById =
+        new Map(
+          reordered.map(
+            (item, index) => [
+              item.id,
+              index,
+            ]
+          )
+        )
+
+      setProducts((current) =>
+        current.map((item) =>
+          positionById.has(item.id)
+            ? {
+                ...item,
+                product_position:
+                  positionById.get(
+                    item.id
+                  ),
+              }
+            : item
+        )
+      )
+    } catch (error) {
+      console.error(
+        "Error ordenando productos:",
+        error
+      )
+      alert(
+        error?.message ||
+          "No se pudo cambiar el orden del producto."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function getNewPositions(
+    targetCategory,
+    targetSubcategory,
+    excludeId = null
+  ) {
+    const categoryProducts =
+      products.filter(
+        (product) =>
+          product.category ===
+            targetCategory &&
+          product.id !== excludeId
+      )
+
+    const sameGroup =
+      categoryProducts.filter(
+        (product) =>
+          sameSubcategory(
+            product.subcategory,
+            targetSubcategory
+          )
+      )
+
+    const existingGroupPosition =
+      sameGroup
+        .map((product) =>
+          product.subcategory_position ==
+          null
+            ? null
+            : Number(
+                product.subcategory_position
+              )
+        )
+        .find(
+          (position) =>
+            position != null
+        )
+
+    const maxSubcategoryPosition =
+      categoryProducts.reduce(
+        (max, product) =>
+          Math.max(
+            max,
+            product.subcategory_position ==
+            null
+              ? -1
+              : Number(
+                  product.subcategory_position
+                )
+          ),
+        -1
+      )
+
+    const maxProductPosition =
+      sameGroup.reduce(
+        (max, product) =>
+          Math.max(
+            max,
+            product.product_position ==
+            null
+              ? -1
+              : Number(
+                  product.product_position
+                )
+          ),
+        -1
+      )
+
+    return {
+      subcategoryPosition:
+        existingGroupPosition != null
+          ? existingGroupPosition
+          : maxSubcategoryPosition + 1,
+      productPosition:
+        maxProductPosition + 1,
+    }
+  }
+
   async function createProduct() {
     const variants =
       buildVariants()
+
+    const {
+      subcategoryPosition,
+      productPosition,
+    } = getNewPositions(
+      category,
+      subcategory
+    )
 
     const {
       data: product,
@@ -1244,6 +1677,10 @@ export default function ProductsAdmin() {
           isBestSeller,
         is_active: true,
         owner_role: "principal",
+        subcategory_position:
+          subcategoryPosition,
+        product_position:
+          productPosition,
       })
       .select()
       .single()
@@ -1301,6 +1738,37 @@ export default function ProductsAdmin() {
     const variants =
       buildVariants()
 
+    const originalProduct =
+      products.find(
+        (product) =>
+          product.id === editingId
+      )
+
+    const changedGroup =
+      !originalProduct ||
+      originalProduct.category !==
+        category ||
+      !sameSubcategory(
+        originalProduct.subcategory,
+        subcategory
+      )
+
+    const nextPositions =
+      changedGroup
+        ? getNewPositions(
+            category,
+            subcategory,
+            editingId
+          )
+        : {
+            subcategoryPosition:
+              originalProduct?.subcategory_position ??
+              0,
+            productPosition:
+              originalProduct?.product_position ??
+              0,
+          }
+
     const {
       error: productError,
     } = await supabase
@@ -1321,6 +1789,10 @@ export default function ProductsAdmin() {
         is_new: isNew,
         is_best_seller:
           isBestSeller,
+        subcategory_position:
+          nextPositions.subcategoryPosition,
+        product_position:
+          nextPositions.productPosition,
         updated_at:
           new Date().toISOString(),
       })
@@ -1927,6 +2399,42 @@ export default function ProductsAdmin() {
                 .includes(query)
             )
         })
+        .sort((a, b) => {
+          const subcategoryA =
+            a.subcategory_position == null
+              ? Number.MAX_SAFE_INTEGER
+              : Number(
+                  a.subcategory_position
+                )
+          const subcategoryB =
+            b.subcategory_position == null
+              ? Number.MAX_SAFE_INTEGER
+              : Number(
+                  b.subcategory_position
+                )
+
+          if (subcategoryA !== subcategoryB) {
+            return subcategoryA - subcategoryB
+          }
+
+          const productA =
+            a.product_position == null
+              ? Number.MAX_SAFE_INTEGER
+              : Number(a.product_position)
+          const productB =
+            b.product_position == null
+              ? Number.MAX_SAFE_INTEGER
+              : Number(b.product_position)
+
+          if (productA !== productB) {
+            return productA - productB
+          }
+
+          return (
+            new Date(a.created_at || 0).getTime() -
+            new Date(b.created_at || 0).getTime()
+          )
+        })
     }, [
       products,
       filterCategory,
@@ -1960,14 +2468,72 @@ export default function ProductsAdmin() {
         )
       }
 
-      return Object.values(
-        groups
-      ).sort((a, b) =>
-        a.label.localeCompare(
-          b.label,
-          "es"
-        )
-      )
+      return Object.values(groups)
+        .map((group) => {
+          const positions =
+            group.products
+              .map((product) =>
+                product.subcategory_position ==
+                null
+                  ? null
+                  : Number(
+                      product.subcategory_position
+                    )
+              )
+              .filter(
+                (position) =>
+                  position != null
+              )
+
+          return {
+            ...group,
+            position: positions.length
+              ? Math.min(...positions)
+              : Number.MAX_SAFE_INTEGER,
+            products: [...group.products].sort(
+              (a, b) => {
+                const positionA =
+                  a.product_position == null
+                    ? Number.MAX_SAFE_INTEGER
+                    : Number(
+                        a.product_position
+                      )
+                const positionB =
+                  b.product_position == null
+                    ? Number.MAX_SAFE_INTEGER
+                    : Number(
+                        b.product_position
+                      )
+
+                if (
+                  positionA !== positionB
+                ) {
+                  return positionA - positionB
+                }
+
+                return (
+                  new Date(
+                    a.created_at || 0
+                  ).getTime() -
+                  new Date(
+                    b.created_at || 0
+                  ).getTime()
+                )
+              }
+            ),
+          }
+        })
+        .sort((a, b) => {
+          if (a.position !== b.position) {
+            return a.position - b.position
+          }
+
+          return a.label.localeCompare(
+            b.label,
+            "es",
+            { sensitivity: "base" }
+          )
+        })
     }, [visibleProducts])
 
   const selectedGroup =
@@ -2336,7 +2902,33 @@ export default function ProductsAdmin() {
           </div>
         </div>
 
-        <div className="grid h-[42px] shrink-0 grid-cols-2 gap-1.5 border-t border-neutral-100 p-1.5">
+        <div className="grid h-[42px] shrink-0 grid-cols-4 gap-1 border-t border-neutral-100 p-1.5">
+          <button
+            type="button"
+            onClick={() =>
+              moveProduct(product, -1)
+            }
+            disabled={saving}
+            title="Mover producto hacia arriba"
+            aria-label="Mover producto hacia arriba"
+            className="min-h-7 rounded-lg border border-neutral-200 text-[12px] font-semibold transition hover:bg-neutral-50 disabled:opacity-30"
+          >
+            ↑
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              moveProduct(product, 1)
+            }
+            disabled={saving}
+            title="Mover producto hacia abajo"
+            aria-label="Mover producto hacia abajo"
+            className="min-h-7 rounded-lg border border-neutral-200 text-[12px] font-semibold transition hover:bg-neutral-50 disabled:opacity-30"
+          >
+            ↓
+          </button>
+
           <button
             type="button"
             onClick={() =>
@@ -2344,7 +2936,7 @@ export default function ProductsAdmin() {
                 product
               )
             }
-            className="min-h-7 rounded-lg border border-neutral-200 text-[8px] font-semibold transition hover:bg-neutral-50 sm:text-[9px]"
+            className="min-h-7 rounded-lg border border-neutral-200 text-[7px] font-semibold transition hover:bg-neutral-50 sm:text-[8px]"
           >
             {product.is_active
               ? "Ocultar"
@@ -2358,7 +2950,7 @@ export default function ProductsAdmin() {
                 product
               )
             }
-            className="min-h-7 rounded-lg border border-red-200 text-[8px] font-semibold text-red-600 transition hover:bg-red-50 sm:text-[9px]"
+            className="min-h-7 rounded-lg border border-red-200 text-[7px] font-semibold text-red-600 transition hover:bg-red-50 sm:text-[8px]"
           >
             Eliminar
           </button>
@@ -2500,6 +3092,94 @@ export default function ProductsAdmin() {
                 className={inputClass}
               />
             </div>
+
+            {!search.trim() &&
+              groupedSubcategories.length > 0 && (
+                <section className="w-full rounded-[26px] border border-neutral-200 bg-neutral-50 p-4 sm:p-6">
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-neutral-900">
+                      Orden de categorías
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Usa las flechas para decidir qué categoría aparece primero en la tienda.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {groupedSubcategories.map(
+                      (group, index) => (
+                        <div
+                          key={group.key}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                "subcategory",
+                                group.key,
+                                false,
+                                filterCategory
+                              )
+                            }
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <span className="block truncate text-sm font-semibold text-neutral-900">
+                              {group.label}
+                            </span>
+                            <span className="mt-0.5 block text-[10px] text-neutral-400">
+                              {group.products.length}{" "}
+                              {group.products.length === 1
+                                ? "producto"
+                                : "productos"}
+                            </span>
+                          </button>
+
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                moveSubcategory(
+                                  group.key,
+                                  -1
+                                )
+                              }
+                              disabled={
+                                saving ||
+                                index === 0
+                              }
+                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white text-lg transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-30"
+                              aria-label={`Mover ${group.label} hacia arriba`}
+                            >
+                              ↑
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                moveSubcategory(
+                                  group.key,
+                                  1
+                                )
+                              }
+                              disabled={
+                                saving ||
+                                index ===
+                                  groupedSubcategories.length -
+                                    1
+                              }
+                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white text-lg transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-30"
+                              aria-label={`Mover ${group.label} hacia abajo`}
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </section>
+              )}
 
             <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6 lg:gap-4">
               <AddProductCard />

@@ -1,6 +1,29 @@
 import { supabase } from "../lib/supabase";
 
 /* =========================================
+   OBTENER POSICIÓN NUMÉRICA
+   ========================================= */
+
+function obtenerPosicion(
+  valor,
+  fallback = Number.MAX_SAFE_INTEGER
+) {
+  if (
+    valor === null ||
+    valor === undefined ||
+    valor === ""
+  ) {
+    return fallback;
+  }
+
+  const numero = Number(valor);
+
+  return Number.isFinite(numero)
+    ? numero
+    : fallback;
+}
+
+/* =========================================
    ORDENAR POR POSICIÓN
    ========================================= */
 
@@ -13,10 +36,54 @@ function ordenarPorPosicion(lista = []) {
 }
 
 /* =========================================
+   ORDENAR PRODUCTOS MANUALMENTE
+
+   1. Respeta product_position.
+   2. Los productos sin posición quedan
+      después de los que sí tienen posición.
+   3. Como respaldo usa created_at.
+   ========================================= */
+
+function ordenarProductos(lista = []) {
+  return [...lista].sort((a, b) => {
+    const posicionA = obtenerPosicion(
+      a?.product_position
+    );
+
+    const posicionB = obtenerPosicion(
+      b?.product_position
+    );
+
+    if (posicionA !== posicionB) {
+      return posicionA - posicionB;
+    }
+
+    const fechaA = new Date(
+      a?.created_at || 0
+    ).getTime();
+
+    const fechaB = new Date(
+      b?.created_at || 0
+    ).getTime();
+
+    if (fechaA !== fechaB) {
+      return fechaA - fechaB;
+    }
+
+    return String(a?.name || "").localeCompare(
+      String(b?.name || ""),
+      "es",
+      {
+        sensitivity: "base",
+      }
+    );
+  });
+}
+
+/* =========================================
    ORDENAR VARIANTES
 
-   IMPORTANTE:
-   1. Primero respeta color_position.
+   1. Respeta color_position.
    2. Después ordena las tallas dentro
       de cada color.
    ========================================= */
@@ -111,6 +178,12 @@ export async function getProducts() {
   try {
     /* =======================================
        1. PRODUCTOS ACTIVOS
+
+       Ya no usamos created_at DESC como
+       orden principal.
+
+       El orden final lo controla
+       product_position.
        ======================================= */
 
     const {
@@ -119,10 +192,7 @@ export async function getProducts() {
     } = await supabase
       .from("products")
       .select("*")
-      .eq("is_active", true)
-      .order("created_at", {
-        ascending: false,
-      });
+      .eq("is_active", true);
 
     if (productsError) {
       console.error(
@@ -154,8 +224,6 @@ export async function getProducts() {
 
     /* =======================================
        2. VARIANTES
-
-       AHORA TRAEMOS color_position.
        ======================================= */
 
     const {
@@ -531,6 +599,26 @@ export async function getProducts() {
           return {
             ...product,
 
+            product_position:
+              product.product_position ===
+                null ||
+              product.product_position ===
+                undefined
+                ? null
+                : Number(
+                    product.product_position
+                  ),
+
+            subcategory_position:
+              product.subcategory_position ===
+                null ||
+              product.subcategory_position ===
+                undefined
+                ? null
+                : Number(
+                    product.subcategory_position
+                  ),
+
             product_variants:
               variantesOrdenadas,
 
@@ -547,12 +635,19 @@ export async function getProducts() {
         }
       );
 
+    /* =======================================
+       11. APLICAR ORDEN MANUAL
+       ======================================= */
+
+    const productosOrdenados =
+      ordenarProductos(resultado);
+
     console.log(
       "Productos cargados correctamente:",
-      resultado
+      productosOrdenados
     );
 
-    return resultado;
+    return productosOrdenados;
   } catch (error) {
     console.error(
       "Error general cargando productos:",

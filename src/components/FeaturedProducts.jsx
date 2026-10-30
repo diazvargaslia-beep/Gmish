@@ -164,9 +164,40 @@ function FeaturedProducts({
         );
       }
 
+      /*
+        ORDEN NORMAL DEL CATÁLOGO
+
+        Respeta el orden manual guardado
+        desde ProductsAdmin mediante
+        product_position.
+
+        Si un producto antiguo todavía no
+        tiene product_position, queda después
+        de los productos que sí están ordenados.
+      */
+      const positionA =
+        a.product_position == null
+          ? Number.MAX_SAFE_INTEGER
+          : Number(a.product_position);
+
+      const positionB =
+        b.product_position == null
+          ? Number.MAX_SAFE_INTEGER
+          : Number(b.product_position);
+
+      if (positionA !== positionB) {
+        return positionA - positionB;
+      }
+
+      /*
+        Si dos productos todavía no tienen
+        una posición distinta, conservamos
+        como respaldo el orden en que fueron
+        creados: primero el más antiguo.
+      */
       return (
-        new Date(b.created_at || 0).getTime() -
-        new Date(a.created_at || 0).getTime()
+        new Date(a.created_at || 0).getTime() -
+        new Date(b.created_at || 0).getTime()
       );
     });
   }, [

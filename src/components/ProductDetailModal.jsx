@@ -23,33 +23,187 @@ function ProductDetailModal({ product, onClose }) {
   const closeTimeout = useRef(null);
   const closeHandlerRef = useRef(() => {});
 
-  // Reiniciar las opciones al cambiar de producto.
+  const variants = product.product_variants || [];
+
+  /* =========================================
+     IMÁGENES GENERALES
+     ========================================= */
+
+  const productImages = useMemo(
+    () =>
+      [...(product.product_images || [])]
+        .sort(
+          (a, b) =>
+            Number(a.position || 0) -
+            Number(b.position || 0)
+        )
+        .map((image) => image.image_url)
+        .filter(Boolean),
+    [product]
+  );
+
+  /* =========================================
+     TALLAS DISPONIBLES
+     ========================================= */
+
+  const sizes = useMemo(() => {
+    const result = [];
+
+    variants.forEach((variant) => {
+      if (
+        Number(variant.stock) > 0 &&
+        !result.includes(variant.size)
+      ) {
+        result.push(variant.size);
+      }
+    });
+
+    return result;
+  }, [variants]);
+
+  /* =========================================
+     COLORES DISPONIBLES
+
+     IMPORTANTE:
+     Un producto puede tener varias variantes
+     porque cada talla es una variante.
+
+     Aquí agrupamos por COLOR, no por cantidad
+     de variantes.
+     ========================================= */
+
+  const colors = useMemo(() => {
+    const uniqueColors = new Map();
+
+    const orderedVariants = [...variants].sort(
+      (a, b) =>
+        Number(a?.color_position ?? 0) -
+        Number(b?.color_position ?? 0)
+    );
+
+    orderedVariants.forEach((variant) => {
+      if (Number(variant.stock) <= 0) {
+        return;
+      }
+
+      const colorName = String(
+        variant.color || ""
+      ).trim();
+
+      if (!colorName) {
+        return;
+      }
+
+      const colorKey = colorName.toLowerCase();
+
+      if (!uniqueColors.has(colorKey)) {
+        const variantImages = [
+          ...(variant.product_variant_images || []),
+        ]
+          .sort(
+            (a, b) =>
+              Number(a.position || 0) -
+              Number(b.position || 0)
+          )
+          .map((image) => image.image_url)
+          .filter(Boolean);
+
+        uniqueColors.set(colorKey, {
+          name: colorName,
+          hex: variant.color_hex || "#777777",
+          images: variantImages,
+          oldImage: variant.color_image_url || "",
+          position: Number(
+            variant.color_position ?? 0
+          ),
+        });
+
+        return;
+      }
+
+      const currentColor =
+        uniqueColors.get(colorKey);
+
+      if (
+        (!currentColor.images ||
+          currentColor.images.length === 0) &&
+        variant.product_variant_images?.length
+      ) {
+        currentColor.images = [
+          ...(variant.product_variant_images || []),
+        ]
+          .sort(
+            (a, b) =>
+              Number(a.position || 0) -
+              Number(b.position || 0)
+          )
+          .map((image) => image.image_url)
+          .filter(Boolean);
+      }
+
+      if (
+        !currentColor.oldImage &&
+        variant.color_image_url
+      ) {
+        currentColor.oldImage =
+          variant.color_image_url;
+      }
+    });
+
+    return [...uniqueColors.values()].sort(
+      (a, b) =>
+        Number(a.position ?? 0) -
+        Number(b.position ?? 0)
+    );
+  }, [variants]);
+
+  /* =========================================
+     REINICIAR AL CAMBIAR DE PRODUCTO
+
+     REGLA:
+     - 1 color  -> se selecciona solo.
+     - 2+ colores -> ninguno seleccionado.
+     - La talla SIEMPRE queda sin seleccionar.
+     ========================================= */
+
   useEffect(() => {
     setSelectedSize("");
-    setSelectedColor("");
+
+    if (colors.length === 1) {
+      setSelectedColor(colors[0].name);
+    } else {
+      setSelectedColor("");
+    }
+
     setQuantity(1);
     setActiveImage(0);
     setAdded(false);
     setSelectionPulse(false);
+    setImageChanging(false);
     setModalVisible(false);
+
     closingRef.current = false;
+    historyEntryAdded.current = false;
 
     const frame = requestAnimationFrame(() => {
       setModalVisible(true);
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [product]);
+  }, [product.id, colors]);
 
-  // Registrar el detalle en el historial sin perder
-  // la página ni la posición del catálogo.
+  /* =========================================
+     HISTORIAL DEL MODAL
+     ========================================= */
+
   useEffect(() => {
     if (!historyEntryAdded.current) {
       const currentState = window.history.state;
 
       window.history.replaceState(
         {
-          ...(currentState && typeof currentState === "object"
+          ...(currentState &&
+          typeof currentState === "object"
             ? currentState
             : {}),
           gmishScrollY: window.scrollY,
@@ -80,9 +234,10 @@ function ProductDetailModal({ product, onClose }) {
       closingRef.current = true;
       setModalVisible(false);
 
-      closeTimeout.current = window.setTimeout(() => {
-        onClose();
-      }, 220);
+      closeTimeout.current =
+        window.setTimeout(() => {
+          onClose();
+        }, 220);
     }
 
     function handlePopState() {
@@ -98,7 +253,9 @@ function ProductDetailModal({ product, onClose }) {
     function handleClose() {
       if (closingRef.current) return;
 
-      if (window.history.state?.gmishProductModal) {
+      if (
+        window.history.state?.gmishProductModal
+      ) {
         window.history.back();
       } else {
         closeModal();
@@ -107,17 +264,35 @@ function ProductDetailModal({ product, onClose }) {
 
     closeHandlerRef.current = handleClose;
 
-    window.addEventListener("popstate", handlePopState);
-    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener(
+      "popstate",
+      handlePopState
+    );
+
+    document.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
     document.body.style.overflow = "hidden";
 
     return () => {
-      window.removeEventListener("popstate", handlePopState);
-      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener(
+        "popstate",
+        handlePopState
+      );
+
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
+
       document.body.style.overflow = "";
 
       if (closeTimeout.current) {
-        window.clearTimeout(closeTimeout.current);
+        window.clearTimeout(
+          closeTimeout.current
+        );
       }
     };
   }, [product.id, onClose]);
@@ -126,81 +301,54 @@ function ProductDetailModal({ product, onClose }) {
     closeHandlerRef.current();
   }
 
-  const variants = product.product_variants || [];
-
-  const productImages = useMemo(
-    () =>
-      [...(product.product_images || [])]
-        .sort(
-          (a, b) =>
-            Number(a.position || 0) - Number(b.position || 0)
-        )
-        .map((image) => image.image_url)
-        .filter(Boolean),
-    [product]
-  );
-
-  const sizes = useMemo(() => {
-    const result = [];
-
-    variants.forEach((variant) => {
-      if (
-        Number(variant.stock) > 0 &&
-        !result.includes(variant.size)
-      ) {
-        result.push(variant.size);
-      }
-    });
-
-    return result;
-  }, [variants]);
-
-  const colors = useMemo(() => {
-    const uniqueColors = new Map();
-
-    variants.forEach((variant) => {
-      if (
-        Number(variant.stock) > 0 &&
-        !uniqueColors.has(variant.color)
-      ) {
-        const variantImages = [
-          ...(variant.product_variant_images || []),
-        ]
-          .sort(
-            (a, b) =>
-              Number(a.position || 0) - Number(b.position || 0)
-          )
-          .map((image) => image.image_url)
-          .filter(Boolean);
-
-        uniqueColors.set(variant.color, {
-          name: variant.color,
-          hex: variant.color_hex || "#777777",
-          images: variantImages,
-          oldImage: variant.color_image_url || "",
-        });
-      }
-    });
-
-    return [...uniqueColors.values()];
-  }, [variants]);
+  /* =========================================
+     COLOR SELECCIONADO
+     ========================================= */
 
   const selectedColorData =
-    colors.find((color) => color.name === selectedColor) || null;
+    colors.find(
+      (color) =>
+        color.name === selectedColor
+    ) || null;
+
+  /* =========================================
+     IMÁGENES PRINCIPALES DE CADA COLOR
+
+     Cuando todavía no hay color elegido,
+     solo se muestra la principal de cada
+     color.
+     ========================================= */
 
   const generalColorImages = useMemo(() => {
     const images = [];
 
     colors.forEach((color) => {
-      const firstImage = color.images?.[0] || color.oldImage || "";
+      const firstImage =
+        color.images?.[0] ||
+        color.oldImage ||
+        "";
 
-      if (firstImage && !images.includes(firstImage)) {
+      if (
+        firstImage &&
+        !images.includes(firstImage)
+      ) {
         images.push(firstImage);
       }
     });
 
     return images;
   }, [colors]);
+
+  /* =========================================
+     IMÁGENES QUE SE MOSTRARÁN
+
+     Si hay un color seleccionado:
+     mostramos TODAS las fotos de ese color.
+
+     Esto hace que los productos con un solo
+     color muestren automáticamente todas
+     sus fotografías.
+     ========================================= */
 
   const displayedImages = useMemo(() => {
     if (!selectedColorData) {
@@ -209,36 +357,67 @@ function ProductDetailModal({ product, onClose }) {
         : productImages;
     }
 
-    if (selectedColorData.images.length > 0) {
+    if (
+      selectedColorData.images.length > 0
+    ) {
       return selectedColorData.images;
     }
 
     if (selectedColorData.oldImage) {
-      return [selectedColorData.oldImage];
+      return [
+        selectedColorData.oldImage,
+      ];
     }
 
     return productImages;
-  }, [selectedColorData, generalColorImages, productImages]);
+  }, [
+    selectedColorData,
+    generalColorImages,
+    productImages,
+  ]);
 
   useEffect(() => {
-    if (activeImage >= displayedImages.length) {
+    if (
+      activeImage >=
+      displayedImages.length
+    ) {
       setActiveImage(0);
     }
-  }, [displayedImages, activeImage]);
+  }, [
+    displayedImages,
+    activeImage,
+  ]);
 
   const displayedImage =
-    displayedImages[activeImage] || displayedImages[0] || "";
+    displayedImages[activeImage] ||
+    displayedImages[0] ||
+    "";
+
+  /* =========================================
+     VARIANTE SELECCIONADA
+     ========================================= */
 
   const selectedVariant = useMemo(() => {
-    if (!selectedSize || !selectedColor) return null;
+    if (
+      !selectedSize ||
+      !selectedColor
+    ) {
+      return null;
+    }
 
     return variants.find(
       (variant) =>
-        variant.size === selectedSize &&
-        variant.color === selectedColor &&
+        variant.size ===
+          selectedSize &&
+        variant.color ===
+          selectedColor &&
         Number(variant.stock) > 0
     );
-  }, [variants, selectedSize, selectedColor]);
+  }, [
+    variants,
+    selectedSize,
+    selectedColor,
+  ]);
 
   const cartQuantity = selectedVariant
     ? getCartQuantity(
@@ -249,9 +428,10 @@ function ProductDetailModal({ product, onClose }) {
       )
     : 0;
 
-  const stockAvailable = selectedVariant
-    ? Number(selectedVariant.stock)
-    : 0;
+  const stockAvailable =
+    selectedVariant
+      ? Number(selectedVariant.stock)
+      : 0;
 
   const remainingStock = Math.max(
     stockAvailable - cartQuantity,
@@ -263,48 +443,95 @@ function ProductDetailModal({ product, onClose }) {
     remainingStock > 0 &&
     quantity <= remainingStock;
 
-  const availableColorsForSize = useMemo(() => {
-    if (!selectedSize) return colors;
+  /* =========================================
+     COLORES SEGÚN TALLA
+     ========================================= */
 
-    const availableNames = new Set(
-      variants
-        .filter(
-          (variant) =>
-            variant.size === selectedSize &&
-            Number(variant.stock) > 0
-        )
-        .map((variant) => variant.color)
-    );
+  const availableColorsForSize =
+    useMemo(() => {
+      if (!selectedSize) {
+        return colors;
+      }
 
-    return colors.filter((color) =>
-      availableNames.has(color.name)
-    );
-  }, [variants, colors, selectedSize]);
+      const availableNames =
+        new Set(
+          variants
+            .filter(
+              (variant) =>
+                variant.size ===
+                  selectedSize &&
+                Number(
+                  variant.stock
+                ) > 0
+            )
+            .map(
+              (variant) =>
+                variant.color
+            )
+        );
 
-  const availableSizesForColor = useMemo(() => {
-    if (!selectedColor) return sizes;
-
-    return [
-      ...new Set(
-        variants
-          .filter(
-            (variant) =>
-              variant.color === selectedColor &&
-              Number(variant.stock) > 0
+      return colors.filter(
+        (color) =>
+          availableNames.has(
+            color.name
           )
-          .map((variant) => variant.size)
-      ),
-    ];
-  }, [variants, sizes, selectedColor]);
+      );
+    }, [
+      variants,
+      colors,
+      selectedSize,
+    ]);
+
+  /* =========================================
+     TALLAS SEGÚN COLOR
+     ========================================= */
+
+  const availableSizesForColor =
+    useMemo(() => {
+      if (!selectedColor) {
+        return sizes;
+      }
+
+      return [
+        ...new Set(
+          variants
+            .filter(
+              (variant) =>
+                variant.color ===
+                  selectedColor &&
+                Number(
+                  variant.stock
+                ) > 0
+            )
+            .map(
+              (variant) =>
+                variant.size
+            )
+        ),
+      ];
+    }, [
+      variants,
+      sizes,
+      selectedColor,
+    ]);
 
   function triggerSelectionPulse() {
     setSelectionPulse(false);
 
     requestAnimationFrame(() => {
       setSelectionPulse(true);
-      setTimeout(() => setSelectionPulse(false), 350);
+
+      setTimeout(
+        () =>
+          setSelectionPulse(false),
+        350
+      );
     });
   }
+
+  /* =========================================
+     CAMBIAR IMAGEN
+     ========================================= */
 
   function changeImage(index) {
     if (
@@ -318,18 +545,34 @@ function ProductDetailModal({ product, onClose }) {
 
     setTimeout(() => {
       setActiveImage(index);
-      setTimeout(() => setImageChanging(false), 180);
+
+      setTimeout(
+        () =>
+          setImageChanging(false),
+        180
+      );
     }, 120);
   }
 
   function nextImage() {
-    if (displayedImages.length <= 1) return;
+    if (
+      displayedImages.length <= 1
+    ) {
+      return;
+    }
 
-    changeImage((activeImage + 1) % displayedImages.length);
+    changeImage(
+      (activeImage + 1) %
+        displayedImages.length
+    );
   }
 
   function previousImage() {
-    if (displayedImages.length <= 1) return;
+    if (
+      displayedImages.length <= 1
+    ) {
+      return;
+    }
 
     changeImage(
       activeImage === 0
@@ -338,28 +581,48 @@ function ProductDetailModal({ product, onClose }) {
     );
   }
 
-  function handleColorChange(colorName) {
-    if (colorName === selectedColor) return;
+  /* =========================================
+     CAMBIAR COLOR
+     ========================================= */
+
+  function handleColorChange(
+    colorName
+  ) {
+    if (
+      colorName === selectedColor
+    ) {
+      return;
+    }
 
     setSelectedColor(colorName);
     setActiveImage(0);
     setImageChanging(true);
 
-    setTimeout(() => setImageChanging(false), 300);
+    setTimeout(
+      () =>
+        setImageChanging(false),
+      300
+    );
 
     triggerSelectionPulse();
 
     const availableSizes = variants
       .filter(
         (variant) =>
-          variant.color === colorName &&
+          variant.color ===
+            colorName &&
           Number(variant.stock) > 0
       )
-      .map((variant) => variant.size);
+      .map(
+        (variant) =>
+          variant.size
+      );
 
     if (
       selectedSize &&
-      !availableSizes.includes(selectedSize)
+      !availableSizes.includes(
+        selectedSize
+      )
     ) {
       setSelectedSize("");
     }
@@ -367,8 +630,16 @@ function ProductDetailModal({ product, onClose }) {
     setQuantity(1);
   }
 
+  /* =========================================
+     CAMBIAR TALLA
+     ========================================= */
+
   function handleSizeChange(size) {
-    if (size === selectedSize) return;
+    if (
+      size === selectedSize
+    ) {
+      return;
+    }
 
     setSelectedSize(size);
     setQuantity(1);
@@ -380,7 +651,8 @@ function ProductDetailModal({ product, onClose }) {
       !variants.some(
         (variant) =>
           variant.size === size &&
-          variant.color === selectedColor &&
+          variant.color ===
+            selectedColor &&
           Number(variant.stock) > 0
       )
     ) {
@@ -389,34 +661,63 @@ function ProductDetailModal({ product, onClose }) {
     }
   }
 
-  function handleTouchStart(event) {
-    if (displayedImages.length <= 1) return;
+  /* =========================================
+     SWIPE EN CELULAR
+     ========================================= */
 
-    touchStartX.current = event.touches[0].clientX;
-    touchCurrentX.current = event.touches[0].clientX;
-    touchStartY.current = event.touches[0].clientY;
-    touchCurrentY.current = event.touches[0].clientY;
+  function handleTouchStart(event) {
+    if (
+      displayedImages.length <= 1
+    ) {
+      return;
+    }
+
+    touchStartX.current =
+      event.touches[0].clientX;
+
+    touchCurrentX.current =
+      event.touches[0].clientX;
+
+    touchStartY.current =
+      event.touches[0].clientY;
+
+    touchCurrentY.current =
+      event.touches[0].clientY;
   }
 
   function handleTouchMove(event) {
-    if (displayedImages.length <= 1) return;
+    if (
+      displayedImages.length <= 1
+    ) {
+      return;
+    }
 
-    touchCurrentX.current = event.touches[0].clientX;
-    touchCurrentY.current = event.touches[0].clientY;
+    touchCurrentX.current =
+      event.touches[0].clientX;
+
+    touchCurrentY.current =
+      event.touches[0].clientY;
   }
 
   function handleTouchEnd() {
-    if (displayedImages.length <= 1) return;
+    if (
+      displayedImages.length <= 1
+    ) {
+      return;
+    }
 
     const differenceX =
-      touchStartX.current - touchCurrentX.current;
+      touchStartX.current -
+      touchCurrentX.current;
 
     const differenceY =
-      touchStartY.current - touchCurrentY.current;
+      touchStartY.current -
+      touchCurrentY.current;
 
     if (
       Math.abs(differenceX) < 45 ||
-      Math.abs(differenceX) < Math.abs(differenceY)
+      Math.abs(differenceX) <
+        Math.abs(differenceY)
     ) {
       return;
     }
@@ -426,22 +727,40 @@ function ProductDetailModal({ product, onClose }) {
       : previousImage();
   }
 
+  /* =========================================
+     CANTIDAD
+     ========================================= */
+
   function increaseQuantity() {
-    if (!selectedVariant) return;
+    if (!selectedVariant) {
+      return;
+    }
 
     setQuantity((current) =>
-      Math.min(current + 1, remainingStock)
+      Math.min(
+        current + 1,
+        remainingStock
+      )
     );
   }
 
   function decreaseQuantity() {
     setQuantity((current) =>
-      Math.max(current - 1, 1)
+      Math.max(
+        current - 1,
+        1
+      )
     );
   }
 
+  /* =========================================
+     AGREGAR AL CARRITO
+     ========================================= */
+
   function handleAddToCart() {
-    if (!canAddToCart) return;
+    if (!canAddToCart) {
+      return;
+    }
 
     addToCart({
       productId: product.id,
@@ -451,10 +770,14 @@ function ProductDetailModal({ product, onClose }) {
       selectedSize,
       selectedColor,
       selectedColorHex:
-        selectedColorData?.hex || "#777777",
+        selectedColorData?.hex ||
+        "#777777",
       quantity,
-      variantId: selectedVariant.id,
-      availableStock: Number(selectedVariant.stock),
+      variantId:
+        selectedVariant.id,
+      availableStock: Number(
+        selectedVariant.stock
+      ),
     });
 
     setAdded(true);
@@ -463,6 +786,10 @@ function ProductDetailModal({ product, onClose }) {
       setAdded(false);
     }, 1800);
   }
+
+  /* =========================================
+     OFERTA
+     ========================================= */
 
   const isOffer =
     product.old_price &&
@@ -473,7 +800,9 @@ function ProductDetailModal({ product, onClose }) {
     ? Math.round(
         (1 -
           Number(product.price) /
-            Number(product.old_price)) *
+            Number(
+              product.old_price
+            )) *
           100
       )
     : 0;
@@ -487,7 +816,8 @@ function ProductDetailModal({ product, onClose }) {
       }`}
       onMouseDown={(event) => {
         if (
-          event.target === event.currentTarget
+          event.target ===
+          event.currentTarget
         ) {
           handleClose();
         }
@@ -514,9 +844,15 @@ function ProductDetailModal({ product, onClose }) {
         <div className="w-full shrink-0 overflow-visible bg-stone-50 md:w-[44%] lg:w-[46%]">
           <div
             className="relative h-[42vh] min-h-[280px] max-h-[460px] w-full overflow-hidden bg-stone-100 sm:h-[46vh] md:h-[72vh] md:max-h-none md:min-h-[500px]"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            onTouchStart={
+              handleTouchStart
+            }
+            onTouchMove={
+              handleTouchMove
+            }
+            onTouchEnd={
+              handleTouchEnd
+            }
           >
             {displayedImage ? (
               <img
@@ -548,11 +884,14 @@ function ProductDetailModal({ product, onClose }) {
               </span>
             )}
 
-            {displayedImages.length > 1 && (
+            {displayedImages.length >
+              1 && (
               <>
                 <button
                   type="button"
-                  onClick={previousImage}
+                  onClick={
+                    previousImage
+                  }
                   aria-label="Imagen anterior"
                   className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/90 text-3xl text-stone-800 shadow transition hover:bg-white"
                 >
@@ -570,18 +909,24 @@ function ProductDetailModal({ product, onClose }) {
 
                 <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-2 rounded-full bg-white/90 px-3 py-2 shadow">
                   {displayedImages.map(
-                    (image, index) => (
+                    (
+                      image,
+                      index
+                    ) => (
                       <button
                         key={`${image}-${index}`}
                         type="button"
                         onClick={() =>
-                          changeImage(index)
+                          changeImage(
+                            index
+                          )
                         }
                         aria-label={`Mostrar imagen ${
                           index + 1
                         }`}
                         className={`h-1.5 rounded-full transition-all ${
-                          activeImage === index
+                          activeImage ===
+                          index
                             ? "w-7 bg-stone-900"
                             : "w-1.5 bg-stone-300"
                         }`}
@@ -594,21 +939,28 @@ function ProductDetailModal({ product, onClose }) {
           </div>
 
           {/* MINIATURAS */}
-          {displayedImages.length > 1 && (
+          {displayedImages.length >
+            1 && (
             <div className="flex gap-2.5 overflow-x-auto border-t border-stone-200 bg-white p-3.5 md:p-4">
               {displayedImages.map(
-                (image, index) => (
+                (
+                  image,
+                  index
+                ) => (
                   <button
                     key={`${image}-${index}-thumb`}
                     type="button"
                     onClick={() =>
-                      changeImage(index)
+                      changeImage(
+                        index
+                      )
                     }
                     aria-label={`Ver miniatura ${
                       index + 1
                     }`}
                     className={`h-[76px] w-[58px] min-w-[58px] overflow-hidden rounded-lg border transition ${
-                      activeImage === index
+                      activeImage ===
+                      index
                         ? "border-stone-900 opacity-100"
                         : "border-stone-200 opacity-60 hover:opacity-100"
                     }`}
@@ -636,7 +988,9 @@ function ProductDetailModal({ product, onClose }) {
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-2xl font-bold tracking-tight text-stone-900">
                 S/{" "}
-                {Number(product.price).toFixed(2)}
+                {Number(
+                  product.price
+                ).toFixed(2)}
               </span>
 
               {isOffer && (
@@ -673,14 +1027,18 @@ function ProductDetailModal({ product, onClose }) {
 
                     return (
                       <button
-                        key={color.name}
+                        key={
+                          color.name
+                        }
                         type="button"
                         onClick={() =>
                           handleColorChange(
                             color.name
                           )
                         }
-                        title={color.name}
+                        title={
+                          color.name
+                        }
                         aria-label={`Color ${color.name}`}
                         aria-pressed={
                           isSelected
@@ -723,14 +1081,17 @@ function ProductDetailModal({ product, onClose }) {
                 {availableSizesForColor.map(
                   (size) => {
                     const isSelected =
-                      selectedSize === size;
+                      selectedSize ===
+                      size;
 
                     return (
                       <button
                         key={size}
                         type="button"
                         onClick={() =>
-                          handleSizeChange(size)
+                          handleSizeChange(
+                            size
+                          )
                         }
                         aria-pressed={
                           isSelected
@@ -787,8 +1148,12 @@ function ProductDetailModal({ product, onClose }) {
             <div className="mt-4 flex w-fit items-center overflow-hidden rounded-lg border border-stone-200">
               <button
                 type="button"
-                onClick={decreaseQuantity}
-                disabled={quantity <= 1}
+                onClick={
+                  decreaseQuantity
+                }
+                disabled={
+                  quantity <= 1
+                }
                 aria-label="Reducir cantidad"
                 className="flex h-12 w-12 items-center justify-center text-lg text-stone-600 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-30"
               >
@@ -801,10 +1166,13 @@ function ProductDetailModal({ product, onClose }) {
 
               <button
                 type="button"
-                onClick={increaseQuantity}
+                onClick={
+                  increaseQuantity
+                }
                 disabled={
                   !selectedVariant ||
-                  quantity >= remainingStock
+                  quantity >=
+                    remainingStock
                 }
                 aria-label="Aumentar cantidad"
                 className="flex h-12 w-12 items-center justify-center text-lg text-stone-600 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-30"
@@ -817,8 +1185,12 @@ function ProductDetailModal({ product, onClose }) {
           {/* AGREGAR AL CARRITO */}
           <button
             type="button"
-            onClick={handleAddToCart}
-            disabled={!canAddToCart}
+            onClick={
+              handleAddToCart
+            }
+            disabled={
+              !canAddToCart
+            }
             className={`mt-8 w-full rounded-xl px-5 py-4 text-sm font-bold tracking-wide transition ${
               added
                 ? "bg-stone-700 text-white"
