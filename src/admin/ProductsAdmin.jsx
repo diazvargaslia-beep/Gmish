@@ -18,6 +18,38 @@ const secondaryButtonClass =
 const productTileClass =
   "h-[340px] w-full overflow-hidden rounded-[20px] border border-neutral-200 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.035)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.07)] sm:h-[360px]"
 
+function createLocalId() {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`
+}
+
+function createSize(size = "") {
+  return {
+    localId: createLocalId(),
+    size: String(size),
+    stock: "",
+    variantId: null,
+  }
+}
+
+function createLetterSizes() {
+  return SIZES.map((size) => createSize(size))
+}
+
+function createEmptyColor(sizeType = "letters", numericSizes = []) {
+  return {
+    localId: createLocalId(),
+    name: "",
+    hex: "#777777",
+    images: [],
+    sizes:
+      sizeType === "numeric"
+        ? numericSizes.map((size) => createSize(size))
+        : createLetterSizes(),
+  }
+}
+
 function normalizeSubcategory(value) {
   const normalized = String(value || "")
     .trim()
@@ -78,24 +110,6 @@ function generateSlug(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-}
-
-function createEmptyColor() {
-  return {
-    localId:
-      typeof crypto !== "undefined" &&
-      crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`,
-    name: "",
-    hex: "#777777",
-    images: [],
-    sizes: SIZES.map((size) => ({
-      size,
-      stock: "",
-      variantId: null,
-    })),
-  }
 }
 
 function SectionHeader({
@@ -191,6 +205,10 @@ export default function ProductsAdmin() {
   const [isNew, setIsNew] = useState(false)
   const [isBestSeller, setIsBestSeller] =
     useState(false)
+
+  const [sizeType, setSizeType] =
+    useState("letters")
+
   const [colors, setColors] = useState([])
 
   const [selectedPhoto, setSelectedPhoto] =
@@ -432,7 +450,10 @@ export default function ProductsAdmin() {
     setOldPrice("")
     setIsNew(false)
     setIsBestSeller(false)
-    setColors([createEmptyColor()])
+    setSizeType("letters")
+    setColors([
+      createEmptyColor("letters"),
+    ])
     setSelectedPhoto(null)
   }
 
@@ -447,10 +468,111 @@ export default function ProductsAdmin() {
     )
   }
 
+  function changeSizeType(nextType) {
+    if (nextType === sizeType) {
+      return
+    }
+
+    const hasStock = colors.some(
+      (color) =>
+        color.sizes.some(
+          (size) =>
+            Number(size.stock || 0) > 0
+        )
+    )
+
+    if (hasStock) {
+      const confirmed =
+        window.confirm(
+          "Al cambiar el tipo de talla se reiniciará el stock que escribiste. ¿Deseas continuar?"
+        )
+
+      if (!confirmed) {
+        return
+      }
+    }
+
+    setSizeType(nextType)
+
+    setColors((current) =>
+      current.map((color) => ({
+        ...color,
+        sizes:
+          nextType === "letters"
+            ? createLetterSizes()
+            : [createSize("")],
+      }))
+    )
+  }
+
+  function addNumericSize() {
+    setColors((current) =>
+      current.map((color) => ({
+        ...color,
+        sizes: [
+          ...(color.sizes || []),
+          createSize(""),
+        ],
+      }))
+    )
+  }
+
+  function updateNumericSizeName(
+    sizeIndex,
+    value
+  ) {
+    const cleanValue =
+      String(value || "")
+        .replace(/[^\d]/g, "")
+
+    setColors((current) =>
+      current.map((color) => ({
+        ...color,
+        sizes: color.sizes.map(
+          (size, currentSizeIndex) =>
+            currentSizeIndex ===
+            sizeIndex
+              ? {
+                  ...size,
+                  size: cleanValue,
+                }
+              : size
+        ),
+      }))
+    )
+  }
+
+  function removeNumericSize(
+    sizeIndex
+  ) {
+    setColors((current) =>
+      current.map((color) => ({
+        ...color,
+        sizes: color.sizes.filter(
+          (_, currentSizeIndex) =>
+            currentSizeIndex !==
+            sizeIndex
+        ),
+      }))
+    )
+  }
+
   function addColor() {
+    const numericSizes =
+      sizeType === "numeric"
+        ? (
+            colors[0]?.sizes || []
+          ).map(
+            (size) => size.size
+          )
+        : []
+
     setColors((current) => [
       ...current,
-      createEmptyColor(),
+      createEmptyColor(
+        sizeType,
+        numericSizes
+      ),
     ])
   }
 
@@ -810,20 +932,53 @@ export default function ProductsAdmin() {
   }
 
   function startEditing(product) {
-    const grouped = new Map()
-
-    const orderedVariants = [
+    const productVariants = [
       ...(product.product_variants ||
         []),
-    ].sort(
-      (a, b) =>
-        Number(
-          a.color_position ?? 0
-        ) -
-        Number(
-          b.color_position ?? 0
+    ]
+
+    const uniqueSizes = [
+      ...new Set(
+        productVariants
+          .map((variant) =>
+            String(
+              variant.size || ""
+            ).trim()
+          )
+          .filter(Boolean)
+      ),
+    ]
+
+    const detectedSizeType =
+      uniqueSizes.length > 0 &&
+      uniqueSizes.every((size) =>
+        SIZES.includes(
+          size.toUpperCase()
         )
-    )
+      )
+        ? "letters"
+        : "numeric"
+
+    const sizesForProduct =
+      detectedSizeType === "letters"
+        ? [...SIZES]
+        : [...uniqueSizes].sort(
+            (a, b) =>
+              Number(a) - Number(b)
+          )
+
+    const grouped = new Map()
+
+    const orderedVariants =
+      productVariants.sort(
+        (a, b) =>
+          Number(
+            a.color_position ?? 0
+          ) -
+          Number(
+            b.color_position ?? 0
+          )
+      )
 
     for (const variant of
       orderedVariants) {
@@ -857,11 +1012,7 @@ export default function ProductsAdmin() {
           colorKey,
           {
             localId:
-              typeof crypto !==
-                "undefined" &&
-              crypto.randomUUID
-                ? crypto.randomUUID()
-                : `${Date.now()}-${Math.random()}`,
+              createLocalId(),
             name: colorName,
             hex:
               variant.color_hex ||
@@ -883,13 +1034,9 @@ export default function ProductsAdmin() {
               ),
             ],
             sizes:
-              SIZES.map(
-                (size) => ({
-                  size,
-                  stock: "",
-                  variantId:
-                    null,
-                })
+              sizesForProduct.map(
+                (size) =>
+                  createSize(size)
               ),
           }
         )
@@ -928,8 +1075,8 @@ export default function ProductsAdmin() {
       const size =
         color.sizes.find(
           (item) =>
-            item.size ===
-            variant.size
+            String(item.size) ===
+            String(variant.size)
         )
 
       if (size) {
@@ -981,10 +1128,22 @@ export default function ProductsAdmin() {
       )
     )
 
+    setSizeType(
+      detectedSizeType
+    )
+
     setColors(
       orderedColors.length
         ? orderedColors
-        : [createEmptyColor()]
+        : [
+            createEmptyColor(
+              detectedSizeType,
+              detectedSizeType ===
+                "numeric"
+                ? sizesForProduct
+                : []
+            ),
+          ]
     )
 
     setSelectedPhoto(null)
@@ -1051,6 +1210,51 @@ export default function ProductsAdmin() {
       return false
     }
 
+    if (sizeType === "numeric") {
+      const referenceSizes =
+        colors[0]?.sizes || []
+
+      if (!referenceSizes.length) {
+        alert(
+          "Agrega al menos una talla numérica."
+        )
+        return false
+      }
+
+      const usedSizes = new Set()
+
+      for (const size of referenceSizes) {
+        const value =
+          String(size.size || "").trim()
+
+        if (!value) {
+          alert(
+            "Completa todas las tallas numéricas o elimina las que no necesites."
+          )
+          return false
+        }
+
+        if (
+          !/^\d+$/.test(value) ||
+          Number(value) <= 0
+        ) {
+          alert(
+            `"${value}" no es una talla numérica válida.`
+          )
+          return false
+        }
+
+        if (usedSizes.has(value)) {
+          alert(
+            `La talla ${value} está repetida.`
+          )
+          return false
+        }
+
+        usedSizes.add(value)
+      }
+    }
+
     const usedColorNames =
       new Set()
 
@@ -1085,6 +1289,9 @@ export default function ProductsAdmin() {
       const hasStock =
         color.sizes.some(
           (size) =>
+            String(
+              size.size || ""
+            ).trim() &&
             Number(
               size.stock || 0
             ) > 0
@@ -1124,6 +1331,15 @@ export default function ProductsAdmin() {
       (color, colorIndex) => {
         for (const size of
           color.sizes) {
+          const sizeValue =
+            String(
+              size.size || ""
+            ).trim()
+
+          if (!sizeValue) {
+            continue
+          }
+
           if (
             Number(
               size.stock || 0
@@ -1136,7 +1352,7 @@ export default function ProductsAdmin() {
             id:
               size.variantId ||
               null,
-            size: size.size,
+            size: sizeValue,
             color:
               color.name.trim(),
             color_hex:
@@ -2413,26 +2629,42 @@ export default function ProductsAdmin() {
                   b.subcategory_position
                 )
 
-          if (subcategoryA !== subcategoryB) {
-            return subcategoryA - subcategoryB
+          if (
+            subcategoryA !==
+            subcategoryB
+          ) {
+            return (
+              subcategoryA -
+              subcategoryB
+            )
           }
 
           const productA =
             a.product_position == null
               ? Number.MAX_SAFE_INTEGER
-              : Number(a.product_position)
+              : Number(
+                  a.product_position
+                )
           const productB =
             b.product_position == null
               ? Number.MAX_SAFE_INTEGER
-              : Number(b.product_position)
+              : Number(
+                  b.product_position
+                )
 
-          if (productA !== productB) {
+          if (
+            productA !== productB
+          ) {
             return productA - productB
           }
 
           return (
-            new Date(a.created_at || 0).getTime() -
-            new Date(b.created_at || 0).getTime()
+            new Date(
+              a.created_at || 0
+            ).getTime() -
+            new Date(
+              b.created_at || 0
+            ).getTime()
           )
         })
     }, [
@@ -2490,25 +2722,33 @@ export default function ProductsAdmin() {
             position: positions.length
               ? Math.min(...positions)
               : Number.MAX_SAFE_INTEGER,
-            products: [...group.products].sort(
+            products: [
+              ...group.products,
+            ].sort(
               (a, b) => {
                 const positionA =
-                  a.product_position == null
+                  a.product_position ==
+                  null
                     ? Number.MAX_SAFE_INTEGER
                     : Number(
                         a.product_position
                       )
                 const positionB =
-                  b.product_position == null
+                  b.product_position ==
+                  null
                     ? Number.MAX_SAFE_INTEGER
                     : Number(
                         b.product_position
                       )
 
                 if (
-                  positionA !== positionB
+                  positionA !==
+                  positionB
                 ) {
-                  return positionA - positionB
+                  return (
+                    positionA -
+                    positionB
+                  )
                 }
 
                 return (
@@ -2524,14 +2764,20 @@ export default function ProductsAdmin() {
           }
         })
         .sort((a, b) => {
-          if (a.position !== b.position) {
-            return a.position - b.position
+          if (
+            a.position !== b.position
+          ) {
+            return (
+              a.position - b.position
+            )
           }
 
           return a.label.localeCompare(
             b.label,
             "es",
-            { sensitivity: "base" }
+            {
+              sensitivity: "base",
+            }
           )
         })
     }, [visibleProducts])
@@ -2822,7 +3068,9 @@ export default function ProductsAdmin() {
               <>
                 <button
                   type="button"
-                  onPointerDown={(event) => {
+                  onPointerDown={(
+                    event
+                  ) => {
                     event.preventDefault()
                     event.stopPropagation()
                   }}
@@ -2835,7 +3083,9 @@ export default function ProductsAdmin() {
 
                 <button
                   type="button"
-                  onPointerDown={(event) => {
+                  onPointerDown={(
+                    event
+                  ) => {
                     event.preventDefault()
                     event.stopPropagation()
                   }}
@@ -2906,7 +3156,10 @@ export default function ProductsAdmin() {
           <button
             type="button"
             onClick={() =>
-              moveProduct(product, -1)
+              moveProduct(
+                product,
+                -1
+              )
             }
             disabled={saving}
             title="Mover producto hacia arriba"
@@ -2919,7 +3172,10 @@ export default function ProductsAdmin() {
           <button
             type="button"
             onClick={() =>
-              moveProduct(product, 1)
+              moveProduct(
+                product,
+                1
+              )
             }
             disabled={saving}
             title="Mover producto hacia abajo"
@@ -3094,7 +3350,8 @@ export default function ProductsAdmin() {
             </div>
 
             {!search.trim() &&
-              groupedSubcategories.length > 0 && (
+              groupedSubcategories.length >
+                0 && (
                 <section className="w-full rounded-[26px] border border-neutral-200 bg-neutral-50 p-4 sm:p-6">
                   <div className="mb-4">
                     <p className="text-sm font-semibold text-neutral-900">
@@ -3107,9 +3364,14 @@ export default function ProductsAdmin() {
 
                   <div className="flex flex-col gap-2">
                     {groupedSubcategories.map(
-                      (group, index) => (
+                      (
+                        group,
+                        index
+                      ) => (
                         <div
-                          key={group.key}
+                          key={
+                            group.key
+                          }
                           className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3"
                         >
                           <button
@@ -3125,11 +3387,20 @@ export default function ProductsAdmin() {
                             className="min-w-0 flex-1 text-left"
                           >
                             <span className="block truncate text-sm font-semibold text-neutral-900">
-                              {group.label}
+                              {
+                                group.label
+                              }
                             </span>
                             <span className="mt-0.5 block text-[10px] text-neutral-400">
-                              {group.products.length}{" "}
-                              {group.products.length === 1
+                              {
+                                group
+                                  .products
+                                  .length
+                              }{" "}
+                              {group
+                                .products
+                                .length ===
+                              1
                                 ? "producto"
                                 : "productos"}
                             </span>
@@ -3146,7 +3417,8 @@ export default function ProductsAdmin() {
                               }
                               disabled={
                                 saving ||
-                                index === 0
+                                index ===
+                                  0
                               }
                               className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white text-lg transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-30"
                               aria-label={`Mover ${group.label} hacia arriba`}
@@ -3187,8 +3459,12 @@ export default function ProductsAdmin() {
               {visibleProducts.map(
                 (product) => (
                   <ProductCard
-                    key={product.id}
-                    product={product}
+                    key={
+                      product.id
+                    }
+                    product={
+                      product
+                    }
                   />
                 )
               )}
@@ -3225,8 +3501,12 @@ export default function ProductsAdmin() {
               {selectedGroup?.products?.map(
                 (product) => (
                   <ProductCard
-                    key={product.id}
-                    product={product}
+                    key={
+                      product.id
+                    }
+                    product={
+                      product
+                    }
                   />
                 )
               )}
@@ -3282,9 +3562,12 @@ export default function ProductsAdmin() {
 
                     <input
                       value={name}
-                      onChange={(event) =>
+                      onChange={(
+                        event
+                      ) =>
                         setName(
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
@@ -3300,9 +3583,12 @@ export default function ProductsAdmin() {
                       value={
                         subcategory
                       }
-                      onChange={(event) =>
+                      onChange={(
+                        event
+                      ) =>
                         setSubcategory(
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                       list="gmish-subcategories"
@@ -3314,12 +3600,16 @@ export default function ProductsAdmin() {
                         ...new Set(
                           products
                             .filter(
-                              (product) =>
+                              (
+                                product
+                              ) =>
                                 product.category ===
                                 category
                             )
                             .map(
-                              (product) =>
+                              (
+                                product
+                              ) =>
                                 normalizeSubcategory(
                                   product.subcategory
                                 )
@@ -3328,8 +3618,12 @@ export default function ProductsAdmin() {
                       ].map(
                         (item) => (
                           <option
-                            key={item}
-                            value={item}
+                            key={
+                              item
+                            }
+                            value={
+                              item
+                            }
                           />
                         )
                       )}
@@ -3344,9 +3638,12 @@ export default function ProductsAdmin() {
 
                   <textarea
                     value={description}
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       setDescription(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     placeholder="Describe brevemente el producto, su tela, corte, estilo o características."
@@ -3366,9 +3663,12 @@ export default function ProductsAdmin() {
                       min="0"
                       step="0.01"
                       value={price}
-                      onChange={(event) =>
+                      onChange={(
+                        event
+                      ) =>
                         setPrice(
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
@@ -3387,9 +3687,12 @@ export default function ProductsAdmin() {
                       value={
                         oldPrice
                       }
-                      onChange={(event) =>
+                      onChange={(
+                        event
+                      ) =>
                         setOldPrice(
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                       className={`${inputClass} px-3 py-3 text-xs sm:px-5 sm:py-4 sm:text-sm`}
@@ -3415,6 +3718,138 @@ export default function ProductsAdmin() {
                   />
                 </div>
               </div>
+            </section>
+
+            <section
+              className={`${cardClass} p-5 sm:p-10 lg:p-14`}
+            >
+              <SectionHeader
+                title="Tipo de talla"
+                description="Elige cómo se manejan las tallas de este producto."
+              />
+
+              <div className="mx-auto mt-8 grid w-full max-w-[520px] grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    changeSizeType(
+                      "letters"
+                    )
+                  }
+                  className={`rounded-2xl border px-5 py-4 text-sm font-semibold transition ${
+                    sizeType ===
+                    "letters"
+                      ? "border-neutral-950 bg-neutral-950 text-white"
+                      : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
+                  }`}
+                >
+                  Letras
+                  <span className="mt-1 block text-[10px] font-normal opacity-70">
+                    S · M · L · XL
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    changeSizeType(
+                      "numeric"
+                    )
+                  }
+                  className={`rounded-2xl border px-5 py-4 text-sm font-semibold transition ${
+                    sizeType ===
+                    "numeric"
+                      ? "border-neutral-950 bg-neutral-950 text-white"
+                      : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
+                  }`}
+                >
+                  Numérica
+                  <span className="mt-1 block text-[10px] font-normal opacity-70">
+                    28 · 30 · 32 · ...
+                  </span>
+                </button>
+              </div>
+
+              {sizeType ===
+                "numeric" && (
+                <div className="mx-auto mt-8 max-w-[700px] rounded-[24px] border border-neutral-200 bg-neutral-50 p-5 sm:p-7">
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-neutral-900">
+                      Tallas numéricas
+                    </p>
+
+                    <p className="mt-2 text-xs leading-5 text-neutral-500">
+                      Escribe las tallas que utiliza este producto. Se aplicarán a todos sus colores.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex flex-col gap-3">
+                    {(
+                      colors[0]
+                        ?.sizes || []
+                    ).map(
+                      (
+                        size,
+                        sizeIndex
+                      ) => (
+                        <div
+                          key={
+                            size.localId ||
+                            sizeIndex
+                          }
+                          className="flex items-center gap-3"
+                        >
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputMode="numeric"
+                            value={
+                              size.size
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              updateNumericSizeName(
+                                sizeIndex,
+                                event
+                                  .target
+                                  .value
+                              )
+                            }
+                            placeholder="Ej. 28"
+                            className={`${inputClass} text-center`}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeNumericSize(
+                                sizeIndex
+                              )
+                            }
+                            className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border border-red-200 bg-white text-lg text-red-600 transition hover:bg-red-50"
+                            aria-label="Eliminar talla"
+                            title="Eliminar talla"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      addNumericSize
+                    }
+                    className="mt-5 flex min-h-[50px] w-full items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white text-sm font-semibold text-neutral-700 transition hover:border-neutral-600 hover:bg-neutral-50"
+                  >
+                    + Agregar talla
+                  </button>
+                </div>
+              )}
             </section>
 
             <section
@@ -3785,51 +4220,66 @@ export default function ProductsAdmin() {
                             </p>
 
                             <p className="text-xs text-neutral-500">
-                              Las tallas con 0 no se publicarán.
+                              {sizeType ===
+                              "numeric"
+                                ? "Las tallas numéricas se configuraron arriba. Aquí asignas el stock de cada color."
+                                : "Las tallas con 0 no se publicarán."}
                             </p>
                           </div>
 
-                          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5">
-                            {color.sizes.map(
-                              (
-                                size,
-                                sizeIndex
-                              ) => (
-                                <div
-                                  key={
-                                    size.size
-                                  }
-                                  className="rounded-2xl border border-neutral-200 bg-white p-4 text-center sm:p-5"
-                                >
-                                  <p className="text-sm font-bold">
-                                    {size.size}
-                                  </p>
+                          {color.sizes
+                            .length >
+                          0 ? (
+                            <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5">
+                              {color.sizes.map(
+                                (
+                                  size,
+                                  sizeIndex
+                                ) => (
+                                  <div
+                                    key={
+                                      size.localId ||
+                                      `${size.size}-${sizeIndex}`
+                                    }
+                                    className="rounded-2xl border border-neutral-200 bg-white p-4 text-center sm:p-5"
+                                  >
+                                    <p className="text-sm font-bold">
+                                      {size.size ||
+                                        "—"}
+                                    </p>
 
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={
-                                      size.stock
-                                    }
-                                    onChange={(
-                                      event
-                                    ) =>
-                                      updateStock(
-                                        colorIndex,
-                                        sizeIndex,
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={
+                                        size.stock
+                                      }
+                                      onChange={(
                                         event
-                                          .target
-                                          .value
-                                      )
-                                    }
-                                    placeholder="0"
-                                    className="mt-4 h-12 w-full rounded-xl border border-neutral-200 bg-white text-center text-sm outline-none focus:border-neutral-950"
-                                  />
-                                </div>
-                              )
-                            )}
-                          </div>
+                                      ) =>
+                                        updateStock(
+                                          colorIndex,
+                                          sizeIndex,
+                                          event
+                                            .target
+                                            .value
+                                        )
+                                      }
+                                      placeholder="0"
+                                      className="mt-4 h-12 w-full rounded-xl border border-neutral-200 bg-white text-center text-sm outline-none focus:border-neutral-950"
+                                    />
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mt-8 rounded-2xl border border-dashed border-neutral-300 bg-white px-5 py-8 text-center">
+                              <p className="text-xs text-neutral-500">
+                                Primero agrega una talla numérica en la sección de arriba.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
